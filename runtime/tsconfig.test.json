@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "esModuleInterop": true,
+    "rootDir": ".",
+    "outDir": ".build",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "sdlc-guard/policies/*.ts",
+    "model-router/policies/*.ts",
+    "secret-guard/policies/*.ts",
+    "run-observer/policies/*.ts",
+    "runtime-tests/*.spec.ts"
+  ]
+}

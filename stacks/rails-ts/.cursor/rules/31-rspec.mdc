@@ -1,0 +1,8 @@
+---
+description: RSpec conventions
+globs: ["spec/**/*.rb"]
+---
+- Request specs over controller specs; system specs only for key journeys.
+- FactoryBot: build_stubbed/build before create; traits for variants.
+- WebMock for HTTP, travel_to for time, have_enqueued_job for jobs. No sleep.
+- describe method/endpoint, context condition, it outcome.

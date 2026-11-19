@@ -1,0 +1,96 @@
+name: Kit checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint + kit checks + installer regression tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Check out code (pinned to verified SHA)
+        # v7.0.1 — https://github.com/actions/checkout/releases/tag/v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Lint shell scripts
+        run: shellcheck --severity=error scripts/*.sh tests/*.sh
+
+      - name: Run kit checks (structure, CLI suite, runtime suite, regression, MCP)
+        run: bash scripts/check.sh
+
+  kit-cli:
+    name: kit CLI — build + tests (Node on runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out code (pinned to verified SHA)
+        # v7.0.1 — https://github.com/actions/checkout/releases/tag/v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Verify committed dist is current (rebuild must be a no-op)
+        run: |
+          cd cli
+          npm ci
+          cp -R dist /tmp/dist-before
+          npm run build
+          diff -r /tmp/dist-before dist
+
+      - name: CLI test suite (runs against the built dist)
+        run: |
+          cd cli
+          node --test tests/*.test.mjs
+
+      - name: CLI usage smoke (exit codes and --help contract)
+        run: |
+          cd cli
+          node bin/kit.js --help >/dev/null
+          node bin/kit.js --version | grep -q 5.0.0
+          node bin/kit.js no-such-command >/dev/null 2>&1 && exit 1 || [ $? -eq 2 ]
+
+  kit-runtime:
+    name: Runtime mods — hooks typecheck + policy tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out code (pinned to verified SHA)
+        # v7.0.1 — https://github.com/actions/checkout/releases/tag/v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Typecheck hooks modules + compile + run policy tests
+        run: |
+          cd runtime
+          npm ci
+          npm test
+
+  mcp:
+    name: MCP server build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out code (pinned to verified SHA)
+        # v7.0.1 — https://github.com/actions/checkout/releases/tag/v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Build the SDLC MCP server
+        run: |
+          cd core/mcp/server
+          npm ci
+          npm run build
+
+      - name: Smoke test over stdio (handshake, tools/list, tool calls)
+        run: node tests/mcp-smoke.mjs

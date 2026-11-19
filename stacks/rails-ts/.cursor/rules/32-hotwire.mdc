@@ -1,0 +1,7 @@
+---
+description: Hotwire views and Stimulus
+globs: ["app/views/**/*", "app/components/**/*", "app/javascript/**/*.js", "app/frontend/controllers/**/*.ts"]
+---
+- Turbo Frames/Streams before custom JS; dom_id for targets.
+- Stimulus: one job per controller, use targets/values, no globals.
+- No logic in ERB beyond presentation; extract partials/ViewComponents.

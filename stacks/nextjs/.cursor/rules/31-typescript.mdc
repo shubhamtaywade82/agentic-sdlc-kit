@@ -1,0 +1,8 @@
+---
+description: TypeScript rules
+globs: ["**/*.ts", "**/*.tsx"]
+---
+- Strict mode; no any (use unknown + narrowing); no @ts-ignore.
+- Zod at every external boundary; infer types from schemas.
+- Unions / as const over enums; named exports except Next.js special files.
+- Typed result objects for expected failures. Run `pnpm typecheck` after edits.

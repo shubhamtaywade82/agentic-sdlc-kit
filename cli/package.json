@@ -1,0 +1,20 @@
+{
+  "name": "@agentic-sdlc/kit-cli",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Deterministic engineering CLI for the Agentic SDLC Kit: validators, quality gates, secret scanning and release checks with predictable exit codes.",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "kit": "bin/kit.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~5.5.4",
+    "@types/node": "~18.19.34"
+  }
+}

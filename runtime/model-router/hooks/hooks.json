@@ -1,0 +1,4 @@
+{
+  "description": "model-router hooks: agent model mapping (agent.spawn) and main-model pinning (turn.step).",
+  "modules": ["./register.ts"]
+}

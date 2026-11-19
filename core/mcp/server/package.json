@@ -1,0 +1,27 @@
+{
+  "name": "ai-dev-kit-sdlc-server",
+  "version": "5.0.0",
+  "description": "MCP server exposing the AI Dev Kit SDLC lifecycle (stages, workflows, templates, checklists) to any MCP client. Read-only, no side effects.",
+  "license": "MIT",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "ai-dev-kit-sdlc": "build/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "check": "npm run build && node ../../tests/mcp-smoke.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.4.0",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

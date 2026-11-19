@@ -1,0 +1,12 @@
+{
+  "name": "@agentic-sdlc/kit-runtime",
+  "version": "5.0.0",
+  "private": true,
+  "scripts": {
+    "test": "tsc -p tsconfig.hooks.json && tsc -p tsconfig.test.json && node --test .build/runtime-tests/*.spec.js"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "@types/node": "~24.0.0"
+  }
+}

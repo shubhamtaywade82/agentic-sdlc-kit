@@ -1,0 +1,4 @@
+{
+  "description": "run-observer hooks: session/turn/tool lifecycle observers and the /kit:status command. Observe-only, never blocks.",
+  "modules": ["./register.ts"]
+}

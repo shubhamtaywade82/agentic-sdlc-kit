@@ -1,0 +1,9 @@
+---
+description: Server/client contract (controllers, serializers, generated types)
+globs: ["app/controllers/**/*.rb", "app/serializers/**/*.rb", "app/frontend/api/**/*", "app/frontend/types/**/*", "spec/requests/**/*.rb"]
+---
+- JSON only through serializers; never render json: model.
+- Every endpoint has request specs for status codes, auth pass/fail, and JSON shape.
+- After changing a serializer or route: regenerate TS types/routes, commit them together, fix all tsc errors.
+- Order for cross-boundary work: migration/model → controller/serializer + request spec → regenerate types → frontend.
+- Consistent error shape { error: { code, message, details } }.

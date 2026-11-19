@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "sdlc-guard/hooks/register.ts",
+    "model-router/hooks/register.ts",
+    "secret-guard/hooks/register.ts",
+    "run-observer/hooks/register.ts",
+    "runtime-tests/mod-api.d.ts"
+  ]
+}

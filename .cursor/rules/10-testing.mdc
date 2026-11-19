@@ -1,0 +1,7 @@
+---
+description: Testing rules
+globs: ["**/*test*", "**/*spec*", "spec/**", "test/**", "__tests__/**"]
+---
+- Test behavior, not implementation. Arrange-Act-Assert. One concern per test.
+- Cover happy path, edge cases, and error paths. No real network/time/randomness.
+- Name tests as sentences: "returns 404 when user is missing".

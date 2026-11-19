@@ -6,12 +6,14 @@
 
 - **Product:** Agentic SDLC Kit — runtime-independent SDLC system for AI coding assistants.
 - **Stack:** Node.js >= 20.11.0 / TypeScript ~5.9 / pnpm 9.12.0 monorepo / Vitest 2.1.
-- **Architecture:** Modular monorepo under `packages/`:
+- **Architecture:** Modular monorepo under `packages/` and `plugins/`:
   - `packages/contracts`: shared types and zod schemas (depends on nothing).
-  - `packages/core`: runtime-independent workflow engine, policies, profile generator, verification runner.
-  - `packages/cli`: `kit` executable CLI commands (`--version`, `--help`, `doctor`).
+  - `packages/core`: runtime-independent workflow engine, planning DAG, TDD machine, CLSE engine.
+  - `packages/cli`: `kit` executable CLI commands (15 commands).
   - `packages/claude-code-adapter`: adapter boundary separating host runtime from core.
+  - `packages/mod-sdk`: mod development framework (MockRuntime, capabilities, middleware).
   - `packages/testing`: shared fixtures, assertions, and contract validators.
+  - `plugins/`: standalone runtime plugins (`sdlc-guard`, `secret-guard`, `model-router`, `run-observer`).
 - **Install:** `pnpm install --frozen-lockfile`
 - **Build:** `pnpm run build`
 - **Test:** `pnpm run test` (single package: `pnpm --filter <pkg> test`)
@@ -23,11 +25,14 @@
 
 Enforced by `scripts/check-architecture.ts` (fails build on violation):
 
-1. `contracts` imports nothing.
+1. `contracts` imports nothing from sibling packages.
 2. `core` imports only from `contracts`.
-3. `cli` imports from `core` and `contracts`.
-4. `testing` imports from `contracts` and dev-only deps.
-5. `claude-code-adapter` imports from `contracts`; host SDK imports are deferred to M10+.
+3. `cli` imports only from `core` and `contracts`.
+4. `testing` imports only from `contracts`.
+5. `claude-code-adapter` imports only from `contracts`.
+6. `mod-sdk` imports only from `contracts` and `core`.
+7. `plugins/*` import only from `contracts`, `core`, and `mod-sdk`.
+8. No package imports from a sibling's `dist/`.
 
 ## 3. Code Standards
 

@@ -1,100 +1,197 @@
 # Agentic SDLC Kit
 
-A **runtime-independent** Agentic SDLC kit: a structured SDLC system that
-lets an AI coding assistant take a feature, bug fix, refactor, or new
-application from an ambiguous request to a verified, reviewable change —
-without giving up the engineering discipline a human team would apply.
+A **runtime-independent** Agentic Software Development Lifecycle (SDLC) kit. It gives AI coding assistants and engineering teams a disciplined, structured workflow engine to take a feature, bug fix, refactoring, or new application from ambiguous requirements to verified, reviewable code without sacrificing software engineering rigor.
 
-This repository implements the **0.1 release (M0 + M1)** of the roadmap in
-[`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md). Later milestones (M2
-through M18) are described there as planning labels.
+---
 
-## What is in 0.1
+## Architecture Overview
 
-- **M0 — Architecture freeze** (10 docs + 9 ADRs) under `docs/`.
-- **M1 — Core platform foundation** as a TypeScript pnpm-workspace monorepo:
-  - `packages/contracts` — shared types and zod schemas. Depends on nothing.
-  - `packages/core` — runtime-independent workflow engine, profile generator
-    and validator, artifacts writer, policy evaluator, verification runner.
-  - `packages/cli` — the `kit` executable with `--version`, `--help`, and
-    `doctor`.
-  - `packages/testing` — shared fixtures, assertions, validators, helpers.
-  - `packages/claude-code-adapter` — the architectural boundary that
-    separates the host runtime from the runtime-independent core. **M1
-    ships the boundary declaration only**; the host SDK is not imported
-    until M10 (see ADR-0005).
-- **Baseline CI** under `.github/workflows/ci.yml`.
-- **Architecture check** under `scripts/check-architecture.ts`, wired into
-  `pnpm verify` and CI.
-- **Reference fixture** under `fixtures/fixture-node-fullstack/` for the
-  first M2 `kit inspect` dry-run.
+The repository is organized as a modular TypeScript monorepo under `packages/` and `plugins/`:
 
-## Quick start
+```
+agentic-sdlc-kit/
+├── packages/
+│   ├── contracts/            # Shared Zod schemas and TypeScript domain contracts (imports nothing)
+│   ├── core/                 # Runtime-independent workflow engine, DAG planner, TDD machine, CLSE
+│   ├── cli/                  # `kit` command-line interface (15 commands)
+│   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
+│   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
+│   └── testing/              # Test fixtures, assertion helpers, and contract validators
+├── plugins/                  # Standalone Claude Code runtime plugins (Mods)
+│   ├── sdlc-guard/           # Intercepts destructive operations and enforces fail-closed policy
+│   ├── secret-guard/         # Scans and redacts credentials and API keys before write/exec
+│   ├── model-router/         # Cost-aware model tier routing (Haiku / Sonnet / Opus)
+│   └── run-observer/         # Bounded event streaming and telemetry recorder
+├── docs/                     # Specifications, architecture, contracts, ADRs, and workflows
+└── scripts/                  # Architecture verification and build scripts
+```
+
+### Architectural Invariants
+
+Enforced by `scripts/check-architecture.ts` in CI:
+
+1. `contracts` imports nothing from sibling packages.
+2. `core` imports only from `contracts`.
+3. `cli` imports only from `core` and `contracts`.
+4. `testing` imports only from `contracts`.
+5. `claude-code-adapter` imports only from `contracts`.
+6. `mod-sdk` imports only from `contracts` and `core`.
+7. `plugins/*` import only from `contracts`, `core`, and `mod-sdk`.
+8. The engine core is **runtime-independent**; host adapters bridge host-specific runtimes to core contracts.
+
+---
+
+## Quick Start
+
+### 1. Requirements & Installation
+
+- **Node.js**: `>= 20.11.0`
+- **pnpm**: `9.12.0` (pinned via `packageManager` in `package.json`)
 
 ```bash
-# Install (uses the committed pnpm-lock.yaml)
+# Install dependencies
 pnpm install --frozen-lockfile
 
-# Run the full pipeline (architecture → typecheck → lint → test → build)
-pnpm verify
+# Build all packages and plugins
+pnpm run build
 
-# Smoke the CLI
-node packages/cli/dist/index.js --version
-node packages/cli/dist/index.js --help
+# Run full verification (architecture check, build, lint, typecheck, test)
+pnpm run verify
+```
+
+### 2. Verify CLI Health
+
+```bash
 node packages/cli/dist/index.js doctor
 ```
 
-Requirements: Node 20+ and pnpm 9.12.0. The `packageManager` field in
-`package.json` pins pnpm; `corepack enable` picks it up automatically.
+_(Optional)_ Link `kit` globally to run directly from your PATH:
 
-## Architectural invariants
+```bash
+pnpm --filter @agentic-sdlc-kit/cli link --global
+```
 
-These are enforced by `scripts/check-architecture.ts`, which runs in CI
-before `pnpm verify` and fails the build on any violation
-(see `docs/architecture/ARCHITECTURE.md` §6):
+---
 
-1. `contracts` imports nothing.
-2. `core` imports only from `contracts`.
-3. `cli` imports from `core` and `contracts`.
-4. `testing` imports from `contracts` and dev-only deps.
-5. `claude-code-adapter` imports from `contracts`; the host SDK import
-   lives inside this package only.
-6. No package imports from a sibling's `dist/`.
+## Core Workflows
 
-The single most important invariant: **the core is runtime-independent.**
-The Claude Code adapter is one adapter among many possible adapters, never
-the owner of the product's workflow logic. See ADR-0004 and ADR-0005.
+The kit provides 15 commands covering the complete SDLC:
+
+### 1. Repository Discovery & Initialization
+
+```bash
+# Inspect repository stacks, test frameworks, CI, and agent instructions (read-only)
+kit inspect .
+
+# Generate project profile (.ai-kit/project.yml)
+kit init .
+```
+
+### 2. Incremental Feature Workflow (`kit feature`)
+
+Executes a strict vertical-slice engineering workflow:
+
+1. **Spec**: Validates user stories and acceptance criteria.
+2. **Plan**: Computes implementation DAG and verifies acyclicity.
+3. **TDD**: Executes Red $\to$ Green $\to$ Refactor cycles per task.
+4. **Verify**: Runs deterministic test/lint/typecheck verification.
+5. **Report**: Generates an execution report with artifact evidence.
+
+```bash
+# Validate feature spec and implementation DAG
+kit validate-spec docs/specifications/features/FEATURE-001/SPEC.md
+kit validate-plan docs/plans/FEATURE-001/PLAN.md
+
+# Execute feature workflow
+kit feature FEATURE-001
+# Or run in dry-run mode:
+kit feature FEATURE-001 --dry-run
+```
+
+### 3. Disciplined Bug Fixing (`kit fix`)
+
+Enforces reproduction before code modification:
+
+```bash
+kit fix BUG-101
+```
+
+Workflow:
+
+- Stage 1: Reproduce defect with a failing test (`Red`).
+- Stage 2: Implement minimal corrective fix (`Green`).
+- Stage 3: Confirm regression avoidance across test suite (`Refactor`).
+
+### 4. Scaffold Greenfield App (`kit new`)
+
+Scaffolds an application repository with baseline ADRs, `.ai-kit/project.yml`, and initial specifications:
+
+```bash
+kit new my-app --stack node-typescript --dir ./apps
+```
+
+Supported stacks: `node-typescript`, `react-spa`, `rails-hotwire`, `python`, `go`.
+
+### 5. Deterministic Verification (`kit verify`)
+
+Executes configured test, lint, typecheck, and build steps in isolated process executions without arbitrary shell interpretation:
+
+```bash
+kit verify
+```
+
+### 6. Memory & Self-Evolution (CLSE)
+
+Hierarchical memory store and Continuous Learning & Self-Evolution engine:
+
+```bash
+# Query episodic, semantic, and procedural engineering memory
+kit memory "architecture invariants" --domain architecture
+
+# Run continuous learning distillation, hypothesis generation & benchmarks
+kit evolve
+```
+
+---
+
+## Claude Code Runtime Plugins (Mods)
+
+The kit includes 4 installable plugins in [`plugins/`](plugins/):
+
+| Plugin             | Capability                | Function                                                                                               |
+| :----------------- | :------------------------ | :----------------------------------------------------------------------------------------------------- |
+| **`sdlc-guard`**   | `tool.call`, `tool.check` | Enforces fail-closed safety policy on destructive actions (`rm -rf`, `git push --force`, table drops). |
+| **`secret-guard`** | `tool.call`               | Redacts API keys (Stripe, GitHub, AWS, etc.) before writing or executing tools.                        |
+| **`model-router`** | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
+| **`run-observer`** | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
+
+Install plugins into your runtime environment:
+
+```bash
+kit install --profile full-sdlc --stack node-typescript
+```
+
+---
 
 ## Documentation
 
-The full M0 artifact set lives under `docs/`:
+- [`QUICKSTART.md`](QUICKSTART.md) — Step-by-step practical walk-through.
+- [`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md) — Setup and usage guide for Claude Code, Cursor, AGY, and CI/CD.
+- [`AGENTS.md`](AGENTS.md) — Coding conventions and architectural invariants for AI agents.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution standards and verification requirements.
+- [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) — Monorepo design, boundaries, and invariants.
+- [`docs/workflows/WORKFLOWS.md`](docs/workflows/WORKFLOWS.md) — State machine specifications for feature, app, fix, and refactor.
+- [`docs/product/PRODUCT.md`](docs/product/PRODUCT.md) — Vision, target personas, and non-goals.
+- [`docs/security/SECURITY.md`](docs/security/SECURITY.md) — Threat model, security boundaries, and redaction rules.
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (ADR-0001 through ADR-0017).
 
-- [`docs/product/PRODUCT.md`](docs/product/PRODUCT.md) — vision, users, non-goals.
-- [`docs/requirements/REQUIREMENTS.md`](docs/requirements/REQUIREMENTS.md) — FRs and NFRs for 0.1.
-- [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) — boundaries, components, invariants.
-- [`docs/modules/MODULES.md`](docs/modules/MODULES.md) — packages, skills, agents, commands, Mods, stack packs.
-- [`docs/workflows/WORKFLOWS.md`](docs/workflows/WORKFLOWS.md) — feature, app, fix, refactor lifecycles.
-- [`docs/contracts/CONTRACTS.md`](docs/contracts/CONTRACTS.md) — types and zod schemas.
-- [`docs/security/SECURITY.md`](docs/security/SECURITY.md) — threat model, approval rules, the "not an OS sandbox" limitation.
-- [`docs/testing/TESTING.md`](docs/testing/TESTING.md) — test strategy and Definition of Done.
-- [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md) — milestones M0–M18, release gates.
-- [`docs/adr/`](docs/adr/) — nine Architecture Decision Records.
+---
 
-## The non-negotiable limitation
+## Safety & Boundaries
 
-Claude Code Mods (and equivalent host-runtime plugins) execute with the
-host process's access to the machine. They are **not** an operating-system
-sandbox. The kit provides approval controls, policy evaluation, secret
-redaction, and observability — but real isolation must come from OS
-permissions, containers, restricted credentials, and deployment controls.
-See [`docs/security/SECURITY.md`](docs/security/SECURITY.md) §4 and
-ADR-0009.
+Claude Code Mods and host-runtime plugins execute with the host process's system permissions. They are **not** an operating-system sandbox. Real system isolation requires OS user permissions, containerization, credentials scoping, and deployment gates. See [`docs/security/SECURITY.md`](docs/security/SECURITY.md).
 
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). In short: open an issue first for
-anything beyond a typo; every code change runs `pnpm verify` green on Node
-20 and Node 22, Ubuntu and macOS; every contract change requires an ADR.
+---
 
 ## License
 

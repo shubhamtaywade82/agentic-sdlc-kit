@@ -46,6 +46,15 @@ describe("dispatcher", () => {
     expect(ctx.out[0]).toContain("doctor");
     expect(ctx.out[0]).toContain("inspect");
     expect(ctx.out[0]).toContain("init");
+    expect(ctx.out[0]).toContain("validate-spec");
+    expect(ctx.out[0]).toContain("validate-plan");
+    expect(ctx.out[0]).toContain("verify");
+    expect(ctx.out[0]).toContain("feature");
+    expect(ctx.out[0]).toContain("new");
+    expect(ctx.out[0]).toContain("fix");
+    expect(ctx.out[0]).toContain("install");
+    expect(ctx.out[0]).toContain("memory");
+    expect(ctx.out[0]).toContain("evolve");
     expect(ctx.out[0]).toContain("help");
   });
 

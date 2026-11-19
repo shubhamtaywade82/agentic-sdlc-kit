@@ -8,6 +8,15 @@ import { versionCommand } from "../commands/version.js";
 import { doctorCommand } from "../commands/doctor.js";
 import { inspectCommand } from "../commands/inspect.js";
 import { initCommand } from "../commands/init.js";
+import { validateSpecCommand } from "../commands/validate-spec.js";
+import { validatePlanCommand } from "../commands/validate-plan.js";
+import { verifyCommand } from "../commands/verify.js";
+import { featureCommand } from "../commands/feature.js";
+import { newCommand } from "../commands/new.js";
+import { fixCommand } from "../commands/fix.js";
+import { installCommand } from "../commands/install.js";
+import { memoryCommand } from "../commands/memory.js";
+import { evolveCommand } from "../commands/evolve.js";
 import type { Command, CommandContext, CommandResult } from "../commands/types.js";
 import { createCommandRegistry, type CommandRegistry } from "./registry.js";
 import { VERSION } from "./version.js";
@@ -30,6 +39,15 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   if (!registry.get("doctor")) registry.register(doctorCommand);
   if (!registry.get("inspect")) registry.register(inspectCommand);
   if (!registry.get("init")) registry.register(initCommand);
+  if (!registry.get("validate-spec")) registry.register(validateSpecCommand);
+  if (!registry.get("validate-plan")) registry.register(validatePlanCommand);
+  if (!registry.get("verify")) registry.register(verifyCommand);
+  if (!registry.get("feature")) registry.register(featureCommand);
+  if (!registry.get("new")) registry.register(newCommand);
+  if (!registry.get("fix")) registry.register(fixCommand);
+  if (!registry.get("install")) registry.register(installCommand);
+  if (!registry.get("memory")) registry.register(memoryCommand);
+  if (!registry.get("evolve")) registry.register(evolveCommand);
   if (!registry.get("help")) registry.register(makeHelpCommand(registry));
 
   return {

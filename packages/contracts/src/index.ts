@@ -14,3 +14,4 @@ export * from "./specification/index.js";
 export * from "./planning/index.js";
 export * from "./verification/index.js";
 export * from "./policy/index.js";
+export * from "./learning/index.js";

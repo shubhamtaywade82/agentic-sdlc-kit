@@ -7,8 +7,8 @@ import {
   ImplementationPlanSchema,
   type ImplementationPlan,
   type Result,
-} from "@agentic-sdlc-kit/contracts";
-import { topologicalSort, type DagAnalysis } from "./dag.js";
+} from '@agentic-sdlc-kit/contracts';
+import { topologicalSort, type DagAnalysis } from './dag.js';
 
 export interface PlanValidationResult {
   readonly plan: ImplementationPlan;
@@ -20,7 +20,7 @@ function checkTaskReferences(plan: ImplementationPlan): string[] {
   const taskIds = new Set(plan.tasks.map((t) => t.id));
 
   if (taskIds.size !== plan.tasks.length) {
-    issues.push("Plan contains duplicate task IDs");
+    issues.push('Plan contains duplicate task IDs');
   }
 
   for (const t of plan.tasks) {
@@ -55,14 +55,14 @@ function checkTaskReferences(plan: ImplementationPlan): string[] {
 export function validatePlan(candidate: unknown): Result<PlanValidationResult> {
   const parsed = ImplementationPlanSchema.safeParse(candidate);
   if (!parsed.success) {
-    const detail = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    const detail = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     return { ok: false, error: Errors.planInvalid(`Schema validation failed: ${detail}`) };
   }
 
   const plan = parsed.data;
   const referenceIssues = checkTaskReferences(plan);
   if (referenceIssues.length > 0) {
-    return { ok: false, error: Errors.planInvalid(referenceIssues.join("; ")) };
+    return { ok: false, error: Errors.planInvalid(referenceIssues.join('; ')) };
   }
 
   const dagResult = topologicalSort(plan.tasks, plan.edges);

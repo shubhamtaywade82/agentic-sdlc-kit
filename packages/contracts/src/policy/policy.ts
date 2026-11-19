@@ -9,36 +9,37 @@
 //
 // See docs/contracts/CONTRACTS.md §7 and ADR-0009.
 
-import { z } from "zod";
+import { z } from 'zod';
 
 export const PolicyActionSchema = z.enum([
-  "file.delete",
-  "file.bulk-modify",
-  "db.migrate",
-  "db.production-mutate",
-  "git.force-push",
-  "release.deploy",
-  "secret.modify",
-  "dependency.remove",
+  'file.delete',
+  'file.bulk-modify',
+  'db.migrate',
+  'db.production-mutate',
+  'git.force-push',
+  'release.deploy',
+  'secret.modify',
+  'dependency.remove',
 ]);
 export type PolicyAction = z.infer<typeof PolicyActionSchema>;
 
-export const VerdictSchema = z.enum(["allow", "deny", "require-approval"]);
+export const VerdictSchema = z.enum(['allow', 'deny', 'require-approval']);
+export type Verdict = z.infer<typeof VerdictSchema>;
 
-export const PolicyDecisionSchema = z.discriminatedUnion("verdict", [
+export const PolicyDecisionSchema = z.discriminatedUnion('verdict', [
   z.object({
     action: PolicyActionSchema,
-    verdict: z.literal("allow"),
+    verdict: z.literal('allow'),
     reason: z.string().min(1),
   }),
   z.object({
     action: PolicyActionSchema,
-    verdict: z.literal("deny"),
+    verdict: z.literal('deny'),
     reason: z.string().min(1),
   }),
   z.object({
     action: PolicyActionSchema,
-    verdict: z.literal("require-approval"),
+    verdict: z.literal('require-approval'),
     reason: z.string().min(1),
     approver: z.string().min(1),
   }),

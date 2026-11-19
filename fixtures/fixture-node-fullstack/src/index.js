@@ -11,9 +11,9 @@
 //   - have a .ai-kit/project.yml that matches what `kit init` would produce
 //   - NOT contain real secrets (synthetic patterns only)
 
-import { createServer } from "node:http";
+import { createServer } from 'node:http';
 
-const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
+const PORT = Number.parseInt(process.env.PORT ?? '3000', 10);
 
 /**
  * The application's only endpoint: returns a JSON greeting. This is real
@@ -21,18 +21,18 @@ const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
  */
 export function createApp() {
   return createServer((req, res) => {
-    if (req.url === "/" && req.method === "GET") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ message: "hello from fixture-node-fullstack" }));
+    if (req.url === '/' && req.method === 'GET') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ message: 'hello from fixture-node-fullstack' }));
       return;
     }
-    if (req.url === "/health" && req.method === "GET") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok" }));
+    if (req.url === '/health' && req.method === 'GET') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok' }));
       return;
     }
-    res.writeHead(404, { "content-type": "application/json" });
-    res.end(JSON.stringify({ error: "not found" }));
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: 'not found' }));
   });
 }
 
@@ -45,6 +45,6 @@ export function start(port = PORT) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const server = start();
   console.log(`fixture-node-fullstack listening on http://localhost:${PORT}`);
-  process.on("SIGTERM", () => server.close(() => process.exit(0)));
-  process.on("SIGINT", () => server.close(() => process.exit(0)));
+  process.on('SIGTERM', () => server.close(() => process.exit(0)));
+  process.on('SIGINT', () => server.close(() => process.exit(0)));
 }

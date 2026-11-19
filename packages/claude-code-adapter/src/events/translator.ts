@@ -7,7 +7,7 @@
 // and is exercised by unit tests. The real Claude Code translator lands
 // in M10 when the host SDK is wired.
 
-import type { RuntimeEvent } from "../contracts/runtime-event.js";
+import type { RuntimeEvent } from '../contracts/runtime-event.js';
 
 /**
  * The shape of a "host event" is intentionally `unknown` in M1: the
@@ -27,13 +27,13 @@ export interface EventTranslator {
  */
 export class IdentityTranslator implements EventTranslator {
   translate(event: HostEvent): RuntimeEvent | null {
-    if (typeof event !== "object" || event === null) return null;
+    if (typeof event !== 'object' || event === null) return null;
     const e = event as { kind?: unknown };
     if (
-      e.kind === "lifecycle" ||
-      e.kind === "tool-call" ||
-      e.kind === "model-request" ||
-      e.kind === "verification"
+      e.kind === 'lifecycle' ||
+      e.kind === 'tool-call' ||
+      e.kind === 'model-request' ||
+      e.kind === 'verification'
     ) {
       return event as RuntimeEvent;
     }

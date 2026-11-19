@@ -25,10 +25,12 @@ export function evaluateEvolutionMetrics(input: {
   memoriesApplied: number;
 }): MetricSnapshot {
   const learningEfficiency = computeLearningEfficiency(input.heldOutGain, input.learningCostTokens);
-  const regressionRate = input.totalTasks > 0 ? Number((input.regressions / input.totalTasks).toFixed(4)) : 0;
-  const memoryReuseRate = input.memoriesRetrieved > 0
-    ? Number((input.memoriesApplied / input.memoriesRetrieved).toFixed(4))
-    : 0;
+  const regressionRate =
+    input.totalTasks > 0 ? Number((input.regressions / input.totalTasks).toFixed(4)) : 0;
+  const memoryReuseRate =
+    input.memoriesRetrieved > 0
+      ? Number((input.memoriesApplied / input.memoriesRetrieved).toFixed(4))
+      : 0;
 
   return {
     heldOutGain: input.heldOutGain,

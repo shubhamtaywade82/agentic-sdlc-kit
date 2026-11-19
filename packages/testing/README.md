@@ -28,15 +28,15 @@ import {
   invalidShellStringCommand,
   validateProjectProfile,
   assertOk,
-} from "@agentic-sdlc-kit/testing";
-import { validateProfile } from "@agentic-sdlc-kit/core";
+} from '@agentic-sdlc-kit/testing';
+import { validateProfile } from '@agentic-sdlc-kit/core';
 
-it("accepts a valid profile", () => {
+it('accepts a valid profile', () => {
   const r = validateProfile(validProfile);
   assertOk(r);
 });
 
-it("rejects a shell-string command", () => {
+it('rejects a shell-string command', () => {
   expect(() => validateProjectProfile(invalidShellStringCommand)).toThrow();
 });
 ```

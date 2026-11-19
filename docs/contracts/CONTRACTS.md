@@ -21,17 +21,17 @@ export const err = <E>(error: E): Err<E> => ({ ok: false, error });
 
 // packages/contracts/src/common/errors.ts
 export type KitErrorCode =
-  | "CONTRACT_INVALID"
-  | "PROFILE_INVALID"
-  | "PLAN_INVALID"
-  | "VERIFICATION_FAILED"
-  | "APPROVAL_DENIED"
-  | "APPROVAL_REQUIRED"
-  | "POLICY_VIOLATION"
-  | "DISCOVERY_FAILED"
-  | "ARTIFACT_WRITE_DENIED"
-  | "TIMEOUT"
-  | "INTERNAL";
+  | 'CONTRACT_INVALID'
+  | 'PROFILE_INVALID'
+  | 'PLAN_INVALID'
+  | 'VERIFICATION_FAILED'
+  | 'APPROVAL_DENIED'
+  | 'APPROVAL_REQUIRED'
+  | 'POLICY_VIOLATION'
+  | 'DISCOVERY_FAILED'
+  | 'ARTIFACT_WRITE_DENIED'
+  | 'TIMEOUT'
+  | 'INTERNAL';
 
 export interface KitError {
   code: KitErrorCode;
@@ -48,10 +48,10 @@ architectural invariant). This is enforced by ESLint.
 ### 1.2 Identifiers
 
 ```ts
-export type FeatureId = string;  // FEATURE-NNN
-export type TaskId = string;     // TASK-NNN
-export type RunId = string;      // RUN-NNN or content-derived
-export type CheckId = string;    // e.g., "unit-tests"
+export type FeatureId = string; // FEATURE-NNN
+export type TaskId = string; // TASK-NNN
+export type RunId = string; // RUN-NNN or content-derived
+export type CheckId = string; // e.g., "unit-tests"
 ```
 
 Identifiers MUST match `/^[A-Z]+-[0-9]{3,}$/` or `/^[a-z][a-z0-9-]{0,63}$/`.
@@ -66,9 +66,9 @@ The validator lives in `packages/contracts/src/common/identifier.ts`.
 export interface ProjectProfile {
   schemaVersion: 1;
   name: string;
-  stack: string[];                 // e.g., ["node-typescript", "react"]
+  stack: string[]; // e.g., ["node-typescript", "react"]
   commands: {
-    test?: string[][];             // argument arrays, never shell strings
+    test?: string[][]; // argument arrays, never shell strings
     lint?: string[][];
     typecheck?: string[][];
     build?: string[][];
@@ -86,7 +86,7 @@ the single source of truth for validation.
 
 ```ts
 export interface RepositoryScan {
-  root: string;                    // absolute path
+  root: string; // absolute path
   detectedStacks: string[];
   packageManagers: string[];
   entryPoints: string[];
@@ -105,20 +105,15 @@ discovered script.
 
 ```ts
 // packages/contracts/src/workflow/workflow.ts
-export type WorkflowMode = "app" | "feature" | "fix" | "refactor";
+export type WorkflowMode = 'app' | 'feature' | 'fix' | 'refactor';
 
-export type WorkflowStatus =
-  | "pending"
-  | "in_progress"
-  | "blocked"
-  | "completed"
-  | "failed";
+export type WorkflowStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'failed';
 
 export interface WorkflowState {
   runId: RunId;
   mode: WorkflowMode;
   status: WorkflowStatus;
-  startedAt?: string;              // ISO 8601
+  startedAt?: string; // ISO 8601
   currentTaskId?: TaskId;
   taskHistory: Array<{
     taskId: TaskId;
@@ -127,12 +122,7 @@ export interface WorkflowState {
   }>;
 }
 
-export type WorkflowTransition =
-  | "start"
-  | "block"
-  | "resume"
-  | "complete"
-  | "fail";
+export type WorkflowTransition = 'start' | 'block' | 'resume' | 'complete' | 'fail';
 ```
 
 The transition table is enforced by `core.workflows.engine` and is the only
@@ -154,7 +144,7 @@ export interface FeatureSpecification {
   acceptanceCriteria: Array<{ id: string; criterion: string }>;
   edgeCases: string[];
   dependencies: string[];
-  risks: Array<{ id: string; severity: "low" | "medium" | "high"; description: string }>;
+  risks: Array<{ id: string; severity: 'low' | 'medium' | 'high'; description: string }>;
   openQuestions: Array<{ id: string; question: string; resolved: boolean }>;
 }
 
@@ -182,8 +172,8 @@ export interface Task {
   verification: { command: string[]; expectedStatus: CheckStatus };
   dependencies: TaskId[];
   likelyFiles: string[];
-  estimatedScope: "xs" | "s" | "m" | "l" | "xl";
-  risk: "low" | "medium" | "high";
+  estimatedScope: 'xs' | 's' | 'm' | 'l' | 'xl';
+  risk: 'low' | 'medium' | 'high';
 }
 
 export interface DependencyEdge {
@@ -196,7 +186,7 @@ export interface ImplementationPlan {
   featureId: FeatureId;
   tasks: Task[];
   edges: DependencyEdge[];
-  verticalSlices: TaskId[][];      // ordered
+  verticalSlices: TaskId[][]; // ordered
 }
 ```
 
@@ -209,7 +199,7 @@ integration or regression coverage.
 
 ```ts
 // packages/contracts/src/verification/report.ts
-export type CheckStatus = "passed" | "failed" | "skipped" | "blocked";
+export type CheckStatus = 'passed' | 'failed' | 'skipped' | 'blocked';
 
 export interface Check {
   id: CheckId;
@@ -223,12 +213,13 @@ export interface Check {
 export interface VerificationReport {
   runId: RunId;
   commitSha?: string;
-  status: "passed" | "failed" | "blocked";
+  status: 'passed' | 'failed' | 'blocked';
   checks: Check[];
 }
 ```
 
 **Critical invariants:**
+
 - `passed` means execution succeeded.
 - `failed` means execution found a failure.
 - `skipped` means the check was not performed.
@@ -245,24 +236,24 @@ These invariants are enforced by `core.verification.runner` and tested in
 ```ts
 // packages/contracts/src/policy/policy.ts
 export type PolicyAction =
-  | "file.delete"
-  | "file.bulk-modify"
-  | "db.migrate"
-  | "db.production-mutate"
-  | "git.force-push"
-  | "release.deploy"
-  | "secret.modify"
-  | "dependency.remove";
+  | 'file.delete'
+  | 'file.bulk-modify'
+  | 'db.migrate'
+  | 'db.production-mutate'
+  | 'git.force-push'
+  | 'release.deploy'
+  | 'secret.modify'
+  | 'dependency.remove';
 
 export type PolicyDecision =
-  | { action: PolicyAction; verdict: "allow"; reason: string }
-  | { action: PolicyAction; verdict: "deny"; reason: string }
-  | { action: PolicyAction; verdict: "require-approval"; reason: string; approver: string };
+  | { action: PolicyAction; verdict: 'allow'; reason: string }
+  | { action: PolicyAction; verdict: 'deny'; reason: string }
+  | { action: PolicyAction; verdict: 'require-approval'; reason: string; approver: string };
 
 export interface Approval {
   action: PolicyAction;
   approver: string;
-  grantedAt: string;               // ISO 8601
+  grantedAt: string; // ISO 8601
   rationale: string;
 }
 ```
@@ -277,10 +268,10 @@ is a Critical bug.
 ```ts
 // packages/claude-code-adapter/src/contracts/runtime-event.ts
 export type RuntimeEvent =
-  | { kind: "lifecycle"; phase: "session-start" | "session-end" | "task-start" | "task-end" }
-  | { kind: "tool-call"; tool: string; input: unknown; output?: unknown }
-  | { kind: "model-request"; model: string; effort: string; tokensIn?: number; tokensOut?: number }
-  | { kind: "verification"; report: VerificationReport };
+  | { kind: 'lifecycle'; phase: 'session-start' | 'session-end' | 'task-start' | 'task-end' }
+  | { kind: 'tool-call'; tool: string; input: unknown; output?: unknown }
+  | { kind: 'model-request'; model: string; effort: string; tokensIn?: number; tokensOut?: number }
+  | { kind: 'verification'; report: VerificationReport };
 ```
 
 The adapter translates host events to `RuntimeEvent`. The core consumes
@@ -292,12 +283,14 @@ the core runtime-independent (ADR-0004).
 Persistent artifacts (`ProjectProfile`, `WorkflowState`, `VerificationReport`,
 `ImplementationPlan`) carry a `schemaVersion` field. Breaking changes
 require:
+
 1. A new ADR documenting the change and migration path.
 2. A `schemaVersion` bump.
 3. A migration function in `packages/core/src/artifacts/migrations/`.
 4. Updated tests in `packages/testing`.
 
 The M1 `schemaVersion` values are:
+
 - `ProjectProfile`: `1`
 - `WorkflowState`: `1`
 - `VerificationReport`: `1`

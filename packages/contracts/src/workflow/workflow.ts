@@ -8,28 +8,28 @@
 //
 // See docs/contracts/CONTRACTS.md §3.
 
-import { z } from "zod";
-import type { RunId, TaskId } from "../common/identifier.js";
-import type { CheckStatus } from "../verification/report.js";
+import { z } from 'zod';
+import type { RunId, TaskId } from '../common/identifier.js';
+import type { CheckStatus } from '../verification/report.js';
 
-export const WorkflowModeSchema = z.enum(["app", "feature", "fix", "refactor"]);
+export const WorkflowModeSchema = z.enum(['app', 'feature', 'fix', 'refactor']);
 export type WorkflowMode = z.infer<typeof WorkflowModeSchema>;
 
 export const WorkflowStatusSchema = z.enum([
-  "pending",
-  "in_progress",
-  "blocked",
-  "completed",
-  "failed",
+  'pending',
+  'in_progress',
+  'blocked',
+  'completed',
+  'failed',
 ]);
 export type WorkflowStatus = z.infer<typeof WorkflowStatusSchema>;
 
-export const WorkflowTransitionSchema = z.enum(["start", "block", "resume", "complete", "fail"]);
+export const WorkflowTransitionSchema = z.enum(['start', 'block', 'resume', 'complete', 'fail']);
 export type WorkflowTransition = z.infer<typeof WorkflowTransitionSchema>;
 
 export const TaskHistoryEntrySchema = z.object({
   taskId: z.string(),
-  status: z.enum(["passed", "failed", "skipped", "blocked"]),
+  status: z.enum(['passed', 'failed', 'skipped', 'blocked']),
   evidence: z.array(z.string()).optional(),
 });
 

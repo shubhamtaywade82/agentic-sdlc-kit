@@ -54,12 +54,14 @@ Status: M0 frozen. System boundaries and component architecture for release 0.1
 **Role:** The single source of truth for shared types and zod schemas.
 
 **Rules:**
+
 - Imports nothing from sibling packages.
 - Every public type is exported from `src/index.ts`.
 - Every zod schema is exported alongside its inferred type.
 - Schemas are versioned by `schemaVersion` where persistent.
 
 **Public surface (M1):**
+
 - `common/result.ts` — `Result<T, E>`, `ok`, `err`.
 - `common/errors.ts` — `KitError`, `KitErrorCode`, error helpers.
 - `project/project-profile.ts` — `ProjectProfile`, `ProjectProfileSchema`.
@@ -77,6 +79,7 @@ project-profile generator, artifact writer, policy evaluator, and
 verification orchestrator.
 
 **Rules:**
+
 - Imports only from `@agentic-sdlc-kit/contracts`.
 - Never imports from `@anthropic-ai/*`, `claude-code-adapter`, or any host
   SDK.
@@ -84,6 +87,7 @@ verification orchestrator.
   the `artifacts/` and `verification/` modules.
 
 **M1 surface (minimal, not placeholder):**
+
 - `discovery/repository-scanner.ts` — interface and a no-op default
   implementation that future milestones will replace with real detection.
 - `project-profile/generator.ts` — produces a `ProjectProfile` from a
@@ -104,6 +108,7 @@ verification orchestrator.
 **Role:** The user-facing entry point. `kit <command>`.
 
 **Rules:**
+
 - Imports from `@agentic-sdlc-kit/core` and `@agentic-sdlc-kit/contracts`.
 - Each command is a separate module under `src/commands/` and implements a
   `Command` interface.
@@ -112,6 +117,7 @@ verification orchestrator.
   registry entry.
 
 **M1 commands (working, not placeholders):**
+
 - `kit --version` — prints `0.1.0` from `package.json`.
 - `kit --help` / `kit help` — lists commands.
 - `kit doctor` — checks Node version, pnpm version, and that every workspace
@@ -123,10 +129,12 @@ verification orchestrator.
 assertions later).
 
 **Rules:**
+
 - Imports only from `@agentic-sdlc-kit/contracts` and `vitest`.
 - Provides reusable fixtures, assertions, validators, and helpers.
 
 **M1 surface:**
+
 - `fixtures/project-profile.ts` — sample valid and invalid profiles.
 - `fixtures/repository-scan.ts` — sample scans for unit tests.
 - `assertions/result.ts` — `assertOk`, `assertErr`.
@@ -139,6 +147,7 @@ assertions later).
 and the runtime-independent core.
 
 **Rules:**
+
 - Imports from `@agentic-sdlc-kit/contracts` and (in M10+) Claude Code
   plugin APIs.
 - Exports adapter contracts (`RuntimeEvent`, `RuntimeDecision`) that the
@@ -147,10 +156,11 @@ and the runtime-independent core.
 - **The core never imports from this package.**
 
 **M1 surface (intentionally minimal boundary):**
+
 - `contracts/runtime-event.ts` — `RuntimeEvent` union (lifecycle, tool-call,
   model-request, verification). No Claude Code SDK import in M1.
 - `events/translator.ts` — interface for `translateHostEvent(event):
-  RuntimeEvent`. Concrete implementation lands with M10.
+RuntimeEvent`. Concrete implementation lands with M10.
 - `middleware/approval-gate.ts` — interface only. Wired in M10.
 
 The M1 adapter is a **boundary declaration**, not a working integration.
@@ -204,25 +214,25 @@ ProposedAction ─▶ core.policy.evaluator ─▶ PolicyDecision
 
 ## 4. Trust boundaries
 
-| Boundary                  | What is trusted on each side                                                                                  |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Host runtime ↔ adapter    | Host emits lifecycle events. Adapter is trusted to translate them faithfully; core does not trust the host.   |
-| Adapter ↔ core            | Adapter produces `RuntimeEvent` values that conform to the contract. Core validates them at the boundary.     |
-| Core ↔ CLI                | CLI is trusted to call core functions with valid arguments. Core still validates against zod schemas.          |
-| Core ↔ filesystem         | Core writes only under `.ai-kit/` and `docs/`. Any write outside those roots requires explicit user approval. |
-| Core ↔ subprocess (M6)    | Verification commands are executed with `shell: false`, argument arrays, scoped cwd, bounded timeouts.        |
+| Boundary               | What is trusted on each side                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Host runtime ↔ adapter | Host emits lifecycle events. Adapter is trusted to translate them faithfully; core does not trust the host.   |
+| Adapter ↔ core         | Adapter produces `RuntimeEvent` values that conform to the contract. Core validates them at the boundary.     |
+| Core ↔ CLI             | CLI is trusted to call core functions with valid arguments. Core still validates against zod schemas.         |
+| Core ↔ filesystem      | Core writes only under `.ai-kit/` and `docs/`. Any write outside those roots requires explicit user approval. |
+| Core ↔ subprocess (M6) | Verification commands are executed with `shell: false`, argument arrays, scoped cwd, bounded timeouts.        |
 
 ## 5. Extension points (M18 ready, M1 declared)
 
-| Extension        | Mechanism                                                                                       |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| Stack pack       | Drop a directory under `stack-packs/<name>/` with a `manifest.json` declaring compatibility.    |
-| Skill            | Markdown file under `plugins/skills/<name>/SKILL.md` with a `manifest` block.                   |
-| Agent            | Markdown file under `plugins/agents/<name>/AGENT.md` declaring required capabilities.           |
-| Command          | A module under `packages/cli/src/commands/<name>.ts` implementing the `Command` interface.      |
-| Validator        | A module under `packages/testing/src/validators/<name>.ts` exporting a `Validator<T>`.          |
-| Policy pack      | A directory under `plugins/policies/<name>/` exporting `Policy[]`.                              |
-| Runtime adapter  | A new package under `packages/<runtime>-adapter/` mirroring the `claude-code-adapter` boundary. |
+| Extension       | Mechanism                                                                                       |
+| --------------- | ----------------------------------------------------------------------------------------------- |
+| Stack pack      | Drop a directory under `stack-packs/<name>/` with a `manifest.json` declaring compatibility.    |
+| Skill           | Markdown file under `plugins/skills/<name>/SKILL.md` with a `manifest` block.                   |
+| Agent           | Markdown file under `plugins/agents/<name>/AGENT.md` declaring required capabilities.           |
+| Command         | A module under `packages/cli/src/commands/<name>.ts` implementing the `Command` interface.      |
+| Validator       | A module under `packages/testing/src/validators/<name>.ts` exporting a `Validator<T>`.          |
+| Policy pack     | A directory under `plugins/policies/<name>/` exporting `Policy[]`.                              |
+| Runtime adapter | A new package under `packages/<runtime>-adapter/` mirroring the `claude-code-adapter` boundary. |
 
 The extension API itself is finalized in M18. M1 only declares the contract
 surface so that later milestones do not have to refactor the core.
@@ -241,6 +251,7 @@ surface so that later milestones do not have to refactor the core.
 8. No destructive operation is performed without an explicit approval.
 
 These invariants are enforced by:
+
 - ESLint `no-restricted-imports` rule (added in M1-09).
 - A `scripts/check-architecture.ts` script (M1-11) that fails CI if any
   invariant is violated.

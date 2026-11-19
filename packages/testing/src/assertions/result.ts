@@ -2,18 +2,18 @@
 //
 // Result-shaped assertions. These throw on mismatch (vitest assertions).
 
-import { expect } from "vitest";
-import type { Result } from "@agentic-sdlc-kit/contracts";
+import { expect } from 'vitest';
+import type { Result } from '@agentic-sdlc-kit/contracts';
 
 export function assertOk<T, E>(r: Result<T, E>): T {
   expect(r.ok).toBe(true);
-  if (!r.ok) throw new Error("unreachable");
+  if (!r.ok) throw new Error('unreachable');
   return r.value;
 }
 
 export function assertErr<T, E>(r: Result<T, E>): E {
   expect(r.ok).toBe(false);
-  if (r.ok) throw new Error("expected Err, got Ok");
+  if (r.ok) throw new Error('expected Err, got Ok');
   return r.error;
 }
 

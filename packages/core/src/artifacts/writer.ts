@@ -10,12 +10,12 @@
 // exists so the path-escape invariant is enforced in one place, and so
 // tests can exercise it without monkey-patching fs.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { Errors, type ProjectProfile, type Result } from "@agentic-sdlc-kit/contracts";
-import { serializeProfileToYaml } from "../project-profile/serializer.js";
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { Errors, type ProjectProfile, type Result } from '@agentic-sdlc-kit/contracts';
+import { serializeProfileToYaml } from '../project-profile/serializer.js';
 
-const ALLOWED_ROOTS = [".ai-kit", "docs"] as const;
+const ALLOWED_ROOTS = ['.ai-kit', 'docs'] as const;
 
 /**
  * Resolve a target path against a project root and refuse anything that
@@ -33,8 +33,8 @@ export function resolveArtifactPath(
     };
   }
   // Reject any relative segment that tries to escape.
-  const cleaned = relativePath.replace(/^\.?\/+/, "");
-  if (cleaned.includes("..")) {
+  const cleaned = relativePath.replace(/^\.?\/+/, '');
+  if (cleaned.includes('..')) {
     return {
       ok: false,
       error: Errors.artifactWriteDenied("relative path contains '..'", {
@@ -47,10 +47,10 @@ export function resolveArtifactPath(
   const target = path.resolve(base, cleaned);
   // Final defense: the resolved target must start with the base.
   const rel = path.relative(base, target);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
     return {
       ok: false,
-      error: Errors.artifactWriteDenied("resolved path escapes artifact root", {
+      error: Errors.artifactWriteDenied('resolved path escapes artifact root', {
         root,
         base,
         target,
@@ -74,7 +74,7 @@ export async function writeJson(
   if (!target.ok) return target;
   try {
     await fs.mkdir(path.dirname(target.value), { recursive: true });
-    await fs.writeFile(target.value, JSON.stringify(data, null, 2) + "\n", "utf8");
+    await fs.writeFile(target.value, JSON.stringify(data, null, 2) + '\n', 'utf8');
     return { ok: true, value: target.value };
   } catch (e) {
     return {
@@ -101,7 +101,7 @@ export async function writeMarkdown(
   if (!target.ok) return target;
   try {
     await fs.mkdir(path.dirname(target.value), { recursive: true });
-    await fs.writeFile(target.value, content, "utf8");
+    await fs.writeFile(target.value, content, 'utf8');
     return { ok: true, value: target.value };
   } catch (e) {
     return {
@@ -123,5 +123,5 @@ export async function writeProfile(
   profile: ProjectProfile,
 ): Promise<Result<string>> {
   const content = serializeProfileToYaml(profile);
-  return writeMarkdown(projectRoot, ".ai-kit", "project.yml", content);
+  return writeMarkdown(projectRoot, '.ai-kit', 'project.yml', content);
 }

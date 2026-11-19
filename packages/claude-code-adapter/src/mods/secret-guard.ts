@@ -20,11 +20,11 @@ interface SecretPattern {
 }
 
 const SECRET_PATTERNS: SecretPattern[] = [
-  { type: "stripe", regex: new RegExp("sk" + "_live_[0-9a-zA-Z]{24,}", "g") },
-  { type: "openai", regex: new RegExp("sk" + "-[0-9a-zA-Z]{32,}", "g") },
-  { type: "aws_key", regex: /AKIA[0-9A-Z]{16}/g },
-  { type: "github_pat", regex: /gh[pousr]_[0-9a-zA-Z]{36}/g },
-  { type: "private_key", regex: /-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----/g },
+  { type: 'stripe', regex: new RegExp('sk' + '_live_[0-9a-zA-Z]{24,}', 'g') },
+  { type: 'openai', regex: new RegExp('sk' + '-[0-9a-zA-Z]{32,}', 'g') },
+  { type: 'aws_key', regex: /AKIA[0-9A-Z]{16}/g },
+  { type: 'github_pat', regex: /gh[pousr]_[0-9a-zA-Z]{36}/g },
+  { type: 'private_key', regex: /-----BEGIN[ A-Z0-9_-]+PRIVATE KEY-----/g },
 ];
 
 export class SecretGuard {
@@ -51,7 +51,7 @@ export class SecretGuard {
   evaluateWrite(filePath: string, content: string): { allowed: boolean; reason?: string } {
     const result = this.scan(content);
     if (result.hasSecret) {
-      const types = result.matches.map((m) => m.type).join(", ");
+      const types = result.matches.map((m) => m.type).join(', ');
       return {
         allowed: false,
         reason: `Write to '${filePath}' blocked: contains exposed secret of type(s): ${types}`,

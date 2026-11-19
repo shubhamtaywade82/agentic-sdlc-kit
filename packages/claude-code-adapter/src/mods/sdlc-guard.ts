@@ -51,7 +51,7 @@ export class SdlcGuard {
       return {
         allowed: false,
         requiresApproval: true,
-        reason: "Publishing packages requires explicit human approval",
+        reason: 'Publishing packages requires explicit human approval',
       };
     }
 

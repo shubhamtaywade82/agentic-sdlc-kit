@@ -10,20 +10,21 @@ import {
   MemoryStore,
   PromotionGate,
   evaluateEvolutionMetrics,
-} from "@agentic-sdlc-kit/core";
-import type { Command, CommandContext, CommandResult } from "./types.js";
+} from '@agentic-sdlc-kit/core';
+import type { Command, CommandContext, CommandResult } from './types.js';
 
 export const evolveCommand: Command = {
-  name: "evolve",
-  summary: "Run continuous learning distillation, hypothesis generation, and Evolution Lab benchmarks (M31-M33).",
+  name: 'evolve',
+  summary:
+    'Run continuous learning distillation, hypothesis generation, and Evolution Lab benchmarks (M31-M33).',
   async run(ctx: CommandContext): Promise<CommandResult> {
-    if (ctx.argv.includes("--help") || ctx.argv.includes("-h")) {
+    if (ctx.argv.includes('--help') || ctx.argv.includes('-h')) {
       ctx.stdout(formatHelp());
       return { exitCode: 0 };
     }
 
-    const isJson = ctx.argv.includes("--json");
-    const isDryRun = ctx.argv.includes("--dry-run");
+    const isJson = ctx.argv.includes('--json');
+    const isDryRun = ctx.argv.includes('--dry-run');
 
     // Initialize CLSE pipeline
     const store = new MemoryStore();
@@ -34,21 +35,21 @@ export const evolveCommand: Command = {
 
     const distilled = distiller.distillFromExperiences([
       {
-        id: "EXP-1",
-        workflowId: "WF-1",
-        featureId: "FEATURE-RBAC",
-        stack: "node-typescript",
-        outcome: "failure",
-        phases: [{ name: "tdd", status: "failed", durationMs: 200 }],
+        id: 'EXP-1',
+        workflowId: 'WF-1',
+        featureId: 'FEATURE-RBAC',
+        stack: 'node-typescript',
+        outcome: 'failure',
+        phases: [{ name: 'tdd', status: 'failed', durationMs: 200 }],
         timestamp: new Date().toISOString(),
       },
       {
-        id: "EXP-2",
-        workflowId: "WF-2",
-        featureId: "FEATURE-API",
-        stack: "node-typescript",
-        outcome: "failure",
-        phases: [{ name: "tdd", status: "failed", durationMs: 250 }],
+        id: 'EXP-2',
+        workflowId: 'WF-2',
+        featureId: 'FEATURE-API',
+        stack: 'node-typescript',
+        outcome: 'failure',
+        phases: [{ name: 'tdd', status: 'failed', durationMs: 250 }],
         timestamp: new Date().toISOString(),
       },
     ]);
@@ -59,12 +60,16 @@ export const evolveCommand: Command = {
     const reports = [];
     for (const hyp of hypotheses) {
       const runner = {
-        async evaluateBaseline() { return { passRate: 0.65, tokens: 1200 }; },
-        async evaluateCandidate() { return { passRate: 0.85, regressions: 0, tokens: 1400 }; },
+        async evaluateBaseline() {
+          return { passRate: 0.65, tokens: 1200 };
+        },
+        async evaluateCandidate() {
+          return { passRate: 0.85, regressions: 0, tokens: 1400 };
+        },
       };
       const rep = await lab.runExperiment(hyp, runner);
       reports.push(rep);
-      if (!isDryRun && rep.verdict === "promoted") {
+      if (!isDryRun && rep.verdict === 'promoted') {
         gate.createRequest(hyp, rep);
       }
     }
@@ -86,7 +91,7 @@ export const evolveCommand: Command = {
     };
 
     if (isJson) {
-      ctx.stdout(JSON.stringify(output, null, 2) + "\n");
+      ctx.stdout(JSON.stringify(output, null, 2) + '\n');
     } else {
       ctx.stdout(formatSummary(output));
     }
@@ -95,7 +100,11 @@ export const evolveCommand: Command = {
   },
 };
 
-function formatSummary(out: { distilledLessons: number; hypothesesGenerated: number; metrics: ReturnType<typeof evaluateEvolutionMetrics> }): string {
+function formatSummary(out: {
+  distilledLessons: number;
+  hypothesesGenerated: number;
+  metrics: ReturnType<typeof evaluateEvolutionMetrics>;
+}): string {
   const lines: string[] = [
     `Evolution Lab:      COMPLETED`,
     `Distilled Lessons:  ${out.distilledLessons}`,
@@ -106,21 +115,21 @@ function formatSummary(out: { distilledLessons: number; hypothesesGenerated: num
     `Regression Rate:    ${out.metrics.regressionRate}`,
     `Memory Reuse Rate:  ${(out.metrics.memoryReuseRate * 100).toFixed(0)}%`,
   ];
-  return lines.join("\n") + "\n";
+  return lines.join('\n') + '\n';
 }
 
 function formatHelp(): string {
   return [
-    "Usage: kit evolve [--dry-run] [--json]",
-    "",
-    "Execute the Continuous Learning and Self-Evolution Engine: distill experience,",
-    "synthesize improvement hypotheses, run Evolution Lab benchmarks, and propose",
-    "controlled Skill upgrades with human approval gates.",
-    "",
-    "Options:",
-    "  --dry-run   Simulate benchmarks without staging promotion requests",
-    "  --json      Output full machine-readable experiment and metrics report",
-    "  --help      Show this message",
-    "",
-  ].join("\n");
+    'Usage: kit evolve [--dry-run] [--json]',
+    '',
+    'Execute the Continuous Learning and Self-Evolution Engine: distill experience,',
+    'synthesize improvement hypotheses, run Evolution Lab benchmarks, and propose',
+    'controlled Skill upgrades with human approval gates.',
+    '',
+    'Options:',
+    '  --dry-run   Simulate benchmarks without staging promotion requests',
+    '  --json      Output full machine-readable experiment and metrics report',
+    '  --help      Show this message',
+    '',
+  ].join('\n');
 }

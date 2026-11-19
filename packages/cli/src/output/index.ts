@@ -1,2 +1,2 @@
 // packages/cli/src/output/index.ts
-export * from "./formatter.js";
+export * from './formatter.js';

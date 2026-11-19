@@ -1,65 +1,65 @@
 // packages/contracts/src/project/project-profile.test.ts
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 import {
   PROJECT_PROFILE_SCHEMA_VERSION,
   ProjectProfileSchema,
   makeProfile,
-} from "./project-profile.js";
+} from './project-profile.js';
 
 const validProfile = {
   schemaVersion: PROJECT_PROFILE_SCHEMA_VERSION,
-  name: "fixture-node-fullstack",
-  stack: ["node-typescript", "react"],
+  name: 'fixture-node-fullstack',
+  stack: ['node-typescript', 'react'],
   commands: {
-    test: [["pnpm", "test"]],
-    lint: [["pnpm", "lint"]],
-    typecheck: [["pnpm", "typecheck"]],
-    build: [["pnpm", "build"]],
+    test: [['pnpm', 'test']],
+    lint: [['pnpm', 'lint']],
+    typecheck: [['pnpm', 'typecheck']],
+    build: [['pnpm', 'build']],
   },
 } as const;
 
-describe("ProjectProfileSchema", () => {
-  it("accepts a valid profile", () => {
+describe('ProjectProfileSchema', () => {
+  it('accepts a valid profile', () => {
     const parsed = ProjectProfileSchema.safeParse(validProfile);
     expect(parsed.success).toBe(true);
   });
 
-  it("rejects wrong schemaVersion", () => {
+  it('rejects wrong schemaVersion', () => {
     const r = ProjectProfileSchema.safeParse({ ...validProfile, schemaVersion: 2 });
     expect(r.success).toBe(false);
   });
 
-  it("rejects missing schemaVersion", () => {
+  it('rejects missing schemaVersion', () => {
     const { schemaVersion: _omit, ...rest } = validProfile;
     void _omit;
     const r = ProjectProfileSchema.safeParse(rest);
     expect(r.success).toBe(false);
   });
 
-  it("rejects empty name", () => {
-    const r = ProjectProfileSchema.safeParse({ ...validProfile, name: "" });
+  it('rejects empty name', () => {
+    const r = ProjectProfileSchema.safeParse({ ...validProfile, name: '' });
     expect(r.success).toBe(false);
   });
 
-  it("rejects empty stack", () => {
+  it('rejects empty stack', () => {
     const r = ProjectProfileSchema.safeParse({ ...validProfile, stack: [] });
     expect(r.success).toBe(false);
   });
 
-  it("rejects mixed-case stack entry", () => {
-    const r = ProjectProfileSchema.safeParse({ ...validProfile, stack: ["Node-TypeScript"] });
+  it('rejects mixed-case stack entry', () => {
+    const r = ProjectProfileSchema.safeParse({ ...validProfile, stack: ['Node-TypeScript'] });
     expect(r.success).toBe(false);
   });
 
-  it("rejects a string command (shell string is a contract violation)", () => {
+  it('rejects a string command (shell string is a contract violation)', () => {
     const r = ProjectProfileSchema.safeParse({
       ...validProfile,
-      commands: { test: "pnpm test" },
+      commands: { test: 'pnpm test' },
     });
     expect(r.success).toBe(false);
   });
 
-  it("rejects an empty command array", () => {
+  it('rejects an empty command array', () => {
     const r = ProjectProfileSchema.safeParse({
       ...validProfile,
       commands: { test: [[]] },
@@ -67,22 +67,22 @@ describe("ProjectProfileSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("rejects unknown top-level keys (.strict())", () => {
+  it('rejects unknown top-level keys (.strict())', () => {
     const r = ProjectProfileSchema.safeParse({ ...validProfile, extra: true });
     expect(r.success).toBe(false);
   });
 
-  it("rejects unknown commands keys (.strict())", () => {
+  it('rejects unknown commands keys (.strict())', () => {
     const r = ProjectProfileSchema.safeParse({
       ...validProfile,
-      commands: { ...validProfile.commands, deploy: [["echo", "hi"]] },
+      commands: { ...validProfile.commands, deploy: [['echo', 'hi']] },
     });
     expect(r.success).toBe(false);
   });
 });
 
-describe("makeProfile", () => {
-  it("injects the current schemaVersion and validates", () => {
+describe('makeProfile', () => {
+  it('injects the current schemaVersion and validates', () => {
     const { schemaVersion: _omit, ...rest } = validProfile;
     void _omit;
     const p = makeProfile(rest);
@@ -90,7 +90,7 @@ describe("makeProfile", () => {
     expect(p.name).toBe(validProfile.name);
   });
 
-  it("throws on invalid input (programmer-error path)", () => {
+  it('throws on invalid input (programmer-error path)', () => {
     const { schemaVersion: _omit, ...rest } = validProfile;
     void _omit;
     expect(() => makeProfile({ ...rest, stack: [] })).toThrow();

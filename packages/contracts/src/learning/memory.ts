@@ -3,9 +3,9 @@
 // M29 Hierarchical Memory contracts: episodic, semantic, and procedural memories
 // derived from accumulated engineering experience.
 
-import { z } from "zod";
+import { z } from 'zod';
 
-export const MemoryTypeSchema = z.enum(["episodic", "semantic", "procedural"]);
+export const MemoryTypeSchema = z.enum(['episodic', 'semantic', 'procedural']);
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
 
 export const MemoryEntrySchema = z.object({

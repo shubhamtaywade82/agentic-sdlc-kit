@@ -13,7 +13,7 @@ stack:
   - node-typescript
 commands:
   test:
-    - ["node", "--test", "tests/"]
+    - ['node', '--test', 'tests/']
   # No lint / typecheck / build configured for this fixture (it has no
   # TypeScript compiler, no linter, no build step). The M6 verification
   # runner will report these categories as `skipped`, never `passed`.

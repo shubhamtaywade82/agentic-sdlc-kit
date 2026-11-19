@@ -4,22 +4,22 @@
 // `kit` executable entry point. Parses argv, dispatches to a command,
 // prints output, and exits.
 
-import { createDispatcher } from "./application/dispatcher.js";
-import type { CommandContext } from "./commands/types.js";
+import { createDispatcher } from './application/dispatcher.js';
+import type { CommandContext } from './commands/types.js';
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const ctx: CommandContext = {
     argv,
     cwd: process.cwd(),
-    stdout: (s: string) => process.stdout.write(s + "\n"),
-    stderr: (s: string) => process.stderr.write(s + "\n"),
+    stdout: (s: string) => process.stdout.write(s + '\n'),
+    stderr: (s: string) => process.stderr.write(s + '\n'),
   };
   const { dispatch } = createDispatcher();
   const result = await dispatch(ctx);
-  if (result.message && result.command !== "help" && result.command !== "doctor") {
+  if (result.message && result.command !== 'help' && result.command !== 'doctor') {
     // help and doctor write their own output; everything else prints the message.
-    process.stdout.write(result.message + "\n");
+    process.stdout.write(result.message + '\n');
   }
   process.exit(result.exitCode);
 }

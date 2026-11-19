@@ -7,20 +7,20 @@
 // See docs/contracts/CONTRACTS.md §1.1.
 
 export type KitErrorCode =
-  | "CONTRACT_INVALID"
-  | "PROFILE_INVALID"
-  | "PLAN_INVALID"
-  | "SPEC_INVALID"
-  | "VERIFICATION_FAILED"
-  | "APPROVAL_DENIED"
-  | "APPROVAL_REQUIRED"
-  | "POLICY_VIOLATION"
-  | "DISCOVERY_FAILED"
-  | "ARTIFACT_WRITE_DENIED"
-  | "ARTIFACT_READ_DENIED"
-  | "TIMEOUT"
-  | "NOT_IMPLEMENTED"
-  | "INTERNAL";
+  | 'CONTRACT_INVALID'
+  | 'PROFILE_INVALID'
+  | 'PLAN_INVALID'
+  | 'SPEC_INVALID'
+  | 'VERIFICATION_FAILED'
+  | 'APPROVAL_DENIED'
+  | 'APPROVAL_REQUIRED'
+  | 'POLICY_VIOLATION'
+  | 'DISCOVERY_FAILED'
+  | 'ARTIFACT_WRITE_DENIED'
+  | 'ARTIFACT_READ_DENIED'
+  | 'TIMEOUT'
+  | 'NOT_IMPLEMENTED'
+  | 'INTERNAL';
 
 export interface KitError {
   readonly code: KitErrorCode;
@@ -54,70 +54,49 @@ export const Errors = {
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("CONTRACT_INVALID", message, details, cause),
-  profileInvalid: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("PROFILE_INVALID", message, details, cause),
-  planInvalid: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("PLAN_INVALID", message, details, cause),
-  specInvalid: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("SPEC_INVALID", message, details, cause),
+  ): KitError => kitError('CONTRACT_INVALID', message, details, cause),
+  profileInvalid: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('PROFILE_INVALID', message, details, cause),
+  planInvalid: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('PLAN_INVALID', message, details, cause),
+  specInvalid: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('SPEC_INVALID', message, details, cause),
   verificationFailed: (
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("VERIFICATION_FAILED", message, details, cause),
-  approvalDenied: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("APPROVAL_DENIED", message, details, cause),
+  ): KitError => kitError('VERIFICATION_FAILED', message, details, cause),
+  approvalDenied: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('APPROVAL_DENIED', message, details, cause),
   approvalRequired: (
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("APPROVAL_REQUIRED", message, details, cause),
+  ): KitError => kitError('APPROVAL_REQUIRED', message, details, cause),
   policyViolation: (
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("POLICY_VIOLATION", message, details, cause),
+  ): KitError => kitError('POLICY_VIOLATION', message, details, cause),
   discoveryFailed: (
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("DISCOVERY_FAILED", message, details, cause),
+  ): KitError => kitError('DISCOVERY_FAILED', message, details, cause),
   artifactWriteDenied: (
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("ARTIFACT_WRITE_DENIED", message, details, cause),
+  ): KitError => kitError('ARTIFACT_WRITE_DENIED', message, details, cause),
   artifactReadDenied: (
     message: string,
     details?: Record<string, unknown>,
     cause?: unknown,
-  ): KitError => kitError("ARTIFACT_READ_DENIED", message, details, cause),
-  timeout: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("TIMEOUT", message, details, cause),
-  notImplemented: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("NOT_IMPLEMENTED", message, details, cause),
-  internal: (
-    message: string,
-    details?: Record<string, unknown>,
-    cause?: unknown,
-  ): KitError => kitError("INTERNAL", message, details, cause),
+  ): KitError => kitError('ARTIFACT_READ_DENIED', message, details, cause),
+  timeout: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('TIMEOUT', message, details, cause),
+  notImplemented: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('NOT_IMPLEMENTED', message, details, cause),
+  internal: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
+    kitError('INTERNAL', message, details, cause),
 } as const;

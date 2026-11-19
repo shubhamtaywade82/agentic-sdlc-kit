@@ -65,6 +65,7 @@ Mod's README.
 ### Bypass cannot silently turn deny into allow
 
 A bypass flag, if it exists, MUST be:
+
 1. Set by an explicit user action (env var, CLI flag, or config file).
 2. Logged with the user identity and timestamp.
 3. Limited to a specific action and scope.

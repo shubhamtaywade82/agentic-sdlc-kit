@@ -1,7 +1,7 @@
 // packages/cli/src/commands/feature.test.ts
-import { describe, expect, it } from "vitest";
-import { featureCommand } from "./feature.js";
-import type { CommandContext } from "./types.js";
+import { describe, expect, it } from 'vitest';
+import { featureCommand } from './feature.js';
+import type { CommandContext } from './types.js';
 
 const makeCtx = (
   argv: string[],
@@ -19,18 +19,18 @@ const makeCtx = (
   };
 };
 
-describe("featureCommand", () => {
-  it("shows help when --help is passed", async () => {
-    const ctx = makeCtx(["--help"], "/");
+describe('featureCommand', () => {
+  it('shows help when --help is passed', async () => {
+    const ctx = makeCtx(['--help'], '/');
     const r = await featureCommand.run(ctx);
     expect(r.exitCode).toBe(0);
-    expect(ctx.out[0]).toContain("Usage: kit feature");
+    expect(ctx.out[0]).toContain('Usage: kit feature');
   });
 
-  it("fails if feature ID is missing", async () => {
-    const ctx = makeCtx([], "/");
+  it('fails if feature ID is missing', async () => {
+    const ctx = makeCtx([], '/');
     const r = await featureCommand.run(ctx);
     expect(r.exitCode).toBe(1);
-    expect(ctx.err[0]).toContain("missing required feature identifier");
+    expect(ctx.err[0]).toContain('missing required feature identifier');
   });
 });

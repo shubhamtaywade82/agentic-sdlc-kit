@@ -3,7 +3,7 @@
 // M29 Hierarchical Memory Store: stores and retrieves episodic, semantic,
 // and procedural memory entries with domain indexing and relevance ranking.
 
-import type { MemoryEntry, MemoryType } from "@agentic-sdlc-kit/contracts";
+import type { MemoryEntry, MemoryType } from '@agentic-sdlc-kit/contracts';
 
 export class MemoryStore {
   private readonly entries = new Map<string, MemoryEntry>();

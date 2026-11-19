@@ -1,0 +1,7 @@
+{
+  "name": "run-observer",
+  "version": "0.7.0",
+  "description": "Execution observability Mod: collect session/turn/tool events, persist run reports, redact sensitive output, CLI-first observability via kit runs.",
+  "author": { "name": "Agentic SDLC Kit" },
+  "license": "MIT"
+}

@@ -8,23 +8,20 @@ import {
   ProjectProfileSchema,
   type ProjectProfile,
   type Result,
-} from "@agentic-sdlc-kit/contracts";
+} from '@agentic-sdlc-kit/contracts';
 
 export function validateProfile(input: unknown): Result<ProjectProfile> {
   const parsed = ProjectProfileSchema.safeParse(input);
   if (!parsed.success) {
     return {
       ok: false,
-      error: Errors.profileInvalid(
-        "ProjectProfile failed schema validation",
-        {
-          issues: parsed.error.issues.map((i) => ({
-            path: i.path.join("."),
-            message: i.message,
-            code: i.code,
-          })),
-        },
-      ),
+      error: Errors.profileInvalid('ProjectProfile failed schema validation', {
+        issues: parsed.error.issues.map((i) => ({
+          path: i.path.join('.'),
+          message: i.message,
+          code: i.code,
+        })),
+      }),
     };
   }
   return { ok: true, value: parsed.data };

@@ -5,18 +5,18 @@
 //
 // See docs/contracts/CONTRACTS.md §5.
 
-import { z } from "zod";
+import { z } from 'zod';
 
-export const TaskScopeSchema = z.enum(["xs", "s", "m", "l", "xl"]);
-export const RiskLevelSchema = z.enum(["low", "medium", "high"]);
+export const TaskScopeSchema = z.enum(['xs', 's', 'm', 'l', 'xl']);
+export const RiskLevelSchema = z.enum(['low', 'medium', 'high']);
 
 export const TaskVerificationSchema = z.object({
-  command: z.array(z.string().min(1)).min(1, "verification command must be a non-empty array"),
-  expectedStatus: z.enum(["passed", "failed", "skipped", "blocked"]),
+  command: z.array(z.string().min(1)).min(1, 'verification command must be a non-empty array'),
+  expectedStatus: z.enum(['passed', 'failed', 'skipped', 'blocked']),
 });
 
 export const TaskSchema = z.object({
-  id: z.string().regex(/^[A-Z]+-[0-9]{3,}$/, "id must match TASK-NNN"),
+  id: z.string().regex(/^[A-Z]+-[0-9]{3,}$/, 'id must match TASK-NNN'),
   description: z.string().min(1),
   acceptanceCriteria: z.array(z.string().min(1)).min(1),
   verification: TaskVerificationSchema,
@@ -33,7 +33,7 @@ export const DependencyEdgeSchema = z.object({
 });
 
 export const ImplementationPlanSchema = z.object({
-  featureId: z.string().regex(/^[A-Z]+-[0-9]{3,}$/, "featureId must match FEATURE-NNN"),
+  featureId: z.string().regex(/^[A-Z]+-[0-9]{3,}$/, 'featureId must match FEATURE-NNN'),
   tasks: z.array(TaskSchema),
   edges: z.array(DependencyEdgeSchema),
   verticalSlices: z.array(z.array(z.string())),

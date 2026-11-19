@@ -1,2 +1,2 @@
 // packages/contracts/src/policy/index.ts
-export * from "./policy.js";
+export * from './policy.js';

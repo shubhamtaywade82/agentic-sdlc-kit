@@ -10,19 +10,20 @@
   },
   "packageManager": "pnpm@9.12.0",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "plugins/*"
   ],
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/*\" build",
-    "typecheck": "pnpm -r --filter \"./packages/*\" typecheck",
+    "build": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" build",
+    "typecheck": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm -r --filter \"./packages/*\" test",
-    "test:contract": "pnpm -r --filter \"./packages/*\" test:contract",
+    "test": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" test",
+    "test:contract": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" test:contract",
     "check:architecture": "tsx scripts/check-architecture.ts",
     "verify": "pnpm run check:architecture && pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run test",
-    "clean": "pnpm -r --filter \"./packages/*\" exec -- rm -rf dist *.tsbuildinfo",
+    "clean": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" exec -- rm -rf dist *.tsbuildinfo",
     "kit": "pnpm --filter @agentic-sdlc-kit/cli start"
   },
   "devDependencies": {

@@ -3,7 +3,7 @@
 // Directed Acyclic Graph (DAG) operations for implementation task planning.
 // Computes topological execution order and detects dependency cycles.
 
-import { Errors, type DependencyEdge, type Result, type Task } from "@agentic-sdlc-kit/contracts";
+import { Errors, type DependencyEdge, type Result, type Task } from '@agentic-sdlc-kit/contracts';
 
 export interface DagAnalysis {
   readonly executionOrder: string[];
@@ -11,7 +11,10 @@ export interface DagAnalysis {
   readonly leaves: string[];
 }
 
-export function buildAdjacencyList(tasks: Task[], edges: DependencyEdge[]): Map<string, Set<string>> {
+export function buildAdjacencyList(
+  tasks: Task[],
+  edges: DependencyEdge[],
+): Map<string, Set<string>> {
   const adj = new Map<string, Set<string>>();
   for (const t of tasks) {
     adj.set(t.id, new Set<string>());
@@ -69,7 +72,9 @@ export function topologicalSort(tasks: Task[], edges: DependencyEdge[]): Result<
     const unvisited = tasks.filter((t) => !executionOrder.includes(t.id)).map((t) => t.id);
     return {
       ok: false,
-      error: Errors.planInvalid(`Dependency cycle detected involving tasks: ${unvisited.join(", ")}`),
+      error: Errors.planInvalid(
+        `Dependency cycle detected involving tasks: ${unvisited.join(', ')}`,
+      ),
     };
   }
 

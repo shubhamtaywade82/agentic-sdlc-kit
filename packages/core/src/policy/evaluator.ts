@@ -24,30 +24,26 @@
 // In M1, no action is `allow` by default. M10 will introduce scope-based
 // allow rules (e.g., single-file delete with scope ≤ N).
 
-import type {
-  PolicyAction,
-  PolicyContext,
-  PolicyDecision,
-} from "@agentic-sdlc-kit/contracts";
+import type { PolicyAction, PolicyContext, PolicyDecision } from '@agentic-sdlc-kit/contracts';
 
-const APPROVER = "user";
+const APPROVER = 'user';
 
 const requireApproval = (action: PolicyAction, reason: string): PolicyDecision => ({
   action,
-  verdict: "require-approval",
+  verdict: 'require-approval',
   reason,
   approver: APPROVER,
 });
 
 const deny = (action: PolicyAction, reason: string): PolicyDecision => ({
   action,
-  verdict: "deny",
+  verdict: 'deny',
   reason,
 });
 
 const allow = (action: PolicyAction, reason: string): PolicyDecision => ({
   action,
-  verdict: "allow",
+  verdict: 'allow',
   reason,
 });
 
@@ -62,7 +58,7 @@ const allow = (action: PolicyAction, reason: string): PolicyDecision => ({
 export function evaluate(action: PolicyAction, context: PolicyContext): PolicyDecision {
   // Fail-closed when non-interactive.
   if (!context.interactive) {
-    return deny(action, "non-interactive: destructive action denied (fail-closed)");
+    return deny(action, 'non-interactive: destructive action denied (fail-closed)');
   }
   // M1: no allow rules yet. Every action requires explicit approval.
   // M10 will add scope-based allow rules here.
@@ -78,11 +74,11 @@ export function applyApproval(
   decision: PolicyDecision,
   approval: { approver: string; action: PolicyAction },
 ): PolicyDecision {
-  if (decision.verdict === "deny") {
+  if (decision.verdict === 'deny') {
     // INVARIANT: deny is terminal.
     return decision;
   }
-  if (decision.verdict === "allow") {
+  if (decision.verdict === 'allow') {
     return decision;
   }
   // require-approval
@@ -90,7 +86,7 @@ export function applyApproval(
     return decision;
   }
   if (approval.approver !== decision.approver) {
-    return deny(decision.action, "approval approver mismatch");
+    return deny(decision.action, 'approval approver mismatch');
   }
   return allow(decision.action, `approved by ${approval.approver}`);
 }
@@ -101,11 +97,9 @@ export function applyApproval(
  * in M1 so that the evaluator interface can be exercised without
  * hard-coding `deny` everywhere.
  */
-export function maybeAllowScopedDelete(
-  context: PolicyContext,
-): PolicyDecision | undefined {
+export function maybeAllowScopedDelete(context: PolicyContext): PolicyDecision | undefined {
   if (context.interactive && context.scopeFileCount === 1) {
-    return allow("file.delete", "single-file delete in interactive mode");
+    return allow('file.delete', 'single-file delete in interactive mode');
   }
   return undefined;
 }

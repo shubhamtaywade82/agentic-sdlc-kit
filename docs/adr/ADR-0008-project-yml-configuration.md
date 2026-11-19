@@ -38,13 +38,13 @@ stack:
   - react
 commands:
   test:
-    - ["pnpm", "test"]
+    - ['pnpm', 'test']
   lint:
-    - ["pnpm", "lint"]
+    - ['pnpm', 'lint']
   typecheck:
-    - ["pnpm", "typecheck"]
+    - ['pnpm', 'typecheck']
   build:
-    - ["pnpm", "build"]
+    - ['pnpm', 'build']
 ```
 
 Commands are **argument arrays**, never shell strings. The M6 executor runs

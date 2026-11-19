@@ -19,13 +19,13 @@ workflow logic.
 
 ## 2. Target users
 
-| User                 | What they get from the kit                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| Senior engineer      | An AI pair that respects existing conventions and never silently bypasses approvals.      |
-| Platform / DX team   | A versioned, installable, uninstallable engineering kit they can ship to many repositories.|
-| Engineering manager  | Evidence-based verification reports instead of "the AI said it works".                     |
-| New joiner           | A discoverable map of the codebase's conventions and an enforced Definition of Done.       |
-| Open-source maintainer | A reliable way to apply AI assistance to a real repository without abandoning standards. |
+| User                   | What they get from the kit                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| Senior engineer        | An AI pair that respects existing conventions and never silently bypasses approvals.        |
+| Platform / DX team     | A versioned, installable, uninstallable engineering kit they can ship to many repositories. |
+| Engineering manager    | Evidence-based verification reports instead of "the AI said it works".                      |
+| New joiner             | A discoverable map of the codebase's conventions and an enforced Definition of Done.        |
+| Open-source maintainer | A reliable way to apply AI assistance to a real repository without abandoning standards.    |
 
 ## 3. Primary use cases
 

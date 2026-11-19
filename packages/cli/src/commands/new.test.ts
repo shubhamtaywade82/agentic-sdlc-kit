@@ -1,10 +1,10 @@
 // packages/cli/src/commands/new.test.ts
-import { promises as fs } from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { describe, expect, it } from "vitest";
-import { newCommand } from "./new.js";
-import type { CommandContext } from "./types.js";
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { newCommand } from './new.js';
+import type { CommandContext } from './types.js';
 
 const makeCtx = (
   argv: string[],
@@ -22,21 +22,21 @@ const makeCtx = (
   };
 };
 
-describe("newCommand", () => {
-  it("shows help when --help is passed", async () => {
-    const ctx = makeCtx(["--help"], "/");
+describe('newCommand', () => {
+  it('shows help when --help is passed', async () => {
+    const ctx = makeCtx(['--help'], '/');
     const r = await newCommand.run(ctx);
     expect(r.exitCode).toBe(0);
-    expect(ctx.out[0]).toContain("Usage: kit new");
+    expect(ctx.out[0]).toContain('Usage: kit new');
   });
 
-  it("scaffolds greenfield app in target directory", async () => {
-    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "kit-cli-new-"));
+  it('scaffolds greenfield app in target directory', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-cli-new-'));
     try {
-      const ctx = makeCtx(["crypto-trader", "--dir", tmp], tmp);
+      const ctx = makeCtx(['crypto-trader', '--dir', tmp], tmp);
       const r = await newCommand.run(ctx);
       expect(r.exitCode).toBe(0);
-      expect(ctx.out[0]).toContain("Application:   crypto-trader");
+      expect(ctx.out[0]).toContain('Application:   crypto-trader');
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }

@@ -12,9 +12,9 @@
 //
 // See docs/security/SECURITY.md §1 (no false assurance).
 
-import { z } from "zod";
+import { z } from 'zod';
 
-export const CheckStatusSchema = z.enum(["passed", "failed", "skipped", "blocked"]);
+export const CheckStatusSchema = z.enum(['passed', 'failed', 'skipped', 'blocked']);
 export type CheckStatus = z.infer<typeof CheckStatusSchema>;
 
 export const VERIFICATION_REPORT_SCHEMA_VERSION = 1 as const;
@@ -31,8 +31,11 @@ export const CheckSchema = z.object({
 export const VerificationReportSchema = z.object({
   schemaVersion: z.literal(VERIFICATION_REPORT_SCHEMA_VERSION),
   runId: z.string(),
-  commitSha: z.string().regex(/^[0-9a-f]{40}$/).optional(),
-  status: z.enum(["passed", "failed", "blocked"]),
+  commitSha: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .optional(),
+  status: z.enum(['passed', 'failed', 'blocked']),
   checks: z.array(CheckSchema),
 });
 
@@ -50,10 +53,10 @@ export type VerificationReport = z.infer<typeof VerificationReportSchema>;
 // every check is `skipped`, the report is `blocked` (we could not safely
 // verify anything). This is a contract invariant, not a convenience.
  */
-export function rollupReportStatus(checks: ReadonlyArray<Check>): VerificationReport["status"] {
-  if (checks.length === 0) return "blocked";
-  if (checks.some((c) => c.status === "failed")) return "failed";
-  if (checks.some((c) => c.status === "blocked")) return "blocked";
-  if (checks.every((c) => c.status === "skipped")) return "blocked";
-  return "passed";
+export function rollupReportStatus(checks: ReadonlyArray<Check>): VerificationReport['status'] {
+  if (checks.length === 0) return 'blocked';
+  if (checks.some((c) => c.status === 'failed')) return 'failed';
+  if (checks.some((c) => c.status === 'blocked')) return 'blocked';
+  if (checks.every((c) => c.status === 'skipped')) return 'blocked';
+  return 'passed';
 }

@@ -3,16 +3,20 @@
 // M32 Evolution Lab: isolated experiment runner evaluating candidate Skill modifications
 // against benchmark suites before any change can be promoted.
 
-import type { ExperimentReport, ImprovementHypothesis } from "@agentic-sdlc-kit/contracts";
+import type { ExperimentReport, SkillImprovementHypothesis } from '@agentic-sdlc-kit/contracts';
 
 export interface BenchmarkRunner {
-  evaluateBaseline(hypothesis: ImprovementHypothesis): Promise<{ passRate: number; tokens: number }>;
-  evaluateCandidate(hypothesis: ImprovementHypothesis): Promise<{ passRate: number; regressions: number; tokens: number }>;
+  evaluateBaseline(
+    hypothesis: SkillImprovementHypothesis,
+  ): Promise<{ passRate: number; tokens: number }>;
+  evaluateCandidate(
+    hypothesis: SkillImprovementHypothesis,
+  ): Promise<{ passRate: number; regressions: number; tokens: number }>;
 }
 
 export class EvolutionLab {
   async runExperiment(
-    hypothesis: ImprovementHypothesis,
+    hypothesis: SkillImprovementHypothesis,
     runner: BenchmarkRunner,
   ): Promise<ExperimentReport> {
     const baseline = await runner.evaluateBaseline(hypothesis);
@@ -21,11 +25,11 @@ export class EvolutionLab {
     const heldOutGain = candidate.passRate - baseline.passRate;
     const learningCostTokens = baseline.tokens + candidate.tokens;
 
-    let verdict: ExperimentReport["verdict"] = "inconclusive";
+    let verdict: ExperimentReport['verdict'] = 'inconclusive';
     if (candidate.regressions > 0 || heldOutGain < 0) {
-      verdict = "rejected";
+      verdict = 'rejected';
     } else if (heldOutGain >= 0.1 && candidate.regressions === 0) {
-      verdict = "promoted";
+      verdict = 'promoted';
     }
 
     return {

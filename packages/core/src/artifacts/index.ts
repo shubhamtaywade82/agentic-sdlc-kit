@@ -1,2 +1,2 @@
 // packages/core/src/artifacts/index.ts
-export * from "./writer.js";
+export * from './writer.js';

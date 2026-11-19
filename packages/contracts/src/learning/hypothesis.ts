@@ -2,19 +2,19 @@
 //
 // M31/M32 Improvement Hypothesis & Evolution Lab contracts.
 
-import { z } from "zod";
+import { z } from 'zod';
 
-export const ImprovementHypothesisSchema = z.object({
+export const SkillImprovementHypothesisSchema = z.object({
   id: z.string().min(1),
   targetSkill: z.string().min(1),
   problemObserved: z.string().min(1),
   proposedChange: z.string().min(1),
   expectedBenefit: z.string().min(1),
-  riskLevel: z.enum(["low", "medium", "high"]),
+  riskLevel: z.enum(['low', 'medium', 'high']),
   benchmarkTasks: z.array(z.string()).min(1),
 });
 
-export type ImprovementHypothesis = z.infer<typeof ImprovementHypothesisSchema>;
+export type SkillImprovementHypothesis = z.infer<typeof SkillImprovementHypothesisSchema>;
 
 export const ExperimentReportSchema = z.object({
   hypothesisId: z.string().min(1),
@@ -23,7 +23,7 @@ export const ExperimentReportSchema = z.object({
   heldOutGain: z.number(),
   learningCostTokens: z.number().nonnegative(),
   regressions: z.number().int().nonnegative(),
-  verdict: z.enum(["promoted", "rejected", "inconclusive"]),
+  verdict: z.enum(['promoted', 'rejected', 'inconclusive']),
   completedAt: z.string().min(1),
 });
 

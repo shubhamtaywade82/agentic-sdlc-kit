@@ -3,7 +3,7 @@
 // M13 Run Observer Mod: telemetry and runtime event observer.
 // Collects execution traces, tool call frequencies, token usage, and verification reports.
 
-import type { RuntimeEvent } from "../contracts/runtime-event.js";
+import type { RuntimeEvent } from '../contracts/runtime-event.js';
 
 export interface ObserverMetrics {
   totalEvents: number;
@@ -29,13 +29,13 @@ export class RunObserver {
     this.events.push(event);
     this.metrics.totalEvents++;
 
-    if (event.kind === "tool-call") {
+    if (event.kind === 'tool-call') {
       this.metrics.toolCalls[event.tool] = (this.metrics.toolCalls[event.tool] ?? 0) + 1;
-    } else if (event.kind === "model-request") {
+    } else if (event.kind === 'model-request') {
       this.metrics.tokensIn += event.tokensIn ?? 0;
       this.metrics.tokensOut += event.tokensOut ?? 0;
-    } else if (event.kind === "verification") {
-      if (event.report.status === "passed") {
+    } else if (event.kind === 'verification') {
+      if (event.report.status === 'passed') {
         this.metrics.verificationPassed++;
       } else {
         this.metrics.verificationFailed++;

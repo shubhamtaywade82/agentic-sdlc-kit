@@ -22,22 +22,22 @@ import {
   type WorkflowState,
   type WorkflowStatus,
   type WorkflowTransition,
-} from "@agentic-sdlc-kit/contracts";
+} from '@agentic-sdlc-kit/contracts';
 
 const TRANSITIONS: Readonly<Record<WorkflowStatus, ReadonlyArray<WorkflowTransition>>> = {
-  pending: ["start"],
-  in_progress: ["block", "complete", "fail"],
-  blocked: ["resume", "fail"],
+  pending: ['start'],
+  in_progress: ['block', 'complete', 'fail'],
+  blocked: ['resume', 'fail'],
   completed: [],
   failed: [],
 };
 
 const TARGET_OF: Readonly<Record<WorkflowTransition, WorkflowStatus>> = {
-  start: "in_progress",
-  block: "blocked",
-  resume: "in_progress",
-  complete: "completed",
-  fail: "failed",
+  start: 'in_progress',
+  block: 'blocked',
+  resume: 'in_progress',
+  complete: 'completed',
+  fail: 'failed',
 };
 
 export function canTransition(from: WorkflowStatus, transition: WorkflowTransition): boolean {
@@ -77,10 +77,7 @@ export function transition(
       error: Errors.internal(`no target for transition ${t}`),
     };
   }
-  const startedAt =
-    t === "start"
-      ? now()
-      : state.startedAt;
+  const startedAt = t === 'start' ? now() : state.startedAt;
   const next_state: WorkflowState = { ...state, status: next, startedAt };
   return { ok: true, value: next_state };
 }
@@ -93,7 +90,7 @@ export function createWorkflowState(runId: string, mode: WorkflowMode): Workflow
   return {
     runId,
     mode,
-    status: "pending",
+    status: 'pending',
     taskHistory: [],
   };
 }
@@ -102,5 +99,5 @@ export function createWorkflowState(runId: string, mode: WorkflowMode): Workflow
  * Predicate: is the given status terminal?
  */
 export function isTerminal(status: WorkflowStatus): boolean {
-  return status === "completed" || status === "failed";
+  return status === 'completed' || status === 'failed';
 }

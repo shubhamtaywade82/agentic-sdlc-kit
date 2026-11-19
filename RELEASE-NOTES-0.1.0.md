@@ -4,6 +4,7 @@ This is the first concrete implementation package described at the end of
 the roadmap (`docs/roadmap/ROADMAP.md` §25):
 
 > The first concrete implementation package should therefore be:
+>
 > - M0 artifact freeze.
 > - M1 tasks M1-01 through M1-11.
 > - A clean CI baseline.
@@ -95,16 +96,16 @@ curl -s http://localhost:3999/               # {"message":"hello from fixture-no
 
 ## M1 acceptance criteria (`docs/roadmap/ROADMAP.md` §3.3)
 
-| #   | Criterion                                                          | Status                |
-| --- | ------------------------------------------------------------------ | --------------------- |
-| 1   | All workspace packages build successfully                          | ✅ 5/5 packages built  |
-| 2   | Shared contracts can be imported without circular dependencies    | ✅ check-architecture green |
-| 3   | Core does not depend on Claude Code APIs                           | ✅ enforced + gated    |
-| 4   | CLI launches and displays help/version information                 | ✅ smoke-tested        |
-| 5   | Project profile validation has tests                               | ✅ 12 tests in contracts + 6 in core |
-| 6   | CI runs tests, lint, typecheck and build                           | ✅ `.github/workflows/ci.yml` |
-| 7   | A clean checkout can reproduce the successful build                | ✅ lockfile committed  |
-| 8   | No placeholder package is presented as a working feature           | ✅ adapter is explicitly a boundary declaration (ADR-0005) |
+| #   | Criterion                                                      | Status                                                     |
+| --- | -------------------------------------------------------------- | ---------------------------------------------------------- |
+| 1   | All workspace packages build successfully                      | ✅ 5/5 packages built                                      |
+| 2   | Shared contracts can be imported without circular dependencies | ✅ check-architecture green                                |
+| 3   | Core does not depend on Claude Code APIs                       | ✅ enforced + gated                                        |
+| 4   | CLI launches and displays help/version information             | ✅ smoke-tested                                            |
+| 5   | Project profile validation has tests                           | ✅ 12 tests in contracts + 6 in core                       |
+| 6   | CI runs tests, lint, typecheck and build                       | ✅ `.github/workflows/ci.yml`                              |
+| 7   | A clean checkout can reproduce the successful build            | ✅ lockfile committed                                      |
+| 8   | No placeholder package is presented as a working feature       | ✅ adapter is explicitly a boundary declaration (ADR-0005) |
 
 ## Architectural invariants (`docs/architecture/ARCHITECTURE.md` §6)
 

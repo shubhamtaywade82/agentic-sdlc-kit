@@ -6,7 +6,7 @@
 //
 // See TESTING.md §4.4 and CONTRACTS.md §10.
 
-import { expect } from "vitest";
+import { expect } from 'vitest';
 import {
   ProjectProfileSchema,
   RepositoryScanSchema,
@@ -15,7 +15,7 @@ import {
   FeatureSpecificationSchema,
   ImplementationPlanSchema,
   PolicyDecisionSchema,
-} from "@agentic-sdlc-kit/contracts";
+} from '@agentic-sdlc-kit/contracts';
 
 export function roundTrip<T>(
   schema: { safeParse: (x: unknown) => { success: boolean; data?: T } },
@@ -23,7 +23,7 @@ export function roundTrip<T>(
 ): T {
   const first = schema.safeParse(sample);
   expect(first.success).toBe(true);
-  if (!first.success) throw new Error("unreachable");
+  if (!first.success) throw new Error('unreachable');
   const data = first.data as T;
   // Serialize and re-parse. JSON drops functions and undefined; that is the
   // point: if the schema relies on either, the round trip catches it.

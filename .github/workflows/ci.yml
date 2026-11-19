@@ -32,7 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node: ["20", "22"]
+        node: ['20', '22']
     steps:
       - name: Checkout
         # Pin: actions/checkout@v4 → SHA at tag v4.2.2.

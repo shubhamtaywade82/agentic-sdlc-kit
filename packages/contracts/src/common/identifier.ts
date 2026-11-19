@@ -8,11 +8,11 @@
 //
 // See docs/contracts/CONTRACTS.md §1.2.
 
-import { z } from "zod";
+import { z } from 'zod';
 
 export const IdentifierSchema = z.union([
-  z.string().regex(/^[A-Z]+-[0-9]{3,}$/, "must match FEATURE-NNN pattern"),
-  z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, "must be lowercase kebab-case, max 64 chars"),
+  z.string().regex(/^[A-Z]+-[0-9]{3,}$/, 'must match FEATURE-NNN pattern'),
+  z.string().regex(/^[a-z][a-z0-9-]{0,63}$/, 'must be lowercase kebab-case, max 64 chars'),
 ]);
 
 export type Identifier = z.infer<typeof IdentifierSchema>;

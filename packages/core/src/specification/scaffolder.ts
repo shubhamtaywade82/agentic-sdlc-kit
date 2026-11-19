@@ -2,8 +2,8 @@
 //
 // Scaffolds specification directory templates matching the M3 specification structure.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 
 export interface ScaffoldOptions {
   readonly id: string;
@@ -77,15 +77,23 @@ export async function scaffoldSpecification(options: ScaffoldOptions): Promise<s
   const featureDir = path.join(options.targetDir, options.id);
   await fs.mkdir(featureDir, { recursive: true });
 
-  const specPath = path.join(featureDir, "SPEC.md");
-  const scenariosPath = path.join(featureDir, "SCENARIOS.md");
-  const acceptancePath = path.join(featureDir, "ACCEPTANCE.md");
-  const notesPath = path.join(featureDir, "NOTES.md");
+  const specPath = path.join(featureDir, 'SPEC.md');
+  const scenariosPath = path.join(featureDir, 'SCENARIOS.md');
+  const acceptancePath = path.join(featureDir, 'ACCEPTANCE.md');
+  const notesPath = path.join(featureDir, 'NOTES.md');
 
-  await fs.writeFile(specPath, generateSpecMarkdown(options.id, options.title), "utf8");
-  await fs.writeFile(scenariosPath, generateScenariosMarkdown(options.title), "utf8");
-  await fs.writeFile(acceptancePath, `# Acceptance Criteria for ${options.id}\n\nSee SPEC.md.\n`, "utf8");
-  await fs.writeFile(notesPath, `# Engineering Notes for ${options.id}\n\nTechnical notes and context.\n`, "utf8");
+  await fs.writeFile(specPath, generateSpecMarkdown(options.id, options.title), 'utf8');
+  await fs.writeFile(scenariosPath, generateScenariosMarkdown(options.title), 'utf8');
+  await fs.writeFile(
+    acceptancePath,
+    `# Acceptance Criteria for ${options.id}\n\nSee SPEC.md.\n`,
+    'utf8',
+  );
+  await fs.writeFile(
+    notesPath,
+    `# Engineering Notes for ${options.id}\n\nTechnical notes and context.\n`,
+    'utf8',
+  );
 
   return featureDir;
 }

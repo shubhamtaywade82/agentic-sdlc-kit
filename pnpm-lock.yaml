@@ -102,6 +102,25 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.43)
 
+  packages/mod-sdk:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)
+
   packages/testing:
     dependencies:
       '@agentic-sdlc-kit/contracts':
@@ -111,6 +130,76 @@ importers:
       '@types/node':
         specifier: ^20.14.0
         version: 20.19.43
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  plugins/model-router:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  plugins/run-observer:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  plugins/sdlc-guard:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)
+
+  plugins/secret-guard:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3

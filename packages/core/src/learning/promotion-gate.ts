@@ -3,24 +3,28 @@
 // M33 Controlled Promotion Gate: requires independent verification and explicit
 // human approval before promoting any self-evolution change.
 
-import type { ExperimentReport, ImprovementHypothesis, PromotionRequest } from "@agentic-sdlc-kit/contracts";
+import type {
+  ExperimentReport,
+  SkillImprovementHypothesis,
+  SkillPromotionRequest,
+} from '@agentic-sdlc-kit/contracts';
 
 export class PromotionGate {
-  private readonly requests = new Map<string, PromotionRequest>();
+  private readonly requests = new Map<string, SkillPromotionRequest>();
 
   createRequest(
-    hypothesis: ImprovementHypothesis,
+    hypothesis: SkillImprovementHypothesis,
     report: ExperimentReport,
-  ): PromotionRequest | null {
-    if (report.verdict !== "promoted") return null;
+  ): SkillPromotionRequest | null {
+    if (report.verdict !== 'promoted') return null;
 
-    const request: PromotionRequest = {
+    const request: SkillPromotionRequest = {
       id: `PROMOTE-${Date.now()}`,
       hypothesisId: hypothesis.id,
       targetSkill: hypothesis.targetSkill,
       branchName: `evolve/${hypothesis.targetSkill.toLowerCase()}-${Date.now()}`,
       diffSummary: hypothesis.proposedChange,
-      status: "pending_approval",
+      status: 'pending_approval',
       createdAt: new Date().toISOString(),
     };
 
@@ -28,32 +32,32 @@ export class PromotionGate {
     return request;
   }
 
-  approve(requestId: string, approvedBy: string): PromotionRequest | undefined {
+  approve(requestId: string, approvedBy: string): SkillPromotionRequest | undefined {
     const existing = this.requests.get(requestId);
-    if (!existing || existing.status !== "pending_approval") return undefined;
+    if (!existing || existing.status !== 'pending_approval') return undefined;
 
-    const approved: PromotionRequest = {
+    const approved: SkillPromotionRequest = {
       ...existing,
-      status: "approved",
+      status: 'approved',
       approvedBy,
     };
     this.requests.set(requestId, approved);
     return approved;
   }
 
-  rollback(requestId: string): PromotionRequest | undefined {
+  rollback(requestId: string): SkillPromotionRequest | undefined {
     const existing = this.requests.get(requestId);
     if (!existing) return undefined;
 
-    const rolledBack: PromotionRequest = {
+    const rolledBack: SkillPromotionRequest = {
       ...existing,
-      status: "rolled_back",
+      status: 'rolled_back',
     };
     this.requests.set(requestId, rolledBack);
     return rolledBack;
   }
 
-  get(id: string): PromotionRequest | undefined {
+  get(id: string): SkillPromotionRequest | undefined {
     return this.requests.get(id);
   }
 }

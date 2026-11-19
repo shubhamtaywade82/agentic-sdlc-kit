@@ -25,12 +25,7 @@ See `docs/contracts/CONTRACTS.md` for the full contract documentation.
 ## Usage
 
 ```ts
-import {
-  ProjectProfileSchema,
-  ok,
-  err,
-  Errors,
-} from "@agentic-sdlc-kit/contracts";
+import { ProjectProfileSchema, ok, err, Errors } from '@agentic-sdlc-kit/contracts';
 
 const parsed = ProjectProfileSchema.safeParse(input);
 if (!parsed.success) {

@@ -5,23 +5,23 @@
 //
 // See docs/contracts/CONTRACTS.md §4.
 
-import { z } from "zod";
+import { z } from 'zod';
 
 export const SpecificationSectionSchema = z.enum([
-  "overview",
-  "problem",
-  "scope",
-  "actors",
-  "functionalRequirements",
-  "nonFunctionalRequirements",
-  "acceptanceCriteria",
-  "edgeCases",
-  "dependencies",
-  "risks",
-  "openQuestions",
+  'overview',
+  'problem',
+  'scope',
+  'actors',
+  'functionalRequirements',
+  'nonFunctionalRequirements',
+  'acceptanceCriteria',
+  'edgeCases',
+  'dependencies',
+  'risks',
+  'openQuestions',
 ]);
 
-export const SeveritySchema = z.enum(["low", "medium", "high"]);
+export const SeveritySchema = z.enum(['low', 'medium', 'high']);
 
 export const AcceptanceCriterionSchema = z.object({
   id: z.string(),
@@ -47,7 +47,7 @@ export const OpenQuestionSchema = z.object({
 
 export const FeatureSpecificationSchema = z
   .object({
-    id: z.string().regex(/^[A-Z]+-[0-9]{3,}$/, "id must match FEATURE-NNN"),
+    id: z.string().regex(/^[A-Z]+-[0-9]{3,}$/, 'id must match FEATURE-NNN'),
     title: z.string().min(1).max(200),
     overview: z.string().min(1),
     problem: z.string().min(1),

@@ -6,7 +6,7 @@
 //
 // See docs/contracts/CONTRACTS.md §1.1 and ADR-0007.
 
-import type { KitError } from "./errors.js";
+import type { KitError } from './errors.js';
 
 export interface Ok<T> {
   readonly ok: true;

@@ -21,11 +21,9 @@ The most important distinction:
 
 These are complementary mechanisms, not replacements for one another.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ## 1. What exactly is a Claude Code Mod?
 
@@ -81,11 +79,9 @@ There are three fundamental interception behaviors.
 
 The last behavior is especially important: it can prevent the normal operation or provide a result without executing the underlying tool.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 # 2. What all can you intercept?
 
@@ -143,11 +139,9 @@ Possible applications:
 
 Important: `tool.call` also covers subagent and MCP tool calls. However, provider-side server tool uses that Claude Code does not itself execute are not exposed through `tool.call` or `tool.check`.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+2
-
-
 
 ### `tool.check`
 
@@ -179,11 +173,9 @@ A useful policy:
 
 Use native permission rules for static restrictions and `tool.check` for decisions that depend on runtime conditions, such as the current Git branch.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ### `tool.describe`
 
@@ -229,7 +221,7 @@ This is where you can modify what Claude receives.
 | `skill.prompt`        | Expanded skill instructions              |
 | `attribution.text`    | Commit/PR attribution text               |
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
 
@@ -301,11 +293,9 @@ The official API allows you to change:
 
 The event is an asynchronous generator because model output streams.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ### Example: Model + effort routing
 
@@ -406,11 +396,9 @@ Other possibilities:
 
 `agent.spawn` can also run when a subagent resumes. Account for that so you don't incorrectly count a resumed agent as a new one.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ## E. Session and conversation interception
 
@@ -447,11 +435,9 @@ Multi-agent messaging governance
 
 The ability to intercept `session.append` is especially useful for audit and redaction workflows, although modifying stored conversation content should be treated cautiously.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ## F. UI interception and customization
 
@@ -490,11 +476,9 @@ Supported render components include:
 
 The available components vary by application surface and Claude Code version.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ### Example: Build an agent dashboard
 
@@ -523,12 +507,15 @@ Execution pipeline
 1. Planning
 
    Completed
+
 2. Implementation
 
    Completed
+
 3. Testing
 
    Running
+
 4. Verification
 
    Pending
@@ -539,11 +526,9 @@ You could build this with `ui.render`, `$.ui.open`, `$.ui.resolve`, and the UI i
 
 One limitation: Claude Code documents extensive UI customization, but the permission prompt itself cannot be restyled by a user mod.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ## G. Commands and configuration interception
 
@@ -600,11 +585,9 @@ Inspect declared capabilities
 
 This is useful when developing an enterprise mod ecosystem.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ## I. Intercepting Mods API calls
 
@@ -646,11 +629,9 @@ The exact event payload must be taken from your installed version's type declara
 
 Special case: `http.fetch`. It has support for intercepting requests made through the Mods API. There are also pathways involving Claude Code's own HTTP requests, but those are subject to the built-in security guard and organizational restrictions. Do not assume an ordinary user-installed mod can inspect or rewrite all model-provider traffic.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 # 3. Complete interception map
 
@@ -673,11 +654,9 @@ Here is the consolidated view.
 
 This is the published event surface, not a guarantee that every event is available in every version or every application. The installed Claude Code type declarations are the final authority.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+2
-
-
 
 # 4. How to create a Claude Code Mod
 
@@ -758,11 +737,9 @@ export function register(on) {
 
 These three files form the minimum structure.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ### Step 2 — Run your uploaded template
 
@@ -838,11 +815,9 @@ A mod can potentially:
 
 The built-in security guard and organizational policies limit certain capabilities, but you should not treat a user-installed mod as a security boundary.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ### Five rules I would enforce
 
@@ -879,11 +854,9 @@ Official documented limits include:
 
 External services and complex analysis should not block every tool invocation.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 5\. Validate before installing.
 
@@ -1002,11 +975,9 @@ One implementation detail: each module should expose a `register(on)` function, 
 
 You don't need a Node.js package or bundler merely to load a basic mod, but a governed TypeScript development toolchain makes sense for a larger SDK.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 # 7. Which Mods should you build first?
 
@@ -1113,11 +1084,9 @@ These are the primary resources I would use rather than relying on outdated comm
 
 Version warning: The documentation reference describes different coverage baselines for CLI/Desktop and VS Code. Always inspect the `.claude-plugin/types/` declarations generated by the Claude Code version you are actually running.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ## My recommendation: Build a Mod Development Framework, not just individual Mods
 
@@ -1164,11 +1133,9 @@ Not release-ready yet
 
 Anthropic's own Mods repository uses the same TypeScript-first architecture and `claude-code/testing` test infrastructure.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://github.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://github.com&sz=32)
 
 GitHub
-
-
 
 ### 2. Issues I would address
 
@@ -1183,11 +1150,9 @@ These are two different checks.
 
 Add a CI matrix covering the minimum supported version and latest available version. The Mods API is still documented as early access and may change between releases.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://github.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://github.com&sz=32)
 
 GitHub
-
-
 
 P1 — `/my-mod-usage` has no regression test.
 
@@ -1887,11 +1852,9 @@ Preserves decisions and work state across sessions.
 
 The separation matters because Claude Code itself distinguishes the responsibilities of Skills, subagents and hooks, including when they consume context and how they operate. Skills are loaded on demand, whereas root `CLAUDE.md` instructions consume context throughout the session. We should design around that distinction rather than loading our entire kit into every conversation.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://claude.com&sz=32)
 
 Claude by Anthropic+1
-
-
 
 # 2. The product should have three installable components
 
@@ -2077,11 +2040,9 @@ Stack packs provide technology-specific knowledge. We should not duplicate the f
 
 Claude Code supports plugins that combine commands, agents, skills, hooks and MCP servers. Mods add their own TypeScript hook modules through the plugin structure.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://github.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://github.com&sz=32)
 
 GitHub+1
-
-
 
 # 4. The actual SDLC we should implement
 
@@ -2094,30 +2055,39 @@ We need one lifecycle engine with multiple entry points, not separate and duplic
 1. Discovery & onboarding
 
    Repository inspection, business context, existing architecture, environment and constraints.
+
 2. Requirements engineering
 
    Product brief, functional requirements, non-functional requirements, acceptance criteria and assumptions.
+
 3. System design
 
    Architecture, domain boundaries, database design, API contracts, integrations, security and ADRs.
+
 4. Implementation planning
 
    Dependency graph, vertical slices, technical tasks, dependencies and checkpoints.
+
 5. Development
 
    TDD/BDD, implementation, design-pattern selection, incremental integration and refactoring.
+
 6. Verification
 
    Unit, integration, contract, E2E, static analysis, security and performance checks as applicable.
+
 7. Independent review
 
    Correctness, architecture, security, maintainability, performance and regression review.
+
 8. Documentation
 
    Architecture, API, setup, operational documentation and changelog updates.
+
 9. Release & deployment
 
    Release checks, approval, versioning, CI/CD, deployment and rollback preparation.
+
 10. Operations & feedback
 
     Observability, incidents, postmortems and improvements to future development.
@@ -2688,11 +2658,9 @@ Official Claude Code provides several useful interception points:
 
 These are documented interfaces, not unrestricted access to every internal operation.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+2
-
-
 
 ### Proposed Mod 1 — SDLC Guard
 
@@ -2873,12 +2841,15 @@ Feature execution
 1. Repository discovery
 
    Complete
+
 2. Architecture design
 
    Complete
+
 3. Implementation
 
    Running
+
 4. Verification
 
    Pending
@@ -2904,11 +2875,9 @@ These belong in Skills, templates and deterministic scripts.
 
 Also, Claude Code Mods run with the host's machine-level privileges and are not an isolated security sandbox. Actual isolation requires operating-system permissions, containers or other suitable execution boundaries.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://claude.com&sz=32)
 
 Claude by Anthropic+1
-
-
 
 # 11. Quality gates and Definition of Done
 
@@ -3011,11 +2980,9 @@ The installer must have:
 
 Also, keep the global instructions small. Use Skills and path-scoped rules for on-demand knowledge rather than stuffing everything into `CLAUDE.md`. Anthropic explicitly highlights the context cost of oversized always-loaded instructions.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://claude.com&sz=32)
 
 Claude by Anthropic
-
-
 
 # 13. Implementation roadmap
 
@@ -3032,6 +2999,7 @@ I would develop this in vertical slices rather than attempting to finish every c
    - Project profile schema.
    - Security model.
    - Definition of Done.
+
 2. M1 — Core SDK
    - TypeScript monorepo.
    - Core contracts.
@@ -3229,59 +3197,77 @@ The most important architectural decision remains unchanged: the SDLC engine mus
    Scope, boundaries, contracts, security model, ADRs, acceptance criteria.
 
    Prerequisite
+
 2. M1 — Core platform foundation
 
    Monorepo, TypeScript infrastructure, shared contracts, schemas, testing foundation, CLI skeleton.
+
 3. M2 — Repository discovery and project initialization
 
    Inspect repositories, establish project profiles, detect existing conventions safely.
+
 4. M3 — Requirements engineering
 
    Product briefs, feature specifications, user stories, acceptance criteria, BDD scenarios.
+
 5. M4 — Architecture and implementation planning
 
    Architecture analysis, ADRs, dependency mapping, vertical-slice planning and task validation.
+
 6. M5 — TDD implementation engine
 
    Controlled implementation loop, focused tests, incremental development and refactoring.
+
 7. M6 — Deterministic verification engine
 
    Execute configured checks, collect evidence, produce machine-readable verification reports.
+
 8. M7 — Complete incremental feature workflow
 
    Integrate M2–M6 into one working `/kit:feature` workflow.
 
    First major product release
+
 9. M8 — Greenfield application workflow
 
    Requirements through architecture, scaffolding, vertical slices and release.
+
 10. M9 — Bug-fix and refactoring workflows
 
     Reproduction, regression testing, root-cause analysis and behavior-preserving changes.
+
 11. M10 — Runtime governance Mod
 
     Destructive-operation protection, approval gates, migration and deployment controls.
+
 12. M11 — Secret Guard Mod
 
     Secret detection, redaction and protection of file writes and Git operations.
+
 13. M12 — Model and effort Router Mod
 
     Context-aware model routing, effort selection, fallback and escalation.
+
 14. M13 — Run Observer Mod
 
     Agent, tool, verification, runtime and cost observability.
+
 15. M14 — Technology stack packs
 
     Node.js/TypeScript, React, Rails, and additional stack-specific engineering knowledge.
+
 16. M15 — CLI installer and plugin distribution
 
     Installation profiles, updates, ownership tracking, dry-run and safe uninstall.
+
 17. M16 — CI/CD, compatibility and release engineering
 
     Automated validation, compatibility matrix, packaging and reproducible releases.
+
 18. M17 — Security, reliability and production hardening
 
     Adversarial testing, failure recovery, performance and operational controls.
+
 19. M18 — Ecosystem integrations and extensibility
 
     Additional runtime adapters, MCP integrations, external trackers and extension contracts.
@@ -4084,11 +4070,9 @@ A pure function should evaluate an action against the policy. The Claude Code ad
 
 Claude Code Mods execute with the host process's access to the machine. They are not an operating-system sandbox. The Mod can provide approval controls, but real isolation must come from OS permissions, containers, restricted credentials and deployment controls.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://claude.com&sz=32)
 
 Claude by Anthropic
-
-
 
 ### M10 exit
 
@@ -4168,11 +4152,9 @@ The router must not equate a simple task with a safe task.
 
 The Claude Code adapter can use the relevant turn and agent lifecycle events. Current Mod APIs distinguish main model-request events from agent spawning, but the installed Claude Code version's declarations must be the final authority.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://code.claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://code.claude.com&sz=32)
 
 Claude Code Docs+1
-
-
 
 ### M12 exit
 
@@ -4230,11 +4212,9 @@ A dashboard is a later interface, not a prerequisite for observability.
 
 Claude Code hook execution has time limits and API constraints. Long test suites and expensive analyses must run through explicit scripts, not lifecycle hooks.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://claude.com&sz=32)
 
 Claude by Anthropic
-
-
 
 # 16. M14 — Technology stack packs
 
@@ -4516,11 +4496,9 @@ Use:
 
 The official Claude Code guidance favors concise root instructions and on-demand Skills rather than loading every procedure into the initial context.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://claude.com\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://claude.com&sz=32)
 
 Claude by Anthropic
-
-
 
 ## D. Separate deterministic and AI-driven work
 
@@ -4706,13 +4684,9 @@ I recommend planning through M20, with M8 and M9 receiving the most detailed bre
 | M19       | Evaluation and benchmarking         | Measurable agent/workflow quality       |
 | M20       | Team and organization governance    | Shared policies and controlled adoption |
 
-
-
 Target
 
 &#x20;M17 should represent the production-ready 1.0 product. M18–M20 extend it into a broader ecosystem and team-oriented platform.
-
-
 
 # 2. M8 — Greenfield application development
 
@@ -6107,18 +6081,23 @@ I would call the next stage:
 1. M21 — Real-world adoption and pilot program
 
    Validate the kit against real applications and development teams.
+
 2. M22 — Operational excellence
 
    Establish reliability, support, security response and upgrade management.
+
 3. M23 — Developer experience and usability
 
    Reduce friction in installation, configuration and daily workflows.
+
 4. M24 — Ecosystem and marketplace governance
 
    Establish trusted distribution and extension lifecycle management.
+
 5. M25 — Enterprise readiness
 
    Address compliance, deployment models, identity and organizational adoption.
+
 6. M26 — Continuous product intelligence and evolution
 
    Use evaluation data and actual developer feedback to determine what should improve, change or be removed.
@@ -6566,11 +6545,9 @@ This gives us a realistic form of self-improvement without making model training
 
 Research published in 2026 is also exploring this distinction: agents can evolve persistent memories, tools, strategies and Skills while keeping their underlying model weights fixed. However, improvement is not guaranteed, and gains on familiar tasks do not necessarily generalize to unseen tasks.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://arxiv.org\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://arxiv.org&sz=32)
 
 arxiv.org+1
-
-
 
 # 2. Introduce a new subsystem: Continuous Learning and Self-Evolution Engine
 
@@ -6792,11 +6769,9 @@ The system should not just accumulate more notes. It should improve its ability 
 
 A useful principle from recent work on controlled knowledge updating is to choose the least invasive update mechanism that is sufficient for the evidence and intended scope. Sometimes no persistent update is appropriate.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://pmc.ncbi.nlm.nih.gov\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://pmc.ncbi.nlm.nih.gov&sz=32)
 
 pmc.ncbi.nlm.nih.gov
-
-
 
 # 5. Two learning loops: fast and slow
 
@@ -7028,11 +7003,9 @@ It must also pass its guardrails.
 
 The evaluation should include held-out tasks, repeated runs and different task ordering. Recent evaluations of self-improving agents specifically highlight generalization, learning cost and failure attribution as important measurements.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://arxiv.org\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://arxiv.org&sz=32)
 
 arxiv.org+1
-
-
 
 # 8. Controlled self-modification: What can change automatically?
 
@@ -7337,11 +7310,9 @@ We should report both the gain and the cost rather than optimizing this ratio al
 
 Research on Agent Plasticity emphasizes measuring held-out performance gains and learning cost, not just the final capability level. PAST-Bench also evaluates whether retained experiences were actually saved, retrieved, applied and updated, rather than accepting a performance increase without evidence of its cause.&#x20;
 
-[image](https://www.google.com/s2/favicons?domain=https://arxiv.org\&sz=32)
+[image](https://www.google.com/s2/favicons?domain=https://arxiv.org&sz=32)
 
 arxiv.org+1
-
-
 
 # 13. A concrete example: the kit improves its own TDD Skill
 

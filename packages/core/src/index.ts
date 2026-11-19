@@ -10,14 +10,16 @@
 // Adding an import here from any other @agentic-sdlc-kit/* package besides
 // contracts is a Critical bug and fails scripts/check-architecture.ts.
 
-export * from "./workflows/index.js";
-export * from "./project-profile/index.js";
-export * from "./policy/index.js";
-export * from "./artifacts/index.js";
-export * from "./discovery/index.js";
-export * from "./specification/index.js";
-export * from "./planning/index.js";
-export * from "./tdd/index.js";
-export * from "./stacks/index.js";
-export * from "./learning/index.js";
-export * from "./verification/index.js";
+export * from './workflows/index.js';
+export * from './project-profile/index.js';
+export * from './policy/index.js';
+export * from './artifacts/index.js';
+export * from './discovery/index.js';
+export * from './specification/index.js';
+export * from './planning/index.js';
+export * from './tdd/index.js';
+export * from './stacks/index.js';
+export * from './learning/index.js';
+export * from './verification/index.js';
+export * from './scaffolding/index.js';
+export * from './secret-guard/index.js';

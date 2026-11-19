@@ -31,15 +31,10 @@ See `docs/architecture/ARCHITECTURE.md` §2.2, §6 and ADR-0004.
 ## Usage
 
 ```ts
-import {
-  createWorkflowState,
-  transition,
-  validateProfile,
-  evaluate,
-} from "@agentic-sdlc-kit/core";
+import { createWorkflowState, transition, validateProfile, evaluate } from '@agentic-sdlc-kit/core';
 
-const state = createWorkflowState("RUN-001", "feature");
-const started = transition(state, "start"); // → in_progress
+const state = createWorkflowState('RUN-001', 'feature');
+const started = transition(state, 'start'); // → in_progress
 ```
 
 ## Build

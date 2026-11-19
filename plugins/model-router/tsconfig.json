@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./",
+    "outDir": "./dist",
+    "composite": true,
+    "noEmit": false
+  },
+  "include": ["hooks/**/*.ts", "policies/**/*.ts"],
+  "exclude": ["tests/**/*.ts", "dist", "node_modules", ".claude-plugin"],
+  "references": [{ "path": "../../packages/contracts" }, { "path": "../../packages/mod-sdk" }]
+}

@@ -3,7 +3,7 @@
 // Command registry. The dispatcher uses this to find a command by name.
 // Adding a command = adding one entry here.
 
-import type { Command } from "../commands/types.js";
+import type { Command } from '../commands/types.js';
 
 export interface CommandRegistry {
   list(): ReadonlyArray<Command>;

@@ -21,82 +21,83 @@ export interface StackPackManifest {
 }
 
 export const NODE_TYPESCRIPT_PACK: StackPackManifest = {
-  id: "node-typescript",
-  name: "Node.js / TypeScript",
-  description: "Enterprise TypeScript stack with Vitest, ESLint, and strict compiler checking",
+  id: 'node-typescript',
+  name: 'Node.js / TypeScript',
+  description: 'Enterprise TypeScript stack with Vitest, ESLint, and strict compiler checking',
   defaultCommands: {
-    test: [["pnpm", "test"]],
-    lint: [["pnpm", "lint"]],
-    typecheck: [["pnpm", "typecheck"]],
-    build: [["pnpm", "build"]],
+    test: [['pnpm', 'test']],
+    lint: [['pnpm', 'lint']],
+    typecheck: [['pnpm', 'typecheck']],
+    build: [['pnpm', 'build']],
   },
   conventions: {
-    entryPoints: ["src/index.ts", "src/main.ts"],
-    testFrameworks: ["vitest", "jest", "node:test"],
-    instructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    entryPoints: ['src/index.ts', 'src/main.ts'],
+    testFrameworks: ['vitest', 'jest', 'node:test'],
+    instructionFiles: ['AGENTS.md', 'CLAUDE.md'],
   },
 };
 
 export const REACT_TYPESCRIPT_PACK: StackPackManifest = {
-  id: "react-typescript",
-  name: "React / TypeScript",
-  description: "Frontend React stack with components, hooks, accessible UI, and Playwright/Vitest testing",
+  id: 'react-typescript',
+  name: 'React / TypeScript',
+  description:
+    'Frontend React stack with components, hooks, accessible UI, and Playwright/Vitest testing',
   defaultCommands: {
-    test: [["pnpm", "test"]],
-    lint: [["pnpm", "lint"]],
-    build: [["pnpm", "build"]],
+    test: [['pnpm', 'test']],
+    lint: [['pnpm', 'lint']],
+    build: [['pnpm', 'build']],
   },
   conventions: {
-    entryPoints: ["src/App.tsx", "src/index.tsx", "pages/index.tsx", "app/page.tsx"],
-    testFrameworks: ["vitest", "playwright"],
-    instructionFiles: ["AGENTS.md"],
+    entryPoints: ['src/App.tsx', 'src/index.tsx', 'pages/index.tsx', 'app/page.tsx'],
+    testFrameworks: ['vitest', 'playwright'],
+    instructionFiles: ['AGENTS.md'],
   },
 };
 
 export const RUBY_RAILS_PACK: StackPackManifest = {
-  id: "ruby-rails",
-  name: "Ruby on Rails",
-  description: "Full-stack Rails with Active Record, Service Objects, RuboCop, and RSpec testing",
+  id: 'ruby-rails',
+  name: 'Ruby on Rails',
+  description: 'Full-stack Rails with Active Record, Service Objects, RuboCop, and RSpec testing',
   defaultCommands: {
-    test: [["bundle", "exec", "rspec"]],
-    lint: [["bundle", "exec", "rubocop"]],
+    test: [['bundle', 'exec', 'rspec']],
+    lint: [['bundle', 'exec', 'rubocop']],
   },
   conventions: {
-    entryPoints: ["config/routes.rb", "app/controllers/application_controller.rb"],
-    testFrameworks: ["rspec", "minitest"],
-    instructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    entryPoints: ['config/routes.rb', 'app/controllers/application_controller.rb'],
+    testFrameworks: ['rspec', 'minitest'],
+    instructionFiles: ['AGENTS.md', 'CLAUDE.md'],
   },
 };
 
 export const PYTHON_PACK: StackPackManifest = {
-  id: "python",
-  name: "Python / FastAPI",
-  description: "Python stack with typing, ruff, mypy, and pytest testing",
+  id: 'python',
+  name: 'Python / FastAPI',
+  description: 'Python stack with typing, ruff, mypy, and pytest testing',
   defaultCommands: {
-    test: [["pytest"]],
-    lint: [["ruff", "check", "."]],
-    typecheck: [["mypy", "."]],
+    test: [['pytest']],
+    lint: [['ruff', 'check', '.']],
+    typecheck: [['mypy', '.']],
   },
   conventions: {
-    entryPoints: ["main.py", "app/main.py"],
-    testFrameworks: ["pytest", "unittest"],
-    instructionFiles: ["AGENTS.md"],
+    entryPoints: ['main.py', 'app/main.py'],
+    testFrameworks: ['pytest', 'unittest'],
+    instructionFiles: ['AGENTS.md'],
   },
 };
 
 export const GO_PACK: StackPackManifest = {
-  id: "go",
-  name: "Go Modules",
-  description: "Go stack with interfaces, golangci-lint, and go test",
+  id: 'go',
+  name: 'Go Modules',
+  description: 'Go stack with interfaces, golangci-lint, and go test',
   defaultCommands: {
-    test: [["go", "test", "./..."]],
-    lint: [["golangci-lint", "run"]],
-    build: [["go", "build", "./..."]],
+    test: [['go', 'test', './...']],
+    lint: [['golangci-lint', 'run']],
+    build: [['go', 'build', './...']],
   },
   conventions: {
-    entryPoints: ["main.go"],
-    testFrameworks: ["go test"],
-    instructionFiles: ["AGENTS.md"],
+    entryPoints: ['main.go'],
+    testFrameworks: ['go test'],
+    instructionFiles: ['AGENTS.md'],
   },
 };
 

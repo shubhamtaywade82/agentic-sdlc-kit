@@ -8,13 +8,13 @@
 // `deny` into `allow` is a Critical bug. The middleware MUST refuse to
 // translate a `deny` into a host "allow" decision under any circumstance.
 
-import type { PolicyDecision } from "@agentic-sdlc-kit/contracts";
+import type { PolicyDecision } from '@agentic-sdlc-kit/contracts';
 
 /**
  * The host's view of an approval decision. The adapter maps a
  * PolicyDecision to one of these.
  */
-export type HostApprovalDecision = "allow" | "deny" | "prompt";
+export type HostApprovalDecision = 'allow' | 'deny' | 'prompt';
 
 export interface ApprovalGate {
   /**
@@ -34,9 +34,9 @@ export class DefaultApprovalGate implements ApprovalGate {
   constructor(private readonly interactive: boolean = true) {}
 
   apply(decision: PolicyDecision): HostApprovalDecision {
-    if (decision.verdict === "allow") return "allow";
-    if (decision.verdict === "deny") return "deny";
+    if (decision.verdict === 'allow') return 'allow';
+    if (decision.verdict === 'deny') return 'deny';
     // require-approval
-    return this.interactive ? "prompt" : "deny";
+    return this.interactive ? 'prompt' : 'deny';
   }
 }

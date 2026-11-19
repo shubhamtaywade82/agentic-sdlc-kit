@@ -7,20 +7,20 @@ and §6.
 
 ## 1. Threat model
 
-| Threat                                  | Source                    | Mitigation                                                                                                | Milestone |
-| --------------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------- | --------- |
-| Symlink traversal during install        | Malicious plugin bundle   | mktemp staging; preflight every managed path; reject symlinks; SHA-256 byte-verify staged files.         | M15       |
-| Silent modification of existing files   | Installer or updater      | Skip-if-exists for user files; manifest records kit-owned files only; uninstall removes only owned files.| M15       |
-| Execution of untrusted project scripts  | Repository under inspection | Discovery is read-only; never `exec` a discovered script merely to identify it.                          | M2        |
-| Shell injection via verification cmd    | `ProjectProfile.commands` | Commands are argument arrays executed with `shell: false`; no shell string interpolation.                 | M6        |
-| Path escape during artifact write       | Bug in `core.artifacts`   | Writes confined to `.ai-kit/` and `docs/`; path-escape test in `packages/testing`.                        | M1+       |
-| Secret leakage in reports               | Tool output, git diffs    | Secret Guard Mod scans and redacts before persistence.                                                    | M11       |
-| Destructive op without approval         | Agent or workflow         | Policy evaluator gates every destructive action; bypass is a Critical bug.                                | M10       |
-| Skipped check counted as passed         | Verification reporting    | Status union forbids the transition; tested in `packages/testing`.                                        | M1+       |
-| Scanner failure reported as clean       | Secret scanner            | Scanner failure is a `failed` (or `blocked`) verdict; never `passed`.                                     | M11       |
-| Approval bypass via later stage         | Workflow bug              | Denial is terminal for the action; no transition turns `deny` into `allow`.                              | M10       |
-| Model cost runaway                      | Mis-routed task           | Router starts in suggest-only mode; deterministic fallback; effort routed independently of model.        | M12       |
-| Lockfile / supply-chain attack          | Compromised dependency    | Lockfile committed; CI uses `pnpm install --frozen-lockfile`; releases pin action SHAs.                  | M16       |
+| Threat                                 | Source                      | Mitigation                                                                                                | Milestone |
+| -------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------- | --------- |
+| Symlink traversal during install       | Malicious plugin bundle     | mktemp staging; preflight every managed path; reject symlinks; SHA-256 byte-verify staged files.          | M15       |
+| Silent modification of existing files  | Installer or updater        | Skip-if-exists for user files; manifest records kit-owned files only; uninstall removes only owned files. | M15       |
+| Execution of untrusted project scripts | Repository under inspection | Discovery is read-only; never `exec` a discovered script merely to identify it.                           | M2        |
+| Shell injection via verification cmd   | `ProjectProfile.commands`   | Commands are argument arrays executed with `shell: false`; no shell string interpolation.                 | M6        |
+| Path escape during artifact write      | Bug in `core.artifacts`     | Writes confined to `.ai-kit/` and `docs/`; path-escape test in `packages/testing`.                        | M1+       |
+| Secret leakage in reports              | Tool output, git diffs      | Secret Guard Mod scans and redacts before persistence.                                                    | M11       |
+| Destructive op without approval        | Agent or workflow           | Policy evaluator gates every destructive action; bypass is a Critical bug.                                | M10       |
+| Skipped check counted as passed        | Verification reporting      | Status union forbids the transition; tested in `packages/testing`.                                        | M1+       |
+| Scanner failure reported as clean      | Secret scanner              | Scanner failure is a `failed` (or `blocked`) verdict; never `passed`.                                     | M11       |
+| Approval bypass via later stage        | Workflow bug                | Denial is terminal for the action; no transition turns `deny` into `allow`.                               | M10       |
+| Model cost runaway                     | Mis-routed task             | Router starts in suggest-only mode; deterministic fallback; effort routed independently of model.         | M12       |
+| Lockfile / supply-chain attack         | Compromised dependency      | Lockfile committed; CI uses `pnpm install --frozen-lockfile`; releases pin action SHAs.                   | M16       |
 
 ## 2. Trust boundaries
 
@@ -38,7 +38,7 @@ See `ARCHITECTURE.md` §4. In summary:
 
 ## 3. Approval rules (M0 baseline, enforced from M10)
 
-| Action                       | Default policy                                            | Bypass allowed? |
+| Action                       | Default policy                                           | Bypass allowed? |
 | ---------------------------- | -------------------------------------------------------- | --------------- |
 | File deletion (scoped)       | Allow if scope ≤ N files; else require approval.         | No              |
 | Bulk modification (>N files) | Require approval.                                        | No              |
@@ -64,6 +64,7 @@ when the consequence of failing open is reversible.
 ### 3.2 Bypass cannot silently turn deny into allow
 
 A bypass flag, if it exists, MUST be:
+
 1. Set by an explicit user action (env var, CLI flag, or config file).
 2. Logged with the user identity and timestamp.
 3. Limited to a specific action and scope.
@@ -80,6 +81,7 @@ host process's access to the machine**. They are not an operating-system
 sandbox.
 
 The Mod can:
+
 - Evaluate a policy decision deterministically.
 - Require approval before a destructive action.
 - Refuse to translate a host event that violates policy.
@@ -87,6 +89,7 @@ The Mod can:
 - Observe and report.
 
 The Mod **cannot**:
+
 - Prevent a determined attacker with host access from bypassing it.
 - Replace OS-level file permissions, container isolation, restricted
   credentials, or deployment controls.

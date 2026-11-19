@@ -6,11 +6,11 @@ existing documentation rather than overwriting it.
 
 ## Endpoints
 
-| Method | Path     | Response                          |
-| ------ | -------- | --------------------------------- |
-| GET    | `/`      | `{ message: "hello from ..." }`   |
-| GET    | `/health`| `{ status: "ok" }`                |
-| *      | *        | 404 `{ error: "not found" }`      |
+| Method | Path      | Response                        |
+| ------ | --------- | ------------------------------- |
+| GET    | `/`       | `{ message: "hello from ..." }` |
+| GET    | `/health` | `{ status: "ok" }`              |
+| *      | *         | 404 `{ error: "not found" }`    |
 
 ## Decisions
 

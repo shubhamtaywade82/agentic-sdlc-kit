@@ -3,22 +3,22 @@
 // Read-only repository scanner implementation (M2).
 // Inspects file structure, manifests, and git metadata without executing scripts.
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import {
   Errors,
   RepositoryScanSchema,
   type RepositoryScan,
   type Result,
-} from "@agentic-sdlc-kit/contracts";
-import { detectGitState } from "./git-scanner.js";
-import { detectStacks } from "./stack-detector.js";
+} from '@agentic-sdlc-kit/contracts';
+import { detectGitState } from './git-scanner.js';
+import { detectStacks } from './stack-detector.js';
 import {
   detectAgentInstructions,
   detectCi,
   detectEntryPoints,
   detectMigrations,
-} from "./conventions-detector.js";
+} from './conventions-detector.js';
 
 export interface RepositoryScanner {
   /**
@@ -63,7 +63,7 @@ export class FileSystemRepositoryScanner implements RepositoryScanner {
     if (!parsed.success) {
       return {
         ok: false,
-        error: Errors.discoveryFailed("failed to validate repository scan schema", {
+        error: Errors.discoveryFailed('failed to validate repository scan schema', {
           issues: parsed.error.issues,
         }),
       };
@@ -80,10 +80,10 @@ export class StubRepositoryScanner implements RepositoryScanner {
   async scan(root: string): Promise<Result<RepositoryScan>> {
     return {
       ok: false,
-      error: Errors.notImplemented(
-        "RepositoryScanner is not implemented in M1; lands in M2",
-        { root, milestone: "M2" },
-      ),
+      error: Errors.notImplemented('RepositoryScanner is not implemented in M1; lands in M2', {
+        root,
+        milestone: 'M2',
+      }),
     };
   }
 }

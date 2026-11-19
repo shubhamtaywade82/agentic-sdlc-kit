@@ -15,7 +15,7 @@ import {
   type ProjectProfile,
   type Result,
   type VerificationReport,
-} from "@agentic-sdlc-kit/contracts";
+} from '@agentic-sdlc-kit/contracts';
 
 export interface VerificationRunner {
   /**
@@ -49,19 +49,19 @@ export class DryRunVerificationRunner implements VerificationRunner {
 
     // Add a synthetic `architecture` check that always passes in M1.
     checks.push({
-      id: "architecture",
-      status: "passed",
+      id: 'architecture',
+      status: 'passed',
       durationMs: 0,
-      evidence: ["scripts/check-architecture.ts"],
+      evidence: ['scripts/check-architecture.ts'],
     });
 
     // For every configured command category, add a `skipped` check.
     // In M6 these become real executions.
-    const categories: ReadonlyArray<keyof ProjectProfile["commands"]> = [
-      "test",
-      "lint",
-      "typecheck",
-      "build",
+    const categories: ReadonlyArray<keyof ProjectProfile['commands']> = [
+      'test',
+      'lint',
+      'typecheck',
+      'build',
     ];
     for (const cat of categories) {
       const cmds = profile.commands[cat];
@@ -71,7 +71,7 @@ export class DryRunVerificationRunner implements VerificationRunner {
         if (!cmd) continue;
         checks.push({
           id: cat,
-          status: "skipped",
+          status: 'skipped',
           command: cmd,
         });
       }
@@ -79,7 +79,7 @@ export class DryRunVerificationRunner implements VerificationRunner {
 
     const report: VerificationReport = {
       schemaVersion: 1,
-      runId: "dry-run",
+      runId: 'dry-run',
       status: rollupReportStatus(checks),
       checks,
       ...(opts.commitSha ? { commitSha: opts.commitSha } : {}),

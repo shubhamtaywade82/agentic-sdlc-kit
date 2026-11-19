@@ -2,24 +2,24 @@
 //
 // Sample valid and invalid ProjectProfile inputs for unit tests.
 
-import type { ProjectProfile } from "@agentic-sdlc-kit/contracts";
+import type { ProjectProfile } from '@agentic-sdlc-kit/contracts';
 
 export const validProfile: ProjectProfile = {
   schemaVersion: 1,
-  name: "fixture-node-fullstack",
-  stack: ["node-typescript", "react"],
+  name: 'fixture-node-fullstack',
+  stack: ['node-typescript', 'react'],
   commands: {
-    test: [["pnpm", "test"]],
-    lint: [["pnpm", "lint"]],
-    typecheck: [["pnpm", "typecheck"]],
-    build: [["pnpm", "build"]],
+    test: [['pnpm', 'test']],
+    lint: [['pnpm', 'lint']],
+    typecheck: [['pnpm', 'typecheck']],
+    build: [['pnpm', 'build']],
   },
 };
 
 export const minimalProfile: ProjectProfile = {
   schemaVersion: 1,
-  name: "x",
-  stack: ["node-typescript"],
+  name: 'x',
+  stack: ['node-typescript'],
   commands: {},
 };
 
@@ -28,17 +28,17 @@ export const minimalProfile: ProjectProfile = {
  */
 export const invalidShellStringCommand: unknown = {
   schemaVersion: 1,
-  name: "bad",
-  stack: ["node-typescript"],
-  commands: { test: "pnpm test" },
+  name: 'bad',
+  stack: ['node-typescript'],
+  commands: { test: 'pnpm test' },
 };
 
 /**
  * A profile missing schemaVersion — invalid.
  */
 export const invalidMissingSchemaVersion: unknown = {
-  name: "bad",
-  stack: ["node-typescript"],
+  name: 'bad',
+  stack: ['node-typescript'],
   commands: {},
 };
 
@@ -47,7 +47,7 @@ export const invalidMissingSchemaVersion: unknown = {
  */
 export const invalidEmptyStack: unknown = {
   schemaVersion: 1,
-  name: "bad",
+  name: 'bad',
   stack: [],
   commands: {},
 };
@@ -57,7 +57,7 @@ export const invalidEmptyStack: unknown = {
  */
 export const invalidMixedCaseStack: unknown = {
   schemaVersion: 1,
-  name: "bad",
-  stack: ["Node-TypeScript"],
+  name: 'bad',
+  stack: ['Node-TypeScript'],
   commands: {},
 };

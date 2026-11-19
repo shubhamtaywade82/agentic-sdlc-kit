@@ -3,34 +3,30 @@
 // `kit init [path] [--yes] [--force] [--json]`.
 // Initializes the Agentic SDLC Kit configuration (.ai-kit/project.yml).
 
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import {
-  FileSystemRepositoryScanner,
-  generateProfile,
-  writeProfile,
-} from "@agentic-sdlc-kit/core";
-import type { ProjectProfile } from "@agentic-sdlc-kit/contracts";
-import type { Command, CommandContext, CommandResult } from "./types.js";
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { FileSystemRepositoryScanner, generateProfile, writeProfile } from '@agentic-sdlc-kit/core';
+import type { ProjectProfile } from '@agentic-sdlc-kit/contracts';
+import type { Command, CommandContext, CommandResult } from './types.js';
 
 export const initCommand: Command = {
-  name: "init",
-  summary: "Initialize the Agentic SDLC Kit profile (.ai-kit/project.yml) for a repository.",
+  name: 'init',
+  summary: 'Initialize the Agentic SDLC Kit profile (.ai-kit/project.yml) for a repository.',
   async run(ctx: CommandContext): Promise<CommandResult> {
-    if (ctx.argv.includes("--help") || ctx.argv.includes("-h")) {
+    if (ctx.argv.includes('--help') || ctx.argv.includes('-h')) {
       ctx.stdout(formatHelp());
       return { exitCode: 0 };
     }
 
-    const isJson = ctx.argv.includes("--json");
-    const isForce = ctx.argv.includes("--force") || ctx.argv.includes("-f");
-    const targetArg = ctx.argv.find((a) => !a.startsWith("-"));
-    const targetRoot = path.resolve(ctx.cwd, targetArg ?? ".");
+    const isJson = ctx.argv.includes('--json');
+    const isForce = ctx.argv.includes('--force') || ctx.argv.includes('-f');
+    const targetArg = ctx.argv.find((a) => !a.startsWith('-'));
+    const targetRoot = path.resolve(ctx.cwd, targetArg ?? '.');
 
-    const configPath = path.join(targetRoot, ".ai-kit", "project.yml");
+    const configPath = path.join(targetRoot, '.ai-kit', 'project.yml');
     if (!isForce && (await fileExists(configPath))) {
-      ctx.stderr("kit init: .ai-kit/project.yml already exists (use --force to overwrite)\n");
-      return { exitCode: 1, message: "project profile already exists" };
+      ctx.stderr('kit init: .ai-kit/project.yml already exists (use --force to overwrite)\n');
+      return { exitCode: 1, message: 'project profile already exists' };
     }
 
     const scanner = new FileSystemRepositoryScanner();
@@ -56,7 +52,7 @@ export const initCommand: Command = {
     await ensureDirectories(targetRoot);
 
     if (isJson) {
-      ctx.stdout(JSON.stringify(profile, null, 2) + "\n");
+      ctx.stdout(JSON.stringify(profile, null, 2) + '\n');
     } else {
       ctx.stdout(formatOutput(targetRoot, profile));
     }
@@ -75,33 +71,33 @@ async function fileExists(p: string): Promise<boolean> {
 }
 
 async function ensureDirectories(root: string): Promise<void> {
-  await fs.mkdir(path.join(root, ".ai-kit", "state"), { recursive: true });
-  await fs.mkdir(path.join(root, ".ai-kit", "reports"), { recursive: true });
+  await fs.mkdir(path.join(root, '.ai-kit', 'state'), { recursive: true });
+  await fs.mkdir(path.join(root, '.ai-kit', 'reports'), { recursive: true });
 }
 
 function formatOutput(root: string, profile: ProjectProfile): string {
   const lines: string[] = [
     `Initialized Agentic SDLC Kit profile for '${profile.name}':`,
-    `  Stack:    ${profile.stack.join(", ")}`,
-    `  Commands: ${Object.keys(profile.commands).join(", ") || "(none)"}`,
-    `  Config:   ${path.join(root, ".ai-kit", "project.yml")}`,
-    "",
+    `  Stack:    ${profile.stack.join(', ')}`,
+    `  Commands: ${Object.keys(profile.commands).join(', ') || '(none)'}`,
+    `  Config:   ${path.join(root, '.ai-kit', 'project.yml')}`,
+    '',
     "Next: Run 'kit inspect' to verify repository information.",
-    "",
+    '',
   ];
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 function formatHelp(): string {
   return [
-    "Usage: kit init [path] [--yes] [--force] [--json]",
-    "",
-    "Inspect a repository and generate .ai-kit/project.yml configuration.",
-    "",
-    "Options:",
-    "  --force, -f  Overwrite existing .ai-kit/project.yml",
-    "  --json       Output generated profile as JSON",
-    "  -h, --help   Show this help message",
-    "",
-  ].join("\n");
+    'Usage: kit init [path] [--yes] [--force] [--json]',
+    '',
+    'Inspect a repository and generate .ai-kit/project.yml configuration.',
+    '',
+    'Options:',
+    '  --force, -f  Overwrite existing .ai-kit/project.yml',
+    '  --json       Output generated profile as JSON',
+    '  -h, --help   Show this help message',
+    '',
+  ].join('\n');
 }

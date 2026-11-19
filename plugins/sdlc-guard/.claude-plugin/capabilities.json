@@ -1,0 +1,13 @@
+{
+  "id": "sdlc-guard",
+  "version": "0.7.0",
+  "hooks": ["tool.call", "tool.check"],
+  "apiAccess": ["ui.log", "state.get"],
+  "filesystemAccess": [],
+  "networkAccess": false,
+  "processExecution": false,
+  "modifiesPrompts": false,
+  "modifiesToolCalls": true,
+  "modifiesModels": false,
+  "learningAutonomyLevel": "L0"
+}

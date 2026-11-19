@@ -8,25 +8,25 @@ milestones.
 ## 1. Workflow modes
 
 ```ts
-type WorkflowMode = "app" | "feature" | "fix" | "refactor";
+type WorkflowMode = 'app' | 'feature' | 'fix' | 'refactor';
 ```
 
-| Mode      | Entry command  | First milestone | What it produces                                    |
-| --------- | -------------- | --------------- | -------------------------------------------------- |
-| app       | `/kit:app`     | M8              | A new application from a product brief              |
-| feature   | `/kit:feature` | M7              | An incremental feature on an existing repository    |
-| fix       | `/kit:fix`     | M9              | The smallest valid correction plus regression test  |
-| refactor  | `/kit:refactor`| M9              | Behavior-preserving structural change               |
+| Mode     | Entry command   | First milestone | What it produces                                   |
+| -------- | --------------- | --------------- | -------------------------------------------------- |
+| app      | `/kit:app`      | M8              | A new application from a product brief             |
+| feature  | `/kit:feature`  | M7              | An incremental feature on an existing repository   |
+| fix      | `/kit:fix`      | M9              | The smallest valid correction plus regression test |
+| refactor | `/kit:refactor` | M9              | Behavior-preserving structural change              |
 
 ## 2. Workflow status state machine
 
 ```ts
 type WorkflowStatus =
-  | "pending"        // created, not started
-  | "in_progress"    // a task is currently being executed
-  | "blocked"        // waiting on approval, dependency, or external input
-  | "completed"      // all tasks done and verification passed
-  | "failed";        // a task failed or verification failed
+  | 'pending' // created, not started
+  | 'in_progress' // a task is currently being executed
+  | 'blocked' // waiting on approval, dependency, or external input
+  | 'completed' // all tasks done and verification passed
+  | 'failed'; // a task failed or verification failed
 ```
 
 Allowed transitions (enforced by `core.workflows.engine`):
@@ -48,10 +48,10 @@ machine and tested in `packages/core/src/workflows/engine.test.ts`.
 
 ```ts
 interface WorkflowState {
-  runId: string;             // stable, reproducible (not a timestamp)
+  runId: string; // stable, reproducible (not a timestamp)
   mode: WorkflowMode;
   status: WorkflowStatus;
-  startedAt: string;         // ISO 8601, set when transitioned to in_progress
+  startedAt: string; // ISO 8601, set when transitioned to in_progress
   currentTaskId?: TaskId;
   taskHistory: Array<{ taskId: TaskId; status: CheckStatus; evidence?: string[] }>;
 }
@@ -144,23 +144,23 @@ mode; the kit does not infer it.
 
 ## 8. Workflow → Milestone → Module traceability
 
-| Step in any workflow | Provided by (milestone) | Module                                |
-| -------------------- | ---------------------- | ------------------------------------- |
-| Inspect repository   | M2                     | core.discovery                        |
-| Generate profile     | M2                     | core.project-profile.generator        |
-| Validate profile     | M2                     | core.project-profile.validator        |
-| Generate spec        | M3                     | Skill: requirements-engineering       |
-| Validate spec        | M3                     | kit validate-spec (cli)               |
-| Architecture analysis| M4                     | Agent: repository-analyst             |
-| Plan                 | M4                     | Skill: implementation-planning        |
-| Validate plan        | M4                     | kit validate-plan (cli)               |
-| Implement task       | M5                     | Skill: tdd-bdd                        |
-| Verify               | M6                     | core.verification.runner              |
-| Code review          | M7                     | Agent: architecture-reviewer          |
-| Approval gate        | M10                    | core.policy.evaluator + adapter       |
-| Secret guard         | M11                    | Mod: secret-guard                     |
-| Model routing        | M12                    | Mod: model-router                     |
-| Observability        | M13                    | Mod: run-observer                     |
+| Step in any workflow  | Provided by (milestone) | Module                          |
+| --------------------- | ----------------------- | ------------------------------- |
+| Inspect repository    | M2                      | core.discovery                  |
+| Generate profile      | M2                      | core.project-profile.generator  |
+| Validate profile      | M2                      | core.project-profile.validator  |
+| Generate spec         | M3                      | Skill: requirements-engineering |
+| Validate spec         | M3                      | kit validate-spec (cli)         |
+| Architecture analysis | M4                      | Agent: repository-analyst       |
+| Plan                  | M4                      | Skill: implementation-planning  |
+| Validate plan         | M4                      | kit validate-plan (cli)         |
+| Implement task        | M5                      | Skill: tdd-bdd                  |
+| Verify                | M6                      | core.verification.runner        |
+| Code review           | M7                      | Agent: architecture-reviewer    |
+| Approval gate         | M10                     | core.policy.evaluator + adapter |
+| Secret guard          | M11                     | Mod: secret-guard               |
+| Model routing         | M12                     | Mod: model-router               |
+| Observability         | M13                     | Mod: run-observer               |
 
 ## 9. Cross-cutting standards (apply to every workflow)
 
@@ -173,18 +173,18 @@ accepted merely because it appears complete.
 
 ### B. Definition of Done
 
-| Dimension      | Completion requirement                                       |
-| -------------- | ----------------------------------------------------------- |
-| Requirements   | Acceptance criteria satisfied                                |
-| Architecture   | Consistent with approved boundaries                          |
-| Implementation | No unrelated changes                                         |
-| Tests          | Required tests executed successfully                         |
-| Regression     | Relevant existing behavior verified                          |
-| Quality        | Lint and typecheck pass where configured                     |
-| Security       | Relevant security checks completed                           |
-| Documentation  | Updated where behavior or contracts changed                  |
-| Review         | Independent review completed                                 |
-| Evidence       | Verification report persisted                                |
+| Dimension      | Completion requirement                      |
+| -------------- | ------------------------------------------- |
+| Requirements   | Acceptance criteria satisfied               |
+| Architecture   | Consistent with approved boundaries         |
+| Implementation | No unrelated changes                        |
+| Tests          | Required tests executed successfully        |
+| Regression     | Relevant existing behavior verified         |
+| Quality        | Lint and typecheck pass where configured    |
+| Security       | Relevant security checks completed          |
+| Documentation  | Updated where behavior or contracts changed |
+| Review         | Independent review completed                |
+| Evidence       | Verification report persisted               |
 
 ### C. Keep agent context small
 

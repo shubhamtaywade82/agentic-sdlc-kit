@@ -8,24 +8,24 @@
 //
 // See ARCHITECTURE.md §3 and ADR-0004 / ADR-0005.
 
-import type { VerificationReport } from "@agentic-sdlc-kit/contracts";
+import type { VerificationReport } from '@agentic-sdlc-kit/contracts';
 
 export type RuntimeEvent =
   | {
-      kind: "lifecycle";
-      phase: "session-start" | "session-end" | "task-start" | "task-end";
+      kind: 'lifecycle';
+      phase: 'session-start' | 'session-end' | 'task-start' | 'task-end';
       runId?: string;
       timestamp: string; // ISO 8601
     }
   | {
-      kind: "tool-call";
+      kind: 'tool-call';
       tool: string;
       input: unknown;
       output?: unknown;
       timestamp: string;
     }
   | {
-      kind: "model-request";
+      kind: 'model-request';
       model: string;
       effort: string;
       tokensIn?: number;
@@ -33,7 +33,7 @@ export type RuntimeEvent =
       timestamp: string;
     }
   | {
-      kind: "verification";
+      kind: 'verification';
       report: VerificationReport;
       timestamp: string;
     };
@@ -41,19 +41,19 @@ export type RuntimeEvent =
 /**
  * Type guard helpers for narrowing a RuntimeEvent by kind.
  */
-export function isLifecycle(e: RuntimeEvent): e is Extract<RuntimeEvent, { kind: "lifecycle" }> {
-  return e.kind === "lifecycle";
+export function isLifecycle(e: RuntimeEvent): e is Extract<RuntimeEvent, { kind: 'lifecycle' }> {
+  return e.kind === 'lifecycle';
 }
-export function isToolCall(e: RuntimeEvent): e is Extract<RuntimeEvent, { kind: "tool-call" }> {
-  return e.kind === "tool-call";
+export function isToolCall(e: RuntimeEvent): e is Extract<RuntimeEvent, { kind: 'tool-call' }> {
+  return e.kind === 'tool-call';
 }
 export function isModelRequest(
   e: RuntimeEvent,
-): e is Extract<RuntimeEvent, { kind: "model-request" }> {
-  return e.kind === "model-request";
+): e is Extract<RuntimeEvent, { kind: 'model-request' }> {
+  return e.kind === 'model-request';
 }
 export function isVerification(
   e: RuntimeEvent,
-): e is Extract<RuntimeEvent, { kind: "verification" }> {
-  return e.kind === "verification";
+): e is Extract<RuntimeEvent, { kind: 'verification' }> {
+  return e.kind === 'verification';
 }

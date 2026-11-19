@@ -6,12 +6,12 @@
 // Scanning is read-only. The scanner MUST NOT execute any discovered
 // script. See docs/security/SECURITY.md §1 and ADR-0009.
 
-import { z } from "zod";
+import { z } from 'zod';
 
 export const GitStateSchema = z.object({
   branch: z.string().min(1),
   dirty: z.boolean(),
-  headSha: z.string().regex(/^[0-9a-f]{40}$/, "headSha must be a 40-char SHA-1"),
+  headSha: z.string().regex(/^[0-9a-f]{40}$/, 'headSha must be a 40-char SHA-1'),
 });
 
 export const RepositoryScanSchema = z.object({

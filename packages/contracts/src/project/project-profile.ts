@@ -7,7 +7,7 @@
 //
 // See docs/contracts/CONTRACTS.md §2 and ADR-0008.
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * Schema version for the ProjectProfile contract. Bumped on breaking
@@ -22,7 +22,7 @@ export const PROJECT_PROFILE_SCHEMA_VERSION = 1 as const;
  */
 export const CommandSchema = z
   .array(z.string().min(1))
-  .min(1, "command must be a non-empty array of arguments");
+  .min(1, 'command must be a non-empty array of arguments');
 
 export const CommandsMapSchema = z
   .object({
@@ -36,19 +36,16 @@ export const CommandsMapSchema = z
 export const ProjectProfileSchema = z
   .object({
     schemaVersion: z.literal(PROJECT_PROFILE_SCHEMA_VERSION),
-    name: z
-      .string()
-      .min(1)
-      .max(128, "name must be 1-128 chars"),
+    name: z.string().min(1).max(128, 'name must be 1-128 chars'),
     stack: z
       .array(
         z
           .string()
           .min(1)
           .max(64)
-          .regex(/^[a-z][a-z0-9-]*$/, "stack entry must be lowercase kebab-case"),
+          .regex(/^[a-z][a-z0-9-]*$/, 'stack entry must be lowercase kebab-case'),
       )
-      .min(1, "stack must contain at least one entry"),
+      .min(1, 'stack must contain at least one entry'),
     commands: CommandsMapSchema,
   })
   .strict();
@@ -63,6 +60,6 @@ export type Command = z.infer<typeof CommandSchema>;
  * (programmer error) if invalid — production callers should use the schema
  * directly and surface a PROFILE_INVALID Result.
  */
-export function makeProfile(input: Omit<ProjectProfile, "schemaVersion">): ProjectProfile {
+export function makeProfile(input: Omit<ProjectProfile, 'schemaVersion'>): ProjectProfile {
   return ProjectProfileSchema.parse({ ...input, schemaVersion: PROJECT_PROFILE_SCHEMA_VERSION });
 }

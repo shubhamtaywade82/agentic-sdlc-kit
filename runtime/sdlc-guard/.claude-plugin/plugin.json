@@ -1,6 +1,0 @@
-{
-  "name": "sdlc-guard",
-  "version": "5.0.0",
-  "description": "Agentic SDLC Kit runtime governance: blocks destructive shell commands (force push, filter-branch, root rm, pipe-to-shell, destructive SQL, chmod -R 777), gates migrations/deployments/pushes behind modal approval and denies writes into protected paths (.github/workflows/**, .git/**, .env*, keys). Fail closed.",
-  "author": { "name": "Agentic SDLC Kit" }
-}

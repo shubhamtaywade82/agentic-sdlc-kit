@@ -1,4 +1,0 @@
-{
-  "description": "sdlc-guard hooks: Bash command assessment (tool.call) and protected-path checks for Edit/Write/NotebookEdit. Fail closed via .catch.",
-  "modules": ["./register.ts"]
-}

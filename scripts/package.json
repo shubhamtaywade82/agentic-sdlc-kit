@@ -1,0 +1,17 @@
+{
+  "name": "@agentic-sdlc-kit/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workspace-level scripts (architecture check).",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check:architecture": "tsx check-architecture.ts",
+    "check:architecture:build": "tsc check-architecture.ts --outDir dist --target ES2022 --module NodeNext --moduleResolution NodeNext --strict"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.0"
+  }
+}

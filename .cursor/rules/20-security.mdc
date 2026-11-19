@@ -1,8 +1,0 @@
----
-description: Security rules for code touching input, auth, data
-alwaysApply: true
----
-- Validate and sanitize all external input; parameterize queries.
-- Never log secrets, tokens, or PII. Use env vars / secret manager.
-- Authorization check on every protected action (deny by default).
-- See checklists/security.md before finishing auth, payments, uploads, or admin features.

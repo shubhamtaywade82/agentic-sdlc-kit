@@ -1,0 +1,15 @@
+{
+  "name": "fixture-node-fullstack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Reference fixture for the Agentic SDLC Kit: an existing Node.js + TypeScript + Express application with a passing test. Target of the first M2 `kit inspect` dry-run.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test tests/"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

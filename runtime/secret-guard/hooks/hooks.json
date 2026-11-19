@@ -1,4 +1,0 @@
-{
-  "description": "secret-guard hooks: secret scanning for Write/NotebookEdit/Edit, staged-diff scanning for git commit, production env-file approval. Fail closed.",
-  "modules": ["./register.ts"]
-}

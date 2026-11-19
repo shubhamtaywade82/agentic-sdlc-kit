@@ -1,6 +1,0 @@
-{
-  "name": "model-router",
-  "version": "5.0.0",
-  "description": "Agentic SDLC Kit runtime governance: model/effort routing for spawned agents and pinned main-conversation models, driven by deterministic rules in .ai/project.yml (router.enabled / router.agents / router.main.model). Default off; never rewrites a model that was not explicitly configured.",
-  "author": { "name": "Agentic SDLC Kit" }
-}

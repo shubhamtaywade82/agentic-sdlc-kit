@@ -1,6 +1,0 @@
-{
-  "name": "run-observer",
-  "version": "5.0.0",
-  "description": "Agentic SDLC Kit runtime telemetry (P1, lean): observes tool calls, turns, model requests and agent spawns without ever blocking them, keeps a session status line, persists a best-effort JSONL run report and answers the /kit:status command.",
-  "author": { "name": "Agentic SDLC Kit" }
-}

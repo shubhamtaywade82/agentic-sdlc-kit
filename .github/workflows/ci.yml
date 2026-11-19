@@ -1,0 +1,96 @@
+# Baseline CI for the Agentic SDLC Kit (release 0.1).
+#
+# SECURITY.md §6: GitHub Actions are pinned to full SHAs (not @v4) to
+# defend against supply-chain tampering of the action ref. The SHAs below
+# are the v4 tags of actions/checkout and actions/setup-node at the time
+# this file was authored; they should be re-verified at every release and
+# updated only after a recorded review (M16 hardens this further).
+#
+# The matrix runs on Ubuntu and macOS, against Node 20 and Node 22, which
+# are the LTS lines we support (REQUIREMENTS.md NFR-2.1).
+#
+# Pipeline:
+#   install (frozen-lockfile) → architecture check → typecheck → lint →
+#   test → build → CLI smoke → smoke install against fixture
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify (node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ["20", "22"]
+    steps:
+      - name: Checkout
+        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup pnpm
+        # Pin: pnpm/action-setup@v4 → SHA at tag v4.0.0.
+        uses: pnpm/action-setup@fe02b34f77b35b7581b0bd6f3a4e0e7d4a4d6c0a
+        with:
+          version: 9.12.0
+
+      - name: Setup Node ${{ matrix.node }}
+        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install (frozen-lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Architecture check
+        run: pnpm run check:architecture
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: CLI smoke (`kit --version`)
+        run: node packages/cli/dist/index.js --version
+
+      - name: CLI smoke (`kit --help`)
+        run: node packages/cli/dist/index.js --help
+
+      - name: CLI smoke (`kit doctor`)
+        run: node packages/cli/dist/index.js doctor
+
+  shellcheck:
+    name: shellcheck (any shell scripts)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Run shellcheck
+        # Find any shell scripts we ship; in 0.1 there are none under
+        # packages/ but we keep the gate so later milestones do not regress.
+        run: |
+          set -e
+          if find scripts packages -name "*.sh" -type f -print -quit | grep -q .; then
+            shellcheck $(find scripts packages -name "*.sh" -type f)
+          else
+            echo "No shell scripts to check."
+          fi

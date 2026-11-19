@@ -1,9 +1,0 @@
----
-description: Rails conventions
-globs: ["app/**/*.rb", "lib/**/*.rb", "config/**/*.rb", "db/migrate/**/*.rb"]
----
-- RESTful controllers, 7 standard actions; thin controllers; authorize every action.
-- Strong params via params.expect; no SQL interpolation; includes/preload to avoid N+1.
-- Validations + DB constraints. Reversible, zero-downtime-safe migrations with indexes.
-- Side effects in jobs (idempotent, pass IDs). No html_safe/raw on user input.
-- Run `bundle exec rspec <file>` and `bin/rubocop <file>` after edits.

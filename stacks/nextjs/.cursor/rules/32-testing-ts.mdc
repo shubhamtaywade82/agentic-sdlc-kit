@@ -1,7 +1,0 @@
----
-description: Vitest, RTL, Playwright conventions
-globs: ["**/*.test.ts", "**/*.test.tsx", "tests/**/*"]
----
-- RTL: query by role/label/text; assert user-visible behavior; user-event for interactions.
-- MSW for network mocks; vi.useFakeTimers for time. No snapshot-only tests.
-- Playwright: getByRole locators, web-first assertions, no waitForTimeout.

@@ -1,0 +1,7 @@
+{
+  "name": "secret-guard",
+  "version": "0.7.0",
+  "description": "Secret protection Mod: detect and redact secrets in tool output, file writes, and git operations. Uses the M11 detector and redactor.",
+  "author": { "name": "Agentic SDLC Kit" },
+  "license": "MIT"
+}

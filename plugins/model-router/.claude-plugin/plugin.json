@@ -1,0 +1,7 @@
+{
+  "name": "model-router",
+  "version": "0.7.0",
+  "description": "Model + effort routing Mod: classify task complexity and risk, select model and effort, preserve explicit user choices, escalate on verification failure.",
+  "author": { "name": "Agentic SDLC Kit" },
+  "license": "MIT"
+}

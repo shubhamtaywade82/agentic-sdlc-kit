@@ -1,6 +1,0 @@
-{
-  "name": "secret-guard",
-  "version": "5.0.0",
-  "description": "Agentic SDLC Kit runtime governance: detects credentials in files being written or edited (AWS keys, private keys, GitHub/GitLab/Slack tokens, Stripe/OpenAI/Google keys, password assignments) and scans the staged diff before git commit runs; asks before writing production env files. Fail closed.",
-  "author": { "name": "Agentic SDLC Kit" }
-}

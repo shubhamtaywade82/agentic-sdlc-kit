@@ -1,0 +1,13 @@
+{
+  "id": "run-observer",
+  "version": "0.7.0",
+  "hooks": ["session.start", "turn.start", "tool.call", "turn.complete"],
+  "apiAccess": ["ui.log", "state.get", "state.set"],
+  "filesystemAccess": [],
+  "networkAccess": false,
+  "processExecution": false,
+  "modifiesPrompts": false,
+  "modifiesToolCalls": false,
+  "modifiesModels": false,
+  "learningAutonomyLevel": "L0"
+}

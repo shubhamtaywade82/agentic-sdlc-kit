@@ -1,9 +1,0 @@
----
-description: Core agent rules (always applied)
-alwaysApply: true
----
-Follow the repository-root `AGENTS.md` (relative path, no leading slash) as the source of truth.
-- Plan before multi-file edits; save plans to `docs/plans/`.
-- Test-first for logic; run tests and show output before saying "done".
-- Follow existing patterns. No scope creep. No secrets.
-- Pushing, merging, tagging, releasing, and deploying ALWAYS require explicit human approval first.

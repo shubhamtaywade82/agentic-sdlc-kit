@@ -1,0 +1,4 @@
+{
+  "description": "sdlc-guard hooks",
+  "modules": ["./hooks/register.js"]
+}

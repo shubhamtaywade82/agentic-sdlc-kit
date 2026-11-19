@@ -1,0 +1,35 @@
+{
+  "name": "@agentic-sdlc-kit/mod-sdk",
+  "version": "0.7.0",
+  "description": "Mod Development Framework: typed event registration, Mods API surface, MockRuntime for tests, capability manifest, middleware composition. Runtime-independent; does not import claude-code.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:contract": "vitest run src/**/*.test.ts",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@agentic-sdlc-kit/contracts": "workspace:*",
+    "@agentic-sdlc-kit/core": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "agentic-sdlc-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Runtime-independent Agentic SDLC Kit. M0+M1 foundation: contracts, core, cli, testing, and the Claude Code adapter boundary.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "workspaces": [
+    "packages/*",
+    "plugins/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" build",
+    "typecheck": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" test",
+    "test:contract": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" test:contract",
+    "check:architecture": "tsx scripts/check-architecture.ts",
+    "verify": "pnpm run check:architecture && pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "clean": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" exec -- rm -rf dist *.tsbuildinfo",
+    "kit": "pnpm --filter @agentic-sdlc-kit/cli start"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
+  }
+}

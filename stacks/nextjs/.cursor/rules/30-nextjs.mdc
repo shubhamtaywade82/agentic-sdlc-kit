@@ -1,9 +1,0 @@
----
-description: Next.js App Router conventions
-globs: ["src/app/**/*", "app/**/*", "src/server/**/*", "src/components/**/*"]
----
-- Server Components by default; "use client" only at the smallest leaf that needs it.
-- Data access lives in src/server; never import it into client code ("server-only").
-- Server Actions/Route Handlers: Zod-validate → authenticate → authorize → execute → revalidate.
-- Await params/searchParams/cookies()/headers(). Be explicit about caching.
-- Use loading/error/not-found files and Suspense. next/image, next/link, next/font.

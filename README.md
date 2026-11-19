@@ -1,133 +1,101 @@
-# Agentic SDLC Kit — `ai-dev-kit` v5.0.0
+# Agentic SDLC Kit
 
-An opinionated, modular AI software development kit. Give it a new application
-idea, a feature request for an existing repository, or a bug/refactoring item,
-and it drives a controlled engineering lifecycle: **LLMs reason, deterministic
-scripts verify, humans approve at the gates** — ending in working, tested,
-reviewed, documented software, not plausible AI-generated code.
+A **runtime-independent** Agentic SDLC kit: a structured SDLC system that
+lets an AI coding assistant take a feature, bug fix, refactor, or new
+application from an ambiguous request to a verified, reviewable change —
+without giving up the engineering discipline a human team would apply.
 
-Built on the open standards: [Agent Skills](https://agentskills.io) ·
-[Model Context Protocol](https://modelcontextprotocol.io) · the official
-[Claude Code Mods API](https://code.claude.com/docs/en/plugins/mods/).
+This repository implements the **0.1 release (M0 + M1)** of the roadmap in
+[`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md). Later milestones (M2
+through M18) are described there as planning labels.
 
-## Three installable components
+## What is in 0.1
 
-| Component | What it is | Install |
-|---|---|---|
-| **sdlc-core** + **kit CLI** | 10-stage lifecycle, 3 execution modes, 6 commands, 9 skills, 4 agents, templates, checklists, MCP tools — plus the deterministic `kit` gates | default |
-| **sdlc-runtime** | Four Claude Code mods: `sdlc-guard`, `model-router`, `secret-guard`, `run-observer` | `--runtime` (Claude Code ≥ 2.1.287) |
-| **sdlc-stacks** | Stack packs with conventions, commands, and 22 GoF pattern implementations each | `--stack <name>` |
-
-One version (5.0.0) across all components — see
-[docs/architecture/system-design.md](docs/architecture/system-design.md) and
-[components.json](components.json).
+- **M0 — Architecture freeze** (10 docs + 9 ADRs) under `docs/`.
+- **M1 — Core platform foundation** as a TypeScript pnpm-workspace monorepo:
+  - `packages/contracts` — shared types and zod schemas. Depends on nothing.
+  - `packages/core` — runtime-independent workflow engine, profile generator
+    and validator, artifacts writer, policy evaluator, verification runner.
+  - `packages/cli` — the `kit` executable with `--version`, `--help`, and
+    `doctor`.
+  - `packages/testing` — shared fixtures, assertions, validators, helpers.
+  - `packages/claude-code-adapter` — the architectural boundary that
+    separates the host runtime from the runtime-independent core. **M1
+    ships the boundary declaration only**; the host SDK is not imported
+    until M10 (see ADR-0005).
+- **Baseline CI** under `.github/workflows/ci.yml`.
+- **Architecture check** under `scripts/check-architecture.ts`, wired into
+  `pnpm verify` and CI.
+- **Reference fixture** under `fixtures/fixture-node-fullstack/` for the
+  first M2 `kit inspect` dry-run.
 
 ## Quick start
 
 ```bash
-# install into your project (never overwrites existing files)
-bash scripts/install.sh /path/to/project --stack node-ts-lib --runtime
+# Install (uses the committed pnpm-lock.yaml)
+pnpm install --frozen-lockfile
 
-# 1. create the project profile + engineering skeleton
-node .ai/kit/bin/kit.js init          # or /kit:init in Claude Code
+# Run the full pipeline (architecture → typecheck → lint → test → build)
+pnpm verify
 
-# 2. run a workflow
-#    Claude Code:  /kit:feature "bulk CSV import with validation"
-#    any assistant: follow .ai/workflows/00-overview.md
-
-# 3. the gates (evidence, not vibes)
-node .ai/kit/bin/kit.js validate-spec docs/specifications/features/<slug>.md
-node .ai/kit/bin/kit.js validate-plan  docs/plans/<slug>.md
-node .ai/kit/bin/kit.js verify         # -> .ai/reports/verification/*.json
-node .ai/kit/bin/kit.js audit          # secrets + dependency advisories
-node .ai/kit/bin/kit.js release-check
-
-# uninstall removes exactly what the manifest recorded
-bash scripts/uninstall.sh /path/to/project --dry-run
+# Smoke the CLI
+node packages/cli/dist/index.js --version
+node packages/cli/dist/index.js --help
+node packages/cli/dist/index.js doctor
 ```
 
-## The six commands (Claude Code)
+Requirements: Node 20+ and pnpm 9.12.0. The `packageManager` field in
+`package.json` pins pnpm; `corepack enable` picks it up automatically.
 
-| Command | Responsibility |
-|---|---|
-| `/kit:init` | Discover the project, create the profile and skeleton |
-| `/kit:app` | Mode A — new application lifecycle (vertical-slice MVP) |
-| `/kit:feature` | Mode B — complete feature in an existing app |
-| `/kit:fix` | Mode C — bug fix (regression-test-first) or behavior-preserving refactor |
-| `/kit:review` | Independent review: code, architecture, security agents |
-| `/kit:release` | Release readiness + controlled, per-action-approved execution |
+## Architectural invariants
 
-Nine skills load on demand (repo-discovery, requirements-engineering,
-system-design, implementation-planning, tdd-bdd, design-pattern-selection,
-code-quality, security-engineering, release-engineering); four read-only
-agents (repository-analyst, architecture-reviewer, code-reviewer,
-security-reviewer). Implementation stays with the primary agent.
+These are enforced by `scripts/check-architecture.ts`, which runs in CI
+before `pnpm verify` and fails the build on any violation
+(see `docs/architecture/ARCHITECTURE.md` §6):
 
-## Gates are scripts, not vibes
+1. `contracts` imports nothing.
+2. `core` imports only from `contracts`.
+3. `cli` imports from `core` and `contracts`.
+4. `testing` imports from `contracts` and dev-only deps.
+5. `claude-code-adapter` imports from `contracts`; the host SDK import
+   lives inside this package only.
+6. No package imports from a sibling's `dist/`.
 
-`kit validate-spec` / `validate-plan` refuse malformed specs and cyclic plans;
-`kit verify` runs your project's quality commands **strictly as argument
-arrays with `shell:false`** and emits a machine-readable VerificationReport
-(PASS / FAIL / SKIPPED / BLOCKED — a skipped check is never a passed check);
-`kit audit` scans for secrets and dependency advisories; `kit release-check`
-demands changelog, evidence, clean tree, and a free tag. Contract schemas:
-[docs/architecture/contracts/](docs/architecture/contracts/).
+The single most important invariant: **the core is runtime-independent.**
+The Claude Code adapter is one adapter among many possible adapters, never
+the owner of the product's workflow logic. See ADR-0004 and ADR-0005.
 
-## Runtime mods (optional)
+## Documentation
 
-`sdlc-guard` blocks force-pushes and pipe-to-shell, asks before
-migrations/deploys, and guards protected paths — fail-closed. `model-router`
-routes subagents by role (opt-in; never rewrites your pinned main model).
-`secret-guard` refuses writes/commits carrying secrets (same canonical
-patterns as `kit audit`). `run-observer` records tool/turn/agent telemetry
-and adds `/kit:status`. Policy cores are pure TypeScript, unit-tested in CI;
-mods run with your privileges and are NOT a sandbox —
-[runtime/README.md](runtime/README.md).
+The full M0 artifact set lives under `docs/`:
 
-## Stack packs
+- [`docs/product/PRODUCT.md`](docs/product/PRODUCT.md) — vision, users, non-goals.
+- [`docs/requirements/REQUIREMENTS.md`](docs/requirements/REQUIREMENTS.md) — FRs and NFRs for 0.1.
+- [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) — boundaries, components, invariants.
+- [`docs/modules/MODULES.md`](docs/modules/MODULES.md) — packages, skills, agents, commands, Mods, stack packs.
+- [`docs/workflows/WORKFLOWS.md`](docs/workflows/WORKFLOWS.md) — feature, app, fix, refactor lifecycles.
+- [`docs/contracts/CONTRACTS.md`](docs/contracts/CONTRACTS.md) — types and zod schemas.
+- [`docs/security/SECURITY.md`](docs/security/SECURITY.md) — threat model, approval rules, the "not an OS sandbox" limitation.
+- [`docs/testing/TESTING.md`](docs/testing/TESTING.md) — test strategy and Definition of Done.
+- [`docs/roadmap/ROADMAP.md`](docs/roadmap/ROADMAP.md) — milestones M0–M18, release gates.
+- [`docs/adr/`](docs/adr/) — nine Architecture Decision Records.
 
-`--stack rails` · `--stack rails-ts` · `--stack nextjs` · `--stack node-ts-lib` —
-each installs stack conventions (AGENTS.md), editor rules, and the pattern
-library (creational / structural / behavioral / testing, idiomatic per
-language) to `.ai/stack/<name>/patterns/`. Pattern *selection* (the five
-questions, when/when-not, seven categories incl. resilience, data,
-architecture) lives in the `design-pattern-selection` skill.
+## The non-negotiable limitation
 
-## Supported adapters (tested)
+Claude Code Mods (and equivalent host-runtime plugins) execute with the
+host process's access to the machine. They are **not** an operating-system
+sandbox. The kit provides approval controls, policy evaluation, secret
+redaction, and observability — but real isolation must come from OS
+permissions, containers, restricted credentials, and deployment controls.
+See [`docs/security/SECURITY.md`](docs/security/SECURITY.md) §4 and
+ADR-0009.
 
-Claude Code · Cursor · Windsurf · GitHub Copilot · Gemini CLI / OpenCode.
-The core is runtime-independent (plain Node 18+ and markdown contracts);
-commands/skills/rules are mapped per adapter by the installer.
+## Contributing
 
-## What's new in v5
-
-Three-component architecture, the `kit` CLI, runtime mods on the official
-Mods API, six commands / nine skills / four agents, 10-stage lifecycle with
-three modes, VerificationReport evidence, project profile, ADRs and
-architecture contracts. Full list: [CHANGELOG.md](CHANGELOG.md); upgrading
-from v4: [docs/migration-v4-to-v5.md](docs/migration-v4-to-v5.md).
-
-## Repository layout
-
-```
-core/      workflows (10 stages, 3 modes) · commands/kit (6) · skills (9) ·
-           agents (4) · prompts · templates · checklists · mcp/
-cli/       kit CLI — TypeScript, zero runtime deps, committed dist/
-runtime/   4 Claude Code mods (.claude-plugin/ + hooks/ + policies/ + tests/)
-stacks/    rails · rails-ts · nextjs · node-ts-lib (AGENTS.md + patterns/)
-scripts/   install.sh · uninstall.sh · check.sh
-docs/      architecture/ (system design, contracts, ADRs) · migration guides
-tests/     run-tests.sh (~250 assertions) · mcp-smoke.mjs
-```
-
-## Verification
-
-`bash scripts/check.sh` runs: shell syntax + shellcheck, structure validation
-(components, 6/9/4/4 inventory, mods fail-closed checks, Agent Skills spec),
-the kit CLI build + 146-test suite, runtime hooks typecheck + 74 policy
-tests, the installer regression suite, and the MCP smoke test. CI
-(SHA-pinned actions, ubuntu + macos) runs the same gates.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). In short: open an issue first for
+anything beyond a typo; every code change runs `pnpm verify` green on Node
+20 and Node 22, Ubuntu and macOS; every contract change requires an ADR.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [`LICENSE`](LICENSE).

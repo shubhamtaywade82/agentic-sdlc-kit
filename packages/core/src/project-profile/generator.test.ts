@@ -41,6 +41,14 @@ describe("generateProfile", () => {
     if (r.ok) expect(r.value.name).toBe("my-cool-app");
   });
 
+  it("generates node:test command when node:test is detected", () => {
+    const r = generateProfile(baseScan({ testFrameworks: ["node:test"] }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.commands.test).toEqual([["node", "--test", "tests/"]]);
+    }
+  });
+
   it("handles unknown primary stack by producing an empty commands map (still valid)", () => {
     const r = generateProfile(baseScan({ detectedStacks: ["unknown-stack"] }));
     expect(r.ok).toBe(true);

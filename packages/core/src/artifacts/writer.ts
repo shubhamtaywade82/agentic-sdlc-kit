@@ -12,7 +12,8 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { Errors, type Result } from "@agentic-sdlc-kit/contracts";
+import { Errors, type ProjectProfile, type Result } from "@agentic-sdlc-kit/contracts";
+import { serializeProfileToYaml } from "../project-profile/serializer.js";
 
 const ALLOWED_ROOTS = [".ai-kit", "docs"] as const;
 
@@ -112,4 +113,15 @@ export async function writeMarkdown(
       }),
     };
   }
+}
+
+/**
+ * Write a ProjectProfile to .ai-kit/project.yml as formatted YAML.
+ */
+export async function writeProfile(
+  projectRoot: string,
+  profile: ProjectProfile,
+): Promise<Result<string>> {
+  const content = serializeProfileToYaml(profile);
+  return writeMarkdown(projectRoot, ".ai-kit", "project.yml", content);
 }

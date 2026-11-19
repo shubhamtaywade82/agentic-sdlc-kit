@@ -44,6 +44,8 @@ describe("dispatcher", () => {
     expect(ctx.out[0]).toContain("kit — Agentic SDLC Kit");
     expect(ctx.out[0]).toContain("version");
     expect(ctx.out[0]).toContain("doctor");
+    expect(ctx.out[0]).toContain("inspect");
+    expect(ctx.out[0]).toContain("init");
     expect(ctx.out[0]).toContain("help");
   });
 

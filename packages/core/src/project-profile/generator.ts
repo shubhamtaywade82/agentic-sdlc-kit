@@ -1,10 +1,7 @@
 // packages/core/src/project-profile/generator.ts
 //
-// Generates a ProjectProfile from a RepositoryScan. The scan is read-only;
-// the generator only shapes data, never executes anything.
-//
-// M1 implementation: supports the obvious stack mappings. M2 will expand
-// detection and may add heuristics for ambiguous cases.
+// Generates a ProjectProfile from a RepositoryScan.
+// The scan is read-only; the generator shapes data, never executes anything.
 
 import {
   Errors,
@@ -14,30 +11,35 @@ import {
 } from "@agentic-sdlc-kit/contracts";
 import { validateProfile } from "./validator.js";
 
-const STACK_TO_COMMANDS: Readonly<Record<string, Partial<Record<"test" | "lint" | "typecheck" | "build", string[][]>>>> = {
-  "node-typescript": {
-    test: [["pnpm", "test"]],
-    lint: [["pnpm", "lint"]],
-    typecheck: [["pnpm", "typecheck"]],
-    build: [["pnpm", "build"]],
-  },
-  "react-typescript": {
-    test: [["pnpm", "test"]],
-    build: [["pnpm", "build"]],
-  },
-  "ruby-rails": {
-    test: [["bundle", "exec", "rspec"]],
-    lint: [["bundle", "exec", "rubocop"]],
-  },
-};
+function deriveCommands(scan: RepositoryScan): ProjectProfile["commands"] {
+  const commands: ProjectProfile["commands"] = {};
+  const primary = scan.detectedStacks[0];
+  const pm = scan.packageManagers[0] ?? "pnpm";
 
-/**
- * Generate a ProjectProfile from a RepositoryScan. The result is validated
- * before being returned.
- *
- * The generator does NOT execute anything; it only shapes data based on
- * what the (read-only) scan found.
- */
+  if (scan.testFrameworks.includes("node:test")) {
+    commands.test = [["node", "--test", "tests/"]];
+    return commands;
+  }
+  if (primary === "node-typescript") {
+    commands.test = [[pm, "test"]];
+    commands.lint = [[pm, "lint"]];
+    commands.typecheck = [[pm, "typecheck"]];
+    commands.build = [[pm, "build"]];
+    return commands;
+  }
+  if (primary === "react-typescript") {
+    commands.test = [[pm, "test"]];
+    commands.build = [[pm, "build"]];
+    return commands;
+  }
+  if (primary === "ruby-rails") {
+    commands.test = [["bundle", "exec", "rspec"]];
+    commands.lint = [["bundle", "exec", "rubocop"]];
+    return commands;
+  }
+  return commands;
+}
+
 export function generateProfile(scan: RepositoryScan): Result<ProjectProfile> {
   const primary = scan.detectedStacks[0];
   if (!primary) {
@@ -46,30 +48,20 @@ export function generateProfile(scan: RepositoryScan): Result<ProjectProfile> {
       error: Errors.discoveryFailed("RepositoryScan did not detect any stacks"),
     };
   }
-  const commands: ProjectProfile["commands"] = {};
-  const cmdMap = STACK_TO_COMMANDS[primary];
-  if (cmdMap) {
-    if (cmdMap.test) commands.test = cmdMap.test;
-    if (cmdMap.lint) commands.lint = cmdMap.lint;
-    if (cmdMap.typecheck) commands.typecheck = cmdMap.typecheck;
-    if (cmdMap.build) commands.build = cmdMap.build;
-  }
+
   const candidate: ProjectProfile = {
     schemaVersion: 1,
     name: deriveName(scan),
     stack: scan.detectedStacks,
-    commands,
+    commands: deriveCommands(scan),
   };
   return validateProfile(candidate);
 }
 
 function deriveName(scan: RepositoryScan): string {
-  // The root is an absolute path; use the last segment as the project name.
-  // Strip trailing slashes for robustness.
   const trimmed = scan.root.replace(/\/+$/, "");
   const segments = trimmed.split("/");
   const last = segments[segments.length - 1];
   if (!last) return "unnamed-project";
-  // Lowercase, replace non-alphanumeric with dashes, collapse repeats.
   return last.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "unnamed-project";
 }

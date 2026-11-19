@@ -6,6 +6,8 @@
 import { makeHelpCommand } from "../commands/help.js";
 import { versionCommand } from "../commands/version.js";
 import { doctorCommand } from "../commands/doctor.js";
+import { inspectCommand } from "../commands/inspect.js";
+import { initCommand } from "../commands/init.js";
 import type { Command, CommandContext, CommandResult } from "../commands/types.js";
 import { createCommandRegistry, type CommandRegistry } from "./registry.js";
 import { VERSION } from "./version.js";
@@ -26,6 +28,8 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   // Register default commands. Help needs the registry so it is built lazily.
   if (!registry.get("version")) registry.register(versionCommand);
   if (!registry.get("doctor")) registry.register(doctorCommand);
+  if (!registry.get("inspect")) registry.register(inspectCommand);
+  if (!registry.get("init")) registry.register(initCommand);
   if (!registry.get("help")) registry.register(makeHelpCommand(registry));
 
   return {

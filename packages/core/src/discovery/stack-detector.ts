@@ -70,7 +70,11 @@ function detectNodeStacks(pkg: PackageJson | null, hasTsConfig: boolean): string
 
   if ('next' in deps) stacks.push('nextjs');
   if ('react' in deps && isTs) stacks.push('react-typescript');
-  stacks.push('node-typescript');
+  // Only label as node-typescript when TypeScript is actually present.
+  // A plain JS project with a package.json should NOT be mislabeled.
+  if (isTs) stacks.push('node-typescript');
+  // For plain Node.js (no TypeScript), use the generic label.
+  if (!isTs && pkg) stacks.push('node');
   return stacks;
 }
 
@@ -83,15 +87,9 @@ export async function detectStacks(root: string): Promise<StackDetectionResult> 
   const locks = {
     pnpm:
       (await fileExists(path.join(root, 'pnpm-lock.yaml'))) ||
-      (await fileExists(path.join(root, 'pnpm-workspace.yaml'))) ||
-      (await fileExists(path.join(root, '..', 'pnpm-lock.yaml'))) ||
-      (await fileExists(path.join(root, '../..', 'pnpm-lock.yaml'))),
-    npm:
-      (await fileExists(path.join(root, 'package-lock.json'))) ||
-      (await fileExists(path.join(root, '..', 'package-lock.json'))),
-    yarn:
-      (await fileExists(path.join(root, 'yarn.lock'))) ||
-      (await fileExists(path.join(root, '..', 'yarn.lock'))),
+      (await fileExists(path.join(root, 'pnpm-workspace.yaml'))),
+    npm: await fileExists(path.join(root, 'package-lock.json')),
+    yarn: await fileExists(path.join(root, 'yarn.lock')),
     bun:
       (await fileExists(path.join(root, 'bun.lockb'))) ||
       (await fileExists(path.join(root, 'bun.lock'))),

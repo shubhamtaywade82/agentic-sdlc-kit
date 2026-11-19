@@ -90,7 +90,7 @@ function formatOutput(root: string, profile: ProjectProfile): string {
 
 function formatHelp(): string {
   return [
-    'Usage: kit init [path] [--yes] [--force] [--json]',
+    'Usage: kit init [path] [--force] [--json]',
     '',
     'Inspect a repository and generate .ai-kit/project.yml configuration.',
     '',

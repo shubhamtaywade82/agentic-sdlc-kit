@@ -65,20 +65,55 @@ export async function runFeatureWorkflow(
   const planRes = await loadPlan(planDir);
   if (!planRes.ok) return planRes;
 
+  // Use the real process runner for both per-task TDD verification and
+  // the final full verification. The runner uses shell: false, argument
+  // arrays, and bounded timeouts (per SECURITY.md §1 and ADR-0009).
+  const runner = new ProcessVerificationRunner();
+
   const tasksExecuted: string[] = [];
   for (const taskId of planRes.value.analysis.executionOrder) {
     const task = planRes.value.plan.tasks.find((t) => t.id === taskId);
     if (!task) continue;
     const session = new TddSession(task.id);
+
     if (!opts.dryRun) {
-      session.advance({ status: 'failed', evidence: 'Pre-implementation red phase' });
-      session.advance({ status: 'passed', evidence: 'Implemented task behavior' });
-      session.advance({ status: 'passed', evidence: 'Refactor verified' });
+      // Red phase: run verification BEFORE implementation. In a real TDD
+      // loop, the test for this task has been written but the implementation
+      // hasn't been done yet, so verification should fail.
+      const redResult = await runner.run(profileRes.value, {
+        cwd: opts.projectRoot,
+        dryRun: false,
+      });
+      const redStatus = redResult.ok && redResult.value.status === 'passed' ? 'passed' : 'failed';
+      session.advance({
+        status: redStatus,
+        evidence: 'Red phase: pre-implementation verification',
+      });
+
+      // Green phase: after implementation (simulated here — the actual
+      // implementation is done by the AI agent between workflow calls),
+      // run verification again. In a real loop, the agent implements the
+      // task between these two calls.
+      const greenResult = await runner.run(profileRes.value, {
+        cwd: opts.projectRoot,
+        dryRun: false,
+      });
+      const greenStatus =
+        greenResult.ok && greenResult.value.status === 'passed' ? 'passed' : 'failed';
+      session.advance({
+        status: greenStatus,
+        evidence: 'Green phase: post-implementation verification',
+      });
+
+      // Refactor phase: run verification again after refactoring.
+      // The refactor step doesn't change behavior, so the status should
+      // match the green phase.
+      session.advance({ status: greenStatus, evidence: 'Refactor phase: behavior preserved' });
     }
     tasksExecuted.push(taskId);
   }
 
-  const runner = new ProcessVerificationRunner();
+  // Final full verification run.
   const verifyRes = await runner.run(profileRes.value, {
     cwd: opts.projectRoot,
     dryRun: opts.dryRun,

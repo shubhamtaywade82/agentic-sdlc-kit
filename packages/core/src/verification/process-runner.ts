@@ -17,6 +17,8 @@ import type { VerificationRunOptions, VerificationRunner } from './runner.js';
 export interface ProcessRunOptions extends VerificationRunOptions {
   cwd?: string;
   timeoutMs?: number;
+  /** Maximum bytes of stdout/stderr to accumulate before truncating. Default: 10 MB. */
+  maxOutputBytes?: number;
 }
 
 interface CommandOutcome {
@@ -24,20 +26,35 @@ interface CommandOutcome {
   readonly exitCode: number | null;
   readonly durationMs: number;
   readonly output: string;
+  readonly truncated: boolean;
 }
 
-function executeProcess(cmd: string[], cwd: string, timeoutMs: number): Promise<CommandOutcome> {
+const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+function executeProcess(
+  cmd: string[],
+  cwd: string,
+  timeoutMs: number,
+  maxOutputBytes: number,
+): Promise<CommandOutcome> {
   return new Promise<CommandOutcome>((resolve) => {
     const start = Date.now();
     const [file, ...args] = cmd;
     if (!file) {
-      resolve({ status: 'failed', exitCode: 1, durationMs: 0, output: 'Empty command array' });
+      resolve({
+        status: 'failed',
+        exitCode: 1,
+        durationMs: 0,
+        output: 'Empty command array',
+        truncated: false,
+      });
       return;
     }
 
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let truncated = false;
 
     const child = spawn(file, args, { cwd, shell: false });
     const timer = setTimeout(() => {
@@ -46,22 +63,37 @@ function executeProcess(cmd: string[], cwd: string, timeoutMs: number): Promise<
       setTimeout(() => child.kill('SIGKILL'), 2000).unref();
     }, timeoutMs);
 
-    child.stdout?.on('data', (d) => {
-      stdout += d.toString();
+    child.stdout?.on('data', (d: Buffer) => {
+      if (Buffer.byteLength(stdout, 'utf8') >= maxOutputBytes) {
+        truncated = true;
+        return;
+      }
+      stdout += d.toString('utf8');
     });
-    child.stderr?.on('data', (d) => {
-      stderr += d.toString();
+    child.stderr?.on('data', (d: Buffer) => {
+      if (Buffer.byteLength(stderr, 'utf8') >= maxOutputBytes) {
+        truncated = true;
+        return;
+      }
+      stderr += d.toString('utf8');
     });
 
     child.on('close', (code) => {
       clearTimeout(timer);
       const durationMs = Date.now() - start;
       const combined = `${stdout}\n${stderr}`.trim();
+      const suffix = truncated ? '\n[output truncated: exceeded maxOutputBytes]' : '';
       if (timedOut) {
-        resolve({ status: 'failed', exitCode: 124, durationMs, output: `Timed out: ${combined}` });
+        resolve({
+          status: 'failed',
+          exitCode: 124,
+          durationMs,
+          output: `Timed out: ${combined}${suffix}`,
+          truncated,
+        });
       } else {
         const status = code === 0 ? 'passed' : 'failed';
-        resolve({ status, exitCode: code, durationMs, output: combined });
+        resolve({ status, exitCode: code, durationMs, output: `${combined}${suffix}`, truncated });
       }
     });
 
@@ -72,6 +104,7 @@ function executeProcess(cmd: string[], cwd: string, timeoutMs: number): Promise<
         exitCode: 1,
         durationMs: Date.now() - start,
         output: err.message,
+        truncated: false,
       });
     });
   });
@@ -84,6 +117,7 @@ export class ProcessVerificationRunner implements VerificationRunner {
   ): Promise<Result<VerificationReport>> {
     const cwd = opts.cwd ?? process.cwd();
     const timeoutMs = opts.timeoutMs ?? 60_000;
+    const maxOutputBytes = opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const checks: Check[] = [];
 
     const categories: ReadonlyArray<keyof ProjectProfile['commands']> = [
@@ -100,7 +134,7 @@ export class ProcessVerificationRunner implements VerificationRunner {
           checks.push({ id: cat, status: 'skipped', command: cmd });
           continue;
         }
-        const outcome = await executeProcess(cmd, cwd, timeoutMs);
+        const outcome = await executeProcess(cmd, cwd, timeoutMs, maxOutputBytes);
         checks.push({
           id: cat,
           status: outcome.status,

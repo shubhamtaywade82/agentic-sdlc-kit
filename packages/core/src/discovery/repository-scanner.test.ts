@@ -59,6 +59,7 @@ describe('FileSystemRepositoryScanner', () => {
     expect(scan.hasCi).toBe(true);
     expect(scan.agentInstructionFiles).toContain('AGENTS.md');
     expect(scan.agentInstructionFiles).toContain('GEMINI.md');
-    expect(scan.git.branch).toBe('feat/agentic-sdlc-kit');
+    expect(scan.git.branch.length).toBeGreaterThan(0);
+    expect(scan.git.headSha).toMatch(/^[0-9a-f]{40}$/);
   });
 });

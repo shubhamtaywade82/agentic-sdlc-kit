@@ -35,7 +35,7 @@ describe('inspectCommand', () => {
     expect(r.exitCode).toBe(0);
     const text = ctx.out[0] ?? '';
     expect(text).toContain('Repository:');
-    expect(text).toContain('node-typescript');
+    expect(text).toContain('node');
     expect(text).toContain('node:test');
   });
 
@@ -44,7 +44,7 @@ describe('inspectCommand', () => {
     const r = await inspectCommand.run(ctx);
     expect(r.exitCode).toBe(0);
     const parsed = JSON.parse(ctx.out[0] ?? '{}');
-    expect(parsed.detectedStacks).toContain('node-typescript');
+    expect(parsed.detectedStacks).toContain('node');
     expect(parsed.testFrameworks).toContain('node:test');
   });
 

@@ -29,7 +29,9 @@ describe('FileSystemRepositoryScanner', () => {
     if (!res.ok) return;
 
     const scan = res.value;
-    expect(scan.detectedStacks).toContain('node-typescript');
+    // fixture-node-fullstack is a plain Node.js project (no TypeScript),
+    // so the detector should label it 'node', not 'node-typescript'.
+    expect(scan.detectedStacks).toContain('node');
     expect(scan.testFrameworks).toContain('node:test');
     expect(scan.agentInstructionFiles).toContain('AGENTS.md');
     expect(scan.entryPoints).toContain('src/index.js');

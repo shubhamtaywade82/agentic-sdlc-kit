@@ -69,7 +69,12 @@ describe('Continuous Learning and Self-Evolution Engine (M27-M35)', () => {
     const distiller = new KnowledgeDistiller();
     const lessons = distiller.distillFromExperiences(collector.list());
     expect(lessons).toHaveLength(1);
-    expect(lessons[0]?.summary).toContain('Recurring failure pattern');
+    // The distiller now produces phase-specific lessons derived from the
+    // actual failure pattern (stack + phase), not a generic "Recurring
+    // failure pattern" string.
+    expect(lessons[0]?.summary).toContain('tdd failures');
+    expect(lessons[0]?.summary).toContain('ruby-rails');
+    expect(lessons[0]?.domain).toBe('ruby-rails');
   });
 
   it('generates improvement hypotheses from high-confidence memories (M31)', () => {

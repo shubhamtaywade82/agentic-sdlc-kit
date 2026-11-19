@@ -40,7 +40,7 @@ jobs:
 
       - name: Setup pnpm
         # Pin: pnpm/action-setup@v4 → SHA at tag v4.0.0.
-        uses: pnpm/action-setup@fe02b34f77b35b7581b0bd6f3a4e0e7d4a4d6c0a
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
           version: 9.12.0
 
@@ -57,17 +57,17 @@ jobs:
       - name: Architecture check
         run: pnpm run check:architecture
 
-      - name: Typecheck
-        run: pnpm run typecheck
+      - name: Build
+        run: pnpm run build
 
       - name: Lint
         run: pnpm run lint
 
+      - name: Typecheck
+        run: pnpm run typecheck
+
       - name: Test
         run: pnpm run test
-
-      - name: Build
-        run: pnpm run build
 
       - name: CLI smoke (`kit --version`)
         run: node packages/cli/dist/index.js --version

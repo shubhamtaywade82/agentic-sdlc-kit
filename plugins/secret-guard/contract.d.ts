@@ -1,84 +1,22 @@
 // plugins/secret-guard/contract.d.ts
 //
-// Type contract for the Claude Code host (referenced by plugin.json's
-// "types" field). Declares the `$.state` values and the `$`/event surface
-// this mod uses, as the ambient 'claude-code' module — the one bare import
-// a hooks module is allowed. Self-contained by host rule (no imports).
+// Types contract for the Claude Code host (plugin.json's "types" field).
+// Per the official grammar the contract is self-contained and declares
+// ONLY what this plugin contributes to the host: its state keys
+// (interface PluginState). Nouns on EngineInterface would be declared
+// here too — secret-guard adds none. The engine merges this file's
+// PluginState into the ambient 'claude-code' module.
 //
-// These declarations mirror the official Mods API (verified November
-// 2026): tool.call carries the tool's arguments as fields of the event
-// (e.command for Bash, e.file_path + e.content for Write, e.file_path +
-// e.old_string + e.new_string for Edit); results observed after
-// `await next(e)` carry deny / isError / text.
+// Everything else the hooks type against — the $ surface
+// (EngineInterface) and the event inputs (*Input) — comes from the
+// engine's own declarations, vendored for offline typechecks at
+// .claude-plugin/types/claude-code/index.d.ts (the engine lays the full
+// live file at that path whenever it loads this plugin) and re-laid by
+// Claude Code in a real session.
 
 declare module 'claude-code' {
-  // ─── Events used by secret-guard ─────────────────────────────────────
-  export interface ToolCallEvent {
-    tool: string;
-    command?: string;
-    file_path?: string;
-    content?: string;
-    old_string?: string;
-    new_string?: string;
-    notebook_path?: string;
-    new_source?: string;
-    [key: string]: unknown;
-  }
-  export interface ToolCallResult {
-    deny?: string;
-    result?: unknown;
-    isError?: boolean;
-    text?: string;
-    context?: string[];
-    [key: string]: unknown;
-  }
-
-  // ─── Mods API surface used by secret-guard ───────────────────────────
-  export interface ModsApi {
-    ui: {
-      log: (message: string) => void;
-      status: (text: string) => void;
-      ask: (question: string, options: ReadonlyArray<string>) => Promise<string>;
-    };
-    process: {
-      run: (args: ReadonlyArray<string>) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
-    };
-    state: {
-      get: <T>(ref: { plugin: string; key: string }) => T | undefined;
-      set: <T>(ref: { plugin: string; key: string }, value: T) => void;
-    };
-  }
-
-  // ─── Registration ────────────────────────────────────────────────────
-  export interface Matcher {
-    tool?: string | ReadonlyArray<string> | RegExp;
-    command?: string;
-    isReadOnly?: boolean;
-  }
-  export interface Registration {
-    catch: (handler: (error: unknown) => unknown) => void;
-  }
-  export interface On {
-    (
-      event: 'tool.call',
-      handler: (
-        $: ModsApi,
-        e: ToolCallEvent,
-        next: (e: ToolCallEvent) => Promise<unknown> | unknown,
-      ) => Promise<unknown> | unknown,
-    ): Registration;
-    (
-      event: 'tool.call',
-      matcher: Matcher,
-      handler: (
-        $: ModsApi,
-        e: ToolCallEvent,
-        next: (e: ToolCallEvent) => Promise<unknown> | unknown,
-      ) => Promise<unknown> | unknown,
-    ): Registration;
-  }
-
-  // The state keys this plugin reads or writes on $.state.
+  // The state keys this plugin reads on $.state (see hooks/register.ts:
+  // every { plugin, key } literal used there is named here).
   interface PluginState {
     'secret-guard': {
       // RedactionPolicy (contracts): defaults ship in the module; the host

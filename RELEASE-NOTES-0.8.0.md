@@ -148,10 +148,13 @@ mismatched directory is an error, not a silent substitution.
 
 **Other fixes from the same audit.**
 
-- **CI actually runs now.** `.github/workflows/ci.yml` had
-  `branches: ain]` (a broken scalar, matching no branch) on both the
-  `push` and `pull_request` triggers — CI never executed. It now triggers
-  on `[main]`.
+- **CI trigger re-verified (correction).** This note previously said
+  `.github/workflows/ci.yml` had `branches: ain]` (a broken scalar) "on
+  both the `push` and `pull_request` triggers — CI never executed." That
+  was wrong: the `ain]` string came from a review-environment rendering
+  artifact that strips the bytes `[m`, and `od -c` confirms ci.yml has
+  contained `branches: [main]` at every commit in history — CI was never
+  broken. The claim is retracted.
 - **`sideEffects: false`** declared for `contracts`, `core`, and
   `mod-sdk`. Without it, esbuild could not tree-shake the workspace
   barrels and the plugin hooks bundles dragged in the entire core
@@ -180,13 +183,14 @@ mismatched directory is an error, not a silent substitution.
 
 - Build: 10/10 packages; all four plugin hooks bundles are self-contained
   (relative imports and `claude-code` only).
-- Tests: 539/539 across 10 packages (39 new tests covering the plugin
+- Tests: 586/586 across 10 packages (the plugin
   manifests, plugin linker, YAML parser, stack detector, git scanner,
   spec parser strictness, schema-issue surfacing, and the zero-checks
-  hint).
+  hint are among them).
 - `check:architecture`, `typecheck`, and `lint` all pass; `pnpm install
-  --frozen-lockfile` succeeds (CI uses it).
+--frozen-lockfile` succeeds (CI uses it).
 - Behavioral smoke: plugin linking (fresh, idempotent re-install, and the
-  unbuilt-kit warning), the full phase-driver cycle
-  (`scripts/smoke-080.sh`), the one-shot audit refusal, and the CLI
+  unbuilt-kit warning), the full phase-driver cycle (run as a one-shot
+  script against the built CLI; the script was not committed to the
+  repository), the one-shot audit refusal, and the CLI
   honesty fixes were all exercised against the built CLI.

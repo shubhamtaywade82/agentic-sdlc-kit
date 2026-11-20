@@ -5,7 +5,8 @@
 //
 //   1. Write / NotebookEdit / Edit — scan the content being written
 //      (e.content / e.new_source / e.new_string; tool arguments are FIELDS
-//      of a tool.call event) and refuse the write when a secret matches.
+//      of a tool.call event, narrowed per tool by the matcher) and refuse
+//      the write when a secret matches.
 //   2. Bash `git commit` / `git push` — read the staged diff with
 //      $.process.run(['git','diff','--cached']) and scan it BEFORE the
 //      command runs; a secret in the diff refuses the commit.
@@ -16,25 +17,42 @@
 // timeout REFUSES the action (fail closed) — the host would otherwise skip
 // a failed hook and let the write/commit through.
 //
-// Static-analysis rules honored here: full $.x.y(...) calls; string-literal
-// event names; `$` passed only to getPolicy, a top-level function of this
-// file; imports are relative files of this plugin plus the 'claude-code'
-// types.
+// Typed against the OFFICIAL engine declarations ('claude-code' — see
+// .claude-plugin/types/claude-code/index.d.ts): $ is EngineInterface,
+// event inputs are *Input, matchers narrow e to the tool variant, and
+// state flows through the official atom/read/update helpers. NOTE: an
+// offline `claude plugin validate` run types the atom ref against an
+// EMPTY PluginState (its checker does not merge this plugin's contract)
+// and so flags the atom() line above the same way it flags Claude
+// Code's own turn-band example mod — the real engine lays the merged
+// declarations at .claude-plugin/types/claude-code/index.d.ts and the
+// same line typechecks cleanly there.
+//
+// Static-analysis rules honored here: full $.x.y(...) calls;
+// string-literal event names; `$` passed only to getPolicy / scanWrite,
+// top-level functions of this file; imports are relative files of this
+// plugin plus the 'claude-code' types.
 
-import type { ModsApi, On, ToolCallEvent } from 'claude-code';
+import type { EngineInterface, On, ToolCallInput, ToolCallResult } from 'claude-code';
+import { atom, read } from 'claude-code';
 import { DEFAULT_REDACTION_POLICY, redactSecrets, scanText } from '../policies/detect';
 import type { RedactionPolicy } from '../policies/detect';
 
-function getPolicy($: ModsApi): RedactionPolicy {
-  return (
-    $.state.get<RedactionPolicy>({ plugin: 'secret-guard', key: 'policy' }) ??
-    DEFAULT_REDACTION_POLICY
-  );
+// The policy state key, declared in contract.d.ts. read() resolves to
+// the stored policy or the module default (initial) when unset.
+const POLICY = atom({ plugin: 'secret-guard', key: 'policy' } as const, DEFAULT_REDACTION_POLICY);
+
+async function getPolicy($: EngineInterface): Promise<RedactionPolicy> {
+  return read($, POLICY);
 }
 
 /** Scan content about to be written; returns a deny reason or null. */
-function scanWrite($: ModsApi, content: string, filePath?: string): string | null {
-  const policy = getPolicy($);
+async function scanWrite(
+  $: EngineInterface,
+  content: string,
+  filePath?: string,
+): Promise<string | null> {
+  const policy = await getPolicy($);
   const result = scanText(content, policy, 'file-write', filePath);
   if (result.outcome === 'findings') {
     $.ui.log(
@@ -63,28 +81,30 @@ function scanWrite($: ModsApi, content: string, filePath?: string): string | nul
 
 export function register(on: On): void {
   // 1. Writes: Write (e.file_path + e.content) and NotebookEdit
-  //    (e.notebook_path + e.new_source).
-  on('tool.call', { tool: ['Write', 'NotebookEdit'] }, async ($, e: ToolCallEvent, next) => {
-    const path = e.file_path ?? e.notebook_path;
-    const content = e.content ?? e.new_source;
+  //    (e.notebook_path + e.new_source). The matcher narrows e to the
+  //    Write|NotebookEdit union; variant fields are read after an
+  //    e.tool check (the official shapes are readonly per-tool variants).
+  on('tool.call', { tool: ['Write', 'NotebookEdit'] }, async ($, e, next) => {
+    const path = e.tool === 'Write' ? e.file_path : e.notebook_path;
+    const content = e.tool === 'Write' ? e.content : e.new_source;
     if (typeof content !== 'string' || content === '') return next(e);
-    const deny = scanWrite($, content, typeof path === 'string' ? path : undefined);
+    const deny = await scanWrite($, content, typeof path === 'string' ? path : undefined);
     if (deny !== null) return { deny };
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 
   // 1b. Edits: scan the replacement text (e.new_string).
-  on('tool.call', { tool: 'Edit' }, async ($, e: ToolCallEvent, next) => {
+  on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
     const path = e.file_path;
     const content = e.new_string;
     if (typeof content !== 'string' || content === '') return next(e);
-    const deny = scanWrite($, content, typeof path === 'string' ? path : undefined);
+    const deny = await scanWrite($, content, typeof path === 'string' ? path : undefined);
     if (deny !== null) return { deny };
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 
   // 2. Git: scan the staged diff before a commit or push enters history.
-  on('tool.call', { tool: 'Bash' }, async ($, e: ToolCallEvent, next) => {
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const command = e.command;
     if (typeof command !== 'string') return next(e);
     if (!/\bgit\s+(commit|push)\b/.test(command)) return next(e);
@@ -100,7 +120,7 @@ export function register(on: On): void {
           'were not scanned for secrets. Run git add and retry from a git repository.',
       };
     }
-    const policy = getPolicy($);
+    const policy = await getPolicy($);
     const result = scanText(diff.stdout, policy, 'git-staged');
     if (result.outcome === 'findings') {
       $.ui.log(
@@ -124,12 +144,19 @@ export function register(on: On): void {
 
   // 3. Tool results: after the tool ran, redact secrets from the text the
   //    model reads. A denied call (r.deny) passes through untouched.
-  on('tool.call', async ($, e: ToolCallEvent, next) => {
-    const r = (await next(e)) as { deny?: unknown; text?: unknown } | undefined;
-    if (r === null || typeof r !== 'object') return r;
+  //    No matcher: e is the full (readonly, per-tool) union; only e.tool
+  //    is read.
+  on('tool.call', async ($, e: ToolCallInput, next) => {
+    // The official engine always resolves next(e) to a ToolCallResult; a
+    // host with nothing configured (e.g. the kit's MockRuntime without a
+    // setHostResult) may resolve to nothing — pass that through untouched
+    // instead of misreading it.
+    const p = next(e);
+    const r = (await p) as ToolCallResult<string> | undefined | null;
+    if (r === null || typeof r !== 'object') return p;
     if (r.deny !== undefined) return r;
     if (typeof r.text !== 'string') return r;
-    const policy = getPolicy($);
+    const policy = await getPolicy($);
     const redacted = redactSecrets(r.text, policy, 'tool-output');
     if (redacted.findings.length > 0) {
       $.ui.log(

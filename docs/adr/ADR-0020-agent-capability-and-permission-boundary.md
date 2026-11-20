@@ -1,156 +1,182 @@
-# ADR-0020: Agent capability and permission boundary
+# ADR-0020: Agent capability and permission boundary — one policy source, two enforcement points
 
-Status: Accepted
+Status: Accepted (v2 — supersedes the v1 text merged in PR #8; makes the policy mechanics explicit)
 Date: 2026-11-20
 Milestone: M36 — Agent Execution and Orchestration Foundation
 
 ## Context
 
 ADR-0019 authorizes Kit to invoke AI agents through a provider-neutral
-`AgentProvider` interface. The immediate question is not _how to call the
-agent_ but _how to bound what the agent can do once connected_.
+`AgentProvider` interface. The central question is not *how to call the
+agent* but *how to bound what the agent can do once connected*.
 
-An agent that is connected to Kit must not receive unrestricted authority
-merely because it is connected. If the provider can execute arbitrary
-shell, write anywhere on the filesystem, or run destructive operations
-without approval, then the entire policy and evidence architecture is
-defeated: an agent could fabricate passing evidence by editing test
-outputs, or cause irreversible damage by force-pushing, running
-migrations, or deploying.
+An agent connected to Kit must not receive unrestricted authority merely
+because it is connected. If the provider can execute arbitrary shell,
+write anywhere on the filesystem, or run destructive operations without
+approval, the policy and evidence architecture is defeated: an agent could
+fabricate passing evidence by editing test outputs, or cause irreversible
+damage by force-pushing, running migrations, or deploying.
 
-The kit already has one enforcement layer — the runtime Mods
-(`plugins/secret-guard`, `plugins/sdlc-guard`, `plugins/model-router`,
-`plugins/run-observer`) — which enforce inside a specific host runtime
-(Claude Code). That layer is host-specific. A provider-neutral boundary is
-needed so that policy is defined once and enforced at every execution
-surface, regardless of which provider runs.
+The kit already has two partial enforcement layers:
 
-`packages/core/src/verification/process-runner.ts` already implements the
-core execution safety properties: `shell: false`, argument arrays, scoped
-`cwd`, bounded timeouts, and bounded output capture. The tool broker is
-the generalization of that discipline to all agent-initiated operations,
-plus capability scoping, path validation, and approvals.
+- **Kit-level**: `core/verification/process-runner.ts` already implements
+  `shell: false`, argument arrays, scoped `cwd`, bounded timeouts, and
+  bounded output capture.
+- **Runtime-level**: the Mods (`plugins/secret-guard`, `plugins/sdlc-guard`,
+  `plugins/model-router`, `plugins/run-observer`) enforce inside a specific
+  host runtime, with fail-closed deny paths (hardened in PRs #6/#7).
+
+The v1 draft of this ADR stated the principle ("one policy source of
+truth, two enforcement points") but left its mechanics undefined. The
+review round required those mechanics to be explicit, and added a security
+qualification the v1 draft understated. Both are adopted here.
 
 ## Decision
 
-Agent authority is **capability-based**, enforced by a **tool broker** that
-is the single security boundary between an agent and the execution
-environment. The agent proposes an operation; the tool broker authorizes
-and executes it.
+### 1. One canonical ExecutionPolicy
 
-### Capability taxonomy
+There is exactly **one** policy definition, in `packages/contracts`:
 
-`AgentCapability` is an allowlist (see
-`packages/contracts/src/agent/capability.ts`):
+- A canonical `ExecutionPolicy` schema (capabilities, writable-path scope,
+  approval requirements, budgets) plus a policy evaluator.
+- Every execution receives a **normalized, versioned policy snapshot**.
+- A stable **`policyHash`** (hash of the snapshot) is recorded in
+  `AgentExecutionEvent`s and in verification evidence, so every decision
+  and every artifact is traceable to the exact policy in force when it was
+  produced.
 
-```
-repository.read | repository.write | git.read | git.write |
-process.test | process.build | process.lint | process.typecheck |
-network.access | external.approval
-```
+### 2. Two enforcement points, both derived from the canonical policy
 
-"Execute arbitrary shell" is **not** a capability and never will be. The
-provider may only exercise capabilities the orchestrator explicitly grants
-in `AgentExecutionRequest.permissions.capabilities`, and the tool broker
-authorizes each tool call against that set.
+| Enforcement point | Mechanism |
+| --- | --- |
+| **Kit enforcement** (provider-neutral) | Process runner, filesystem scope, Git operations, approval checks |
+| **Runtime enforcement** (host-specific) | Claude Code permissions, Mods, fail-closed tool hooks |
 
-### Tool broker rules
+Critical rule: **runtime Mods consume a generated representation of the
+canonical policy — they never maintain an independent policy definition.**
+Two hand-maintained policy layers will drift; the drift will be found
+during an incident, not before.
 
-1. **No model-generated arbitrary shell strings.** Process execution uses
-   an allowlisted executable and an argument array, never a shell string.
-2. **`shell: false`** for all process execution (already enforced in
-   `process-runner.ts`).
-3. **Resolve and validate paths**, including symlinks. Writable paths are
-   restricted to the run's isolated workspace (worktree).
-4. **Never expose environment secrets** in agent context. Agent output,
-   tool arguments, external content, and retrieved memories are treated as
-   untrusted.
-5. **Bound execution**: time, output size, tool-call count, and token
-   budget (`maxToolCalls`, `maxDurationMs`, `maxTokens`). Exceeding the
-   token budget is a `BUDGET_EXCEEDED` error, not silent continuation.
-6. **Persist verification evidence** for each executed operation.
-7. **Require human approval** for deployments, releases, destructive
-   operations, migrations with material risk, force pushes, and sensitive
-   policy changes.
+### 3. Policy parity tests
 
-### Workspace isolation
+Contract tests verify that both enforcement points produce **equivalent
+decisions** for identical policy inputs and identical requested
+operations. A capability denied by the Kit evaluator must be denied by the
+runtime representation, and vice versa. Parity failures are release
+blockers.
+
+### 4. Fail-closed on policy problems
+
+Missing, malformed, or mismatched (wrong `policyHash`, stale snapshot)
+policy configuration **fails closed** for protected operations: the
+operation is denied, the denial is recorded, and the run explains what it
+is waiting for. There is no configuration state in which an unbounded
+operation proceeds.
+
+### 5. Capability taxonomy (unchanged from the v1 text in PR #8)
+
+`AgentCapability` is an allowlist: `repository.read`, `repository.write`,
+`git.read`, `git.write`, `process.test`, `process.build`, `process.lint`,
+`process.typecheck`, `network.access`, `external.approval`. "Execute
+arbitrary shell" is **not** a capability and never will be. The provider
+may only exercise capabilities explicitly granted in the request; the
+enforcement layer authorizes each tool call against that set.
+
+### 6. Tool execution rules (hardened in place before any extraction)
+
+1. No model-generated arbitrary shell strings — allowlisted executable +
+   argument array, never a shell string.
+2. `shell: false` for all process execution.
+3. Resolve and validate paths, including symlinks; writes restricted to
+   the run's workspace.
+4. Never expose environment secrets in agent context; agent output, tool
+   arguments, external content, and retrieved memories are untrusted.
+5. Bound execution: duration, output size, tool calls, budgets.
+6. Persist verification evidence for each executed operation.
+7. Human approval for deployments, releases, destructive operations,
+   migrations with material risk, force pushes, and sensitive policy
+   changes.
+8. **Resume tokens are credentials**: never logged, never included in
+   ordinary events; compromise of a resume token is treated as compromise
+   of the execution.
+
+### 7. Workspace isolation — with an honest security qualification
 
 Autonomous implementation runs in a **dedicated git worktree per workflow
-run**, not in the developer's active working tree. This avoids conflicting
-changes and gives the orchestrator a clean diff to inspect for evidence.
+run** (`ExecutionWorkspace.kind: 'git-worktree'`), never in the
+developer's active working tree. This isolates changes and gives the
+orchestrator a clean diff for evidence.
 
-### One policy source of truth, two enforcement points
+**Qualification (added in v2):** a git worktree isolates repository
+changes; it is **not an OS sandbox**. Mods running with host permissions
+are **not a complete security boundary**. For a real provider, the agent
+process must additionally run with restricted host permissions or in an
+appropriately isolated process/container. **`bypassPermissions` must never
+be used as an orchestration shortcut** — a provider configuration that
+disables the runtime's permission system defeats this ADR and is rejected
+by the provider adapter's configuration validation.
 
-Policy is defined once (capability grants + approval requirements in
-`AgentExecutionRequest` and the project policy) and enforced at two
-points:
+### 8. Budgets with honest enforcement levels
 
-- **Tool broker** — provider-neutral, Kit-level. Authorizes every
-  agent-initiated operation regardless of provider.
-- **Runtime Mods** — host-specific, inside a provider's runtime (e.g.
-  Claude Code hooks). The fail-closed deny paths established in PR #6 are
-  exactly this enforcement point.
+`ExecutionBudget` limits (duration, tool calls, input/output/total
+tokens, estimated cost) are declared per execution. Each limit carries an
+enforcement level from `AgentProviderCapabilities`:
 
-The two points must read the **same** capability/policy definition, or
-they will drift. The Mods are runtime-specific integrations, not the
-primary orchestration engine; the tool broker is primary.
+- `provider-enforced` — the provider reliably enforces or reports it.
+- `gateway-enforced` — Kit enforces it itself (always true for duration
+  and process bounds: the gateway owns the process).
+- `best-effort` — reported as such; execution evidence must state that the
+  limit was not hard-enforced.
 
-### Budgets and abort
+Token or monetary cost enforcement is **never claimed** where the provider
+does not expose reliable usage information. Exceeding an enforced budget
+is a `BUDGET_EXCEEDED` error, not silent continuation.
 
-Every execution carries explicit bounds. `AbortSignal` is passed to
-`execute()`/`resume()`; a signal already aborted yields a `cancelled`
-result, not a hang. A timeout yields `timed_out`. Neither may be reported
-as `completed`. An interrupted execution is recoverable only when the
-provider supports safe session resumption or the workflow can safely
-restart the task; resume must not repeat irreversible side effects.
-
-### Evidence is authoritative
+### 9. Evidence is authoritative
 
 The agent's `proposedArtifacts` list is informational. Kit independently
-inspects git status, actual modified paths, test command and exit status,
-test output, verification configuration, approval records, and artifact
-hashes. A workflow task is complete only when its deterministic acceptance
-conditions are met — never because the agent said so.
+inspects git status, modified paths, test command and exit status, test
+output, verification configuration, approval records, and artifact
+hashes. A workflow task completes only when its deterministic acceptance
+conditions are met.
 
 For TDD specifically, the targeted test must fail (Red) / pass (Green /
 Refactor) for the **expected reason**. A whole-suite failure, a
-compilation failure, an environment failure, an unrelated regression, or a
-malformed test must be distinguished from an expected assertion failure.
-The task-scoped Red-evidence fix (ADR-0018, P1 refinement) enforces
-exactly this: `runTddPhase` consumes the existing `Task.verification`
-contract's per-task command, classifies the failure, and accepts only
-classification `assertion` as Red. An unclassified failure never counts
-as Red.
+compilation failure, an environment failure, an unrelated regression, or
+a malformed test must be distinguished from an expected assertion
+failure. Failure classification (assertion vs compilation vs dependency
+vs discovery vs environment vs timeout vs unclassified) landed as the
+task-scoped Red-evidence fix — PR #9 (ADR-0018, P1 refinement) — which
+runs `task.verification.command` in `runTddPhase`, classifies the
+observed failure, and accepts only classification `assertion` as Red.
+**An unclassified failure never counts as Red.**
 
 ## Consequences
 
-- The tool broker begins as a hardening of `core/verification/process-runner`
-  (allowlisted executables, path scope, approval gate) and is promoted to
-  its own package when a second provider needs it.
-- `AgentExecutionRequest.permissions` is the authoritative grant; providers
-  MUST NOT exceed it. The tool broker rejects out-of-grant operations.
-- Approval-required actions block with `needs_approval` rather than
-  prompting silently; a blocked run explains what it is waiting for.
-- CLSE (M37+) connects only to provenance-backed execution evidence
-  produced under this boundary. Learning from unverified execution would
-  poison it.
+- A canonical `ExecutionPolicy` schema and evaluator land in
+  `packages/contracts` / policy modules; Mods read a generated
+  representation (their hand-maintained policy fragments are retired as
+  the generator lands).
+- Parity tests become part of the release gate for both enforcement
+  points.
+- The provider adapter (PR 4) validates its host-runtime permission
+  configuration at startup and refuses to run with `bypassPermissions`.
+- The tool broker remains a hardening of the existing process runner until
+  extraction is warranted (ADR-0019 §4).
+- CLSE connects only to provenance-backed evidence (`policyHash`-stamped)
+  produced under this boundary.
 
 ## Five decisions explicitly rejected
 
-1. Making the CLI itself an LLM — blurs deterministic and probabilistic
-   responsibilities.
-2. Letting providers execute arbitrary shell — defeats the policy and
-   security architecture.
-3. Making every task a separate autonomous agent — adds coordination
-   overhead before the execution foundation is proven.
-4. Treating a provider's `completed` response as workflow completion —
-   creates false positives.
-5. Expanding CLSE before reliable agent execution — learning from
-   incomplete or fabricated evidence makes the system worse.
+1. Making the CLI itself an LLM.
+2. Letting providers execute arbitrary shell.
+3. Making every task a separate autonomous agent.
+4. Treating a provider's `completed` response as workflow completion.
+5. Expanding CLSE before reliable agent execution.
 
 ## References
 
 - ADR-0019 — hybrid execution model (this boundary secures that model).
-- ADR-0018 — evidence-gated TDD (the invariants the tool broker preserves).
+- ADR-0018 — evidence-gated TDD.
 - `docs/security/SECURITY.md` §1 — no false assurance.
-- `packages/contracts/src/agent/capability.ts` — the capability allowlist.
+- `packages/contracts/src/agent/capability.ts` — the capability allowlist (v1 in PR #8, unchanged).

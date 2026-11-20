@@ -1,26 +1,37 @@
 // packages/testing/src/fixtures/mock-agent-provider.ts
 //
-// MockAgentProvider — a deterministic, in-process AgentProvider for tests.
-// It performs no real agent work; it emits a configurable event sequence
-// and returns a configurable result that parses against
-// AgentExecutionResultSchema. Used by the provider contract harness and by
-// orchestrator integration tests that need a stand-in for a real provider.
+// MockAgentProvider — a deterministic, in-process AgentProvider (v2,
+// handle-based) for tests. It performs no real agent work; it emits a
+// configurable event sequence and returns a configurable result that
+// parses against AgentExecutionResultSchema. Used by the provider
+// contract harness and by orchestrator integration tests that need a
+// stand-in for a real provider.
 //
 // Invariants exercised by the mock (and asserted by the contract harness):
-//   - Already-aborted signal -> status `cancelled`, never `completed`.
-//   - Events carry monotonic per-execution seq starting at 1.
+//   - start()/resume() return AgentExecutionHandle, not results.
+//   - An already-aborted signal yields a `cancelled` result, never `completed`.
+//   - Events carry unique eventId, monotonic per-execution sequence
+//     starting at 1, and echo the request's policyHash.
+//   - The events() subscription returns an unsubscribe function.
 //   - Result fields echo the request's correlation ids.
 //   - cancel() of an unknown executionId resolves void (no throw).
+//   - The resumeToken parameter is treated as a credential: the mock
+//     never places it in events or results.
 
-import type {
-  AgentCapability,
-  AgentEventSink,
-  AgentExecutionResult,
-  AgentExecutionStatus,
-  AgentHealth,
-  AgentProvider,
-  AgentProviderId,
-  AgentExecutionRequest,
+import {
+  AGENT_EVENT_SCHEMA_VERSION,
+  AGENT_EXECUTION_SCHEMA_VERSION,
+  type AgentCapability,
+  type AgentEventSink,
+  type AgentExecutionEvent,
+  type AgentExecutionHandle,
+  type AgentExecutionRequest,
+  type AgentExecutionResult,
+  type AgentExecutionStatus,
+  type AgentHealth,
+  type AgentProvider,
+  type AgentProviderCapabilities,
+  type AgentProviderId,
 } from '@agentic-sdlc-kit/contracts';
 
 export interface MockAgentProviderOptions {
@@ -46,6 +57,21 @@ const DEFAULT_CAPABILITIES: readonly AgentCapability[] = [
   'process.lint',
 ];
 
+/**
+ * Honest enforcement levels for the mock: it can enforce duration and
+ * tool calls (the gateway always can), and it can count tokens (it is
+ * in-process), but it has NO cost information — cost is best-effort,
+ * never claimed as enforced (revision C honesty rule).
+ */
+const MOCK_BUDGET_ENFORCEMENT: AgentProviderCapabilities['budgetEnforcement'] = {
+  maxDurationMs: 'gateway-enforced',
+  maxToolCalls: 'gateway-enforced',
+  maxInputTokens: 'best-effort',
+  maxOutputTokens: 'best-effort',
+  maxTotalTokens: 'best-effort',
+  maxEstimatedCost: 'best-effort',
+};
+
 function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) return reject(new Error('aborted'));
@@ -65,26 +91,39 @@ export class MockAgentProvider implements AgentProvider {
   readonly id: AgentProviderId;
   private readonly opts: MockAgentProviderOptions;
   private readonly cancelled = new Set<string>();
+  /** Captured resume calls, keyed by executionId (for orchestration tests). */
+  private readonly resumed = new Map<string, string>();
 
   constructor(opts: MockAgentProviderOptions = {}) {
     this.id = 'mock';
     this.opts = opts;
   }
 
-  async capabilities(): Promise<readonly AgentCapability[]> {
-    return [...(this.opts.capabilities ?? DEFAULT_CAPABILITIES)];
+  async capabilities(): Promise<AgentProviderCapabilities> {
+    return {
+      capabilities: [...(this.opts.capabilities ?? DEFAULT_CAPABILITIES)],
+      budgetEnforcement: { ...MOCK_BUDGET_ENFORCEMENT },
+    };
   }
 
   async healthCheck(): Promise<AgentHealth> {
     return this.opts.health ?? { available: true };
   }
 
+  /** True if resume() was called for the executionId (test helper). */
+  wasResumedWith(executionId: string): string | undefined {
+    return this.resumed.get(executionId);
+  }
+
   private buildResult(
-    request: AgentExecutionRequest,
+    request: Pick<
+      AgentExecutionRequest,
+      'executionId' | 'workflowRunId' | 'taskId' | 'instructions' | 'policyHash'
+    >,
     status: AgentExecutionStatus,
   ): AgentExecutionResult {
     return {
-      schemaVersion: 1,
+      schemaVersion: AGENT_EXECUTION_SCHEMA_VERSION,
       executionId: request.executionId,
       workflowRunId: request.workflowRunId,
       taskId: request.taskId,
@@ -104,95 +143,99 @@ export class MockAgentProvider implements AgentProvider {
     };
   }
 
-  async execute(
-    request: AgentExecutionRequest,
+  private runExecution(
+    request: Pick<
+      AgentExecutionRequest,
+      'executionId' | 'workflowRunId' | 'taskId' | 'instructions' | 'policyHash'
+    >,
     signal: AbortSignal,
-    onEvent?: AgentEventSink,
-  ): Promise<AgentExecutionResult> {
-    if (this.cancelled.has(request.executionId) || signal.aborted) {
-      return this.buildResult(request, 'cancelled');
-    }
+  ): AgentExecutionHandle {
+    const listeners = new Set<AgentEventSink>();
+    // Events emitted before the first subscription are buffered and
+    // replayed to each new subscriber, so subscribing after start()
+    // resolves never silently loses history (deterministic for tests).
+    const buffer: AgentExecutionEvent[] = [];
+    let sequence = 0;
 
-    let seq = 0;
-    const next = (): number => ++seq;
-    const at = () => new Date().toISOString();
-    if (onEvent && this.opts.emitEvents !== false) {
-      onEvent({
-        schemaVersion: 1,
-        executionId: request.executionId,
-        seq: next(),
-        at: at(),
-        type: 'execution.started',
-      });
-      onEvent({
-        schemaVersion: 1,
-        executionId: request.executionId,
-        seq: next(),
-        at: at(),
-        type: 'tool.requested',
-        toolCallId: 'mock-tc-1',
-        capability: 'process.test',
-      });
-      onEvent({
-        schemaVersion: 1,
-        executionId: request.executionId,
-        seq: next(),
-        at: at(),
-        type: 'tool.result',
-        toolCallId: 'mock-tc-1',
-        status: 'succeeded',
-      });
-    }
+    type EventPayload =
+      | { type: 'execution.started' }
+      | { type: 'message.delta'; content: string }
+      | { type: 'tool.requested'; toolCallId: string; capability: AgentCapability }
+      | { type: 'tool.result'; toolCallId: string; status: 'succeeded' | 'failed' | 'denied' }
+      | { type: 'approval.required'; approvalId: string; action: string; reason: string }
+      | { type: 'execution.progress'; taskId: string; progress?: number }
+      | { type: 'execution.completed'; status: AgentExecutionStatus };
 
-    if (this.opts.delayMs && this.opts.delayMs > 0) {
-      try {
-        await abortableDelay(this.opts.delayMs, signal);
-      } catch {
+    const nextEvent = (payload: EventPayload): void => {
+      if (this.opts.emitEvents === false) return;
+      sequence += 1;
+      const event: AgentExecutionEvent = {
+        schemaVersion: AGENT_EVENT_SCHEMA_VERSION,
+        eventId: `evt-${request.executionId}-${sequence}`,
+        executionId: request.executionId,
+        sequence,
+        policyHash: request.policyHash,
+        occurredAt: new Date().toISOString(),
+        ...payload,
+      };
+      buffer.push(event);
+      for (const sink of listeners) sink(event);
+    };
+
+    const resultPromise = (async (): Promise<AgentExecutionResult> => {
+      if (this.cancelled.has(request.executionId) || signal.aborted) {
         return this.buildResult(request, 'cancelled');
       }
-    }
 
-    const status = this.opts.status ?? 'completed';
-    if (onEvent && this.opts.emitEvents !== false) {
-      onEvent({
-        schemaVersion: 1,
-        executionId: request.executionId,
-        seq: next(),
-        at: at(),
-        type: 'execution.completed',
-        status,
-      });
-    }
-    return this.buildResult(request, status);
+      nextEvent({ type: 'execution.started' });
+      nextEvent({ type: 'tool.requested', toolCallId: 'mock-tc-1', capability: 'process.test' });
+      nextEvent({ type: 'tool.result', toolCallId: 'mock-tc-1', status: 'succeeded' });
+
+      if (this.opts.delayMs && this.opts.delayMs > 0) {
+        try {
+          await abortableDelay(this.opts.delayMs, signal);
+        } catch {
+          return this.buildResult(request, 'cancelled');
+        }
+      }
+
+      const status = this.opts.status ?? 'completed';
+      nextEvent({ type: 'execution.completed', status });
+      return this.buildResult(request, status);
+    })();
+
+    return {
+      executionId: request.executionId,
+      result: () => resultPromise,
+      events: (onEvent: AgentEventSink): (() => void) => {
+        for (const buffered of buffer) onEvent(buffered);
+        listeners.add(onEvent);
+        return () => listeners.delete(onEvent);
+      },
+    };
   }
 
-  async resume(
-    executionId: string,
-    _resumeToken: string,
-    signal: AbortSignal,
-    onEvent?: AgentEventSink,
-  ): Promise<AgentExecutionResult> {
+  async start(request: AgentExecutionRequest, signal: AbortSignal): Promise<AgentExecutionHandle> {
+    return this.runExecution(request, signal);
+  }
+
+  async resume(executionId: string, resumeToken: string): Promise<AgentExecutionHandle> {
     // The mock does not truly persist sessions; resume behaves like a fresh
-    // execute keyed by a synthetic request so the contract shape is honored.
-    const synthetic: AgentExecutionRequest = {
-      schemaVersion: 1,
-      executionId,
-      workflowRunId: 'resumed',
-      taskId: 'task-resumed',
-      providerId: this.id,
-      taskKind: 'implementation',
-      instructions: 'resume',
-      context: { projectRoot: '/repo', relevantFiles: [], constraints: [] },
-      permissions: {
-        capabilities: [...(this.opts.capabilities ?? DEFAULT_CAPABILITIES)],
-        writablePaths: [],
-        networkAllowed: false,
-        maxToolCalls: 1,
-        maxDurationMs: 60_000,
+    // execution keyed by a synthetic request so the contract shape is
+    // honored. The synthetic ids use the canonical Identifier shape so the
+    // result parses. The resumeToken is recorded internally but NEVER
+    // echoed in events or results — it is a credential.
+    this.resumed.set(executionId, resumeToken);
+    return this.runExecution(
+      {
+        executionId,
+        workflowRunId: 'RUN-002',
+        taskId: 'TASK-002',
+        instructions: 'resume',
+        policyHash: 'sha256:mock-resume-policy',
       },
-      approvalPolicy: { requireApprovalFor: [], allowAutonomousExecution: false },
-    };
-    return this.execute(synthetic, signal, onEvent);
+      AbortSignal.timeout(60_000),
+    );
   }
 
   async cancel(executionId: string): Promise<void> {

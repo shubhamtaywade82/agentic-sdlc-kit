@@ -6,7 +6,7 @@ agent instruction file in the target repository.
 ## Conventions
 
 - Plain Node.js; no framework. HTTP via `node:http`.
-- Tests use `node:test`; run with `node --test tests/`.
+- Tests use `node:test`; run with `node --test`.
 - No build step.
 - JSON responses are sent with `content-type: application/json`.
 - Endpoints return 404 for unknown routes.

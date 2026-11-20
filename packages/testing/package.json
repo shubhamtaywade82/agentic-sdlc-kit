@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/testing",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Shared test utilities: fixtures, assertions, validators, helpers.",
   "license": "MIT",
   "type": "module",

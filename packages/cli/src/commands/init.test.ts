@@ -35,7 +35,7 @@ describe('initCommand', () => {
     try {
       await fs.writeFile(
         path.join(tmp, 'package.json'),
-        JSON.stringify({ name: 'my-test-app', scripts: { test: 'node --test tests/' } }),
+        JSON.stringify({ name: 'my-test-app', scripts: { test: 'node --test' } }),
       );
 
       const ctx = makeCtx([], tmp);

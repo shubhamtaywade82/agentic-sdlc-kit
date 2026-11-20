@@ -1,6 +1,6 @@
 // packages/cli/src/commands/init.ts
 //
-// `kit init [path] [--yes] [--force] [--json]`.
+// `kit init [path] [--force] [--json]`.
 // Initializes the Agentic SDLC Kit configuration (.ai-kit/project.yml).
 
 import { promises as fs } from 'node:fs';

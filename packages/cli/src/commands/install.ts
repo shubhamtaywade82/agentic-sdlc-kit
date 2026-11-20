@@ -176,7 +176,7 @@ export const installCommand: Command = {
       // preserved is false because we did not skip it.
       ownershipEntries.push({
         packageId: 'agentic-sdlc-kit',
-        packageVersion: '0.7.1',
+        packageVersion: '0.7.2',
         path: op.path,
         sha256: op.sha256,
         installedAt: now,

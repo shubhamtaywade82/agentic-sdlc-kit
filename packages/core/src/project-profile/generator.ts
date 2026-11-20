@@ -17,7 +17,11 @@ function deriveCommands(scan: RepositoryScan): ProjectProfile['commands'] {
   const pm = scan.packageManagers[0] ?? 'pnpm';
 
   if (scan.testFrameworks.includes('node:test')) {
-    commands.test = [['node', '--test', 'tests/']];
+    // Use auto-discovery (no path argument): `node --test tests/` with a bare
+    // directory argument breaks on Node >= 24 (the test runner treats the
+    // directory as a test file). Auto-discovery works on Node 18.13+ through
+    // 24+, finds **/*.test.?(c|m)js files, and excludes node_modules.
+    commands.test = [['node', '--test']];
     return commands;
   }
   if (primary === 'node-typescript') {

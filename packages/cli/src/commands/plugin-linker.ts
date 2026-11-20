@@ -5,15 +5,19 @@
 // The kit ships four Claude Code plugins (model-router, run-observer,
 // sdlc-guard, secret-guard) in `plugins/` of the kit repository. Claude Code
 // discovers them via `<plugin>/.claude-plugin/plugin.json` and loads their
-// hook modules from the paths declared in `hooks/hooks.json` (resolved
-// relative to the plugin root).
+// hook modules from the paths declared in `hooks/hooks.json`.
+//
+// IMPORTANT (verified against `claude plugin validate`): module paths in
+// hooks/hooks.json resolve relative to the hooks/ DIRECTORY (where the
+// manifest lives), not the plugin root — so the shipped manifest declares
+// `../dist/hooks/register.js`.
 //
 // This module:
 //   1. Locates the kit's `plugins/` directory relative to the CLI's own
 //      installed location (so it works through `pnpm link --global`).
-//   2. Validates each plugin's hooks module path actually exists (the
-//      compiled `dist/hooks/register.js` — this is exactly what the Claude
-//      Code plugin validator checks).
+//   2. Validates each plugin's hooks module path actually exists, resolved
+//      the same way the Claude Code plugin validator resolves it (relative
+//      to the hooks/ directory).
 //   3. Creates idempotent symlinks in `<project>/.claude/plugins/<name>`.
 //
 // Per the kit's no-silent-fabrication principle: a plugin whose hooks module
@@ -61,13 +65,16 @@ export function resolveKitPluginsDir(overrideRoot?: string): string | null {
 
 /**
  * Validate that the hooks module paths declared by a plugin's
- * `hooks/hooks.json` resolve to real files (relative to the plugin root).
- * This mirrors what the Claude Code plugin validator enforces.
+ * `hooks/hooks.json` resolve to real files. Paths resolve relative to the
+ * hooks/ directory — the same base the Claude Code plugin validator uses
+ * (an easy mistake: relative to the plugin root the same string would point
+ * one directory too high).
  */
 export async function validatePluginHooks(
   pluginDir: string,
 ): Promise<{ ok: boolean; missing: string[] }> {
-  const manifestPath = path.join(pluginDir, 'hooks', 'hooks.json');
+  const hooksDir = path.join(pluginDir, 'hooks');
+  const manifestPath = path.join(hooksDir, 'hooks.json');
   let modules: string[] = [];
   try {
     const raw = await fs.readFile(manifestPath, 'utf8');
@@ -80,7 +87,7 @@ export async function validatePluginHooks(
   }
   const missing: string[] = [];
   for (const mod of modules) {
-    const resolved = path.resolve(pluginDir, mod);
+    const resolved = path.resolve(hooksDir, mod);
     try {
       await fs.access(resolved);
     } catch {
@@ -134,6 +141,10 @@ export async function linkRuntimePlugins(
     // Validate hooks modules BEFORE linking so we never install a plugin
     // whose hook module path is broken (which is what the Claude Code
     // plugin validator would reject).
+    //
+    // Note: validatePluginHooks resolves module paths relative to the
+    // hooks/ directory — mirroring the real Claude Code validator — so a
+    // manifest that passes here also passes `claude plugin validate`.
     const hooks = await validatePluginHooks(pluginDir);
     if (!hooks.ok) {
       results.push({

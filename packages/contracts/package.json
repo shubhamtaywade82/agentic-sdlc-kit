@@ -3,6 +3,7 @@
   "version": "0.7.3",
   "description": "Shared contracts (types + zod schemas) for the Agentic SDLC Kit. Depends on nothing.",
   "license": "MIT",
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

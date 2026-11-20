@@ -26,7 +26,7 @@ async function makeFakeKit(kitRoot: string, built: boolean): Promise<void> {
     );
     await fs.writeFile(
       path.join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify({ description: `${name} hooks`, modules: ['./dist/hooks/register.js'] }),
+      JSON.stringify({ description: `${name} hooks`, modules: ['../dist/hooks/register.js'] }),
       'utf8',
     );
     if (built) {
@@ -93,7 +93,34 @@ describe('plugin-linker', () => {
       const dir = path.join(kitRoot, 'plugins', 'sdlc-guard');
       const res = await validatePluginHooks(dir);
       expect(res.ok).toBe(false);
-      expect(res.missing).toContain('./dist/hooks/register.js');
+      expect(res.missing).toContain('../dist/hooks/register.js');
+    } finally {
+      await fs.rm(kitRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('validatePluginHooks resolves module paths relative to the hooks/ directory (like Claude Code)', async () => {
+    const kitRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-kitroot-'));
+    try {
+      // A manifest whose path is correct ONLY when resolved relative to
+      // hooks/ (relative to the plugin root it would miss). Claude Code
+      // resolves against hooks/, and so must the kit.
+      const pluginDir = path.join(kitRoot, 'plugins', 'sdlc-guard');
+      await fs.mkdir(path.join(pluginDir, 'hooks'), { recursive: true });
+      await fs.mkdir(path.join(pluginDir, 'dist', 'hooks'), { recursive: true });
+      await fs.writeFile(
+        path.join(pluginDir, 'dist', 'hooks', 'register.js'),
+        'export const register = () => {};',
+        'utf8',
+      );
+      await fs.writeFile(
+        path.join(pluginDir, 'hooks', 'hooks.json'),
+        JSON.stringify({ modules: ['../dist/hooks/register.js'] }),
+        'utf8',
+      );
+      const res = await validatePluginHooks(pluginDir);
+      expect(res.ok).toBe(true);
+      expect(res.missing).toEqual([]);
     } finally {
       await fs.rm(kitRoot, { recursive: true, force: true });
     }

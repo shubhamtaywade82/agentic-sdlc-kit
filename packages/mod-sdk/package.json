@@ -3,6 +3,7 @@
   "version": "0.7.3",
   "description": "Mod Development Framework: typed event registration, Mods API surface, MockRuntime for tests, capability manifest, middleware composition. Runtime-independent; does not import claude-code.",
   "license": "MIT",
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

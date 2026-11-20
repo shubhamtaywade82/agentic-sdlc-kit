@@ -1,4 +1,4 @@
 {
   "description": "run-observer hooks",
-  "modules": ["./dist/hooks/register.js"]
+  "modules": ["../dist/hooks/register.js"]
 }

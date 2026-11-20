@@ -132,6 +132,11 @@ export type EventOf<N extends EventName> = EventMap[N];
 // this instead of reaching into the host directly, so the SDK can mock it
 // in tests and the capability analyzer can audit which API surfaces a Mod
 // uses.
+export interface StateRef {
+  plugin: string;
+  key: string;
+}
+
 export interface ModsApi {
   ui: {
     log: (message: string) => void;
@@ -142,9 +147,12 @@ export interface ModsApi {
     read: (path: string) => Promise<string>;
     write: (path: string, content: string) => Promise<void>;
   };
+  // State references use { plugin, key } literals — the same shape the
+  // real host requires ("so the values a module reads and writes can be
+  // listed").
   state: {
-    get: <T>(key: string) => T | undefined;
-    set: <T>(key: string, value: T) => void;
+    get: <T>(ref: StateRef) => T | undefined;
+    set: <T>(ref: StateRef, value: T) => void;
   };
   // The host's HTTP fetch, gated by the `networkAccess` capability.
   http: {
@@ -164,6 +172,16 @@ export type Handler<N extends EventName> = (
   next: (e: EventOf<N>) => Promise<unknown> | unknown,
 ) => Promise<unknown> | unknown;
 
+// Streaming events (turn.step) take the generator form instead: the hook
+// is an async generator that yields the chunks and returns the result.
+// A pass-through stream hook delegates and returns its result:
+//   async function* ($, e, next) { ... return next(e); }
+export type StreamHandler<N extends EventName> = (
+  $: ModsApi,
+  e: EventOf<N>,
+  next: (e: EventOf<N>) => Promise<unknown> | unknown,
+) => AsyncGenerator<unknown, unknown, unknown>;
+
 // ─── The `on` function ─────────────────────────────────────────────────────
 // Mods call `on(event, handler)` or `on(event, matcher, handler)`.
 // The matcher is a partial filter (e.g., { tool: 'Bash' }) that the host
@@ -172,8 +190,12 @@ export interface Matcher {
   tool?: string;
 }
 export interface On {
-  <N extends EventName>(event: N, handler: Handler<N>): void;
-  <N extends EventName>(event: N, matcher: Matcher, handler: Handler<N>): void;
+  <N extends EventName>(event: N, handler: Handler<N> | StreamHandler<N>): void;
+  <N extends EventName>(
+    event: N,
+    matcher: Matcher,
+    handler: Handler<N> | StreamHandler<N>,
+  ): void;
 }
 
 // The register function every Mod exports.

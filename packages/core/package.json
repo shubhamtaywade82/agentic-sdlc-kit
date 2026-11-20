@@ -3,6 +3,7 @@
   "version": "0.7.3",
   "description": "Runtime-independent core: workflow engine, project-profile generator/validator, artifacts writer, policy evaluator, verification runner.",
   "license": "MIT",
+  "sideEffects": false,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

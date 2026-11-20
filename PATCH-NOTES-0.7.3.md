@@ -24,8 +24,30 @@ mods") and `docs/HOST_INTEGRATIONS.md` ("To enable the 4 guard plugins …
 
 **Fix.**
 
-- All four `hooks/hooks.json` manifests now declare `./dist/hooks/register.js`
-  — the path the TypeScript build actually produces.
+- All four `hooks/hooks.json` manifests now declare `../dist/hooks/register.js`
+  — the path the TypeScript build actually produces, resolved relative to the
+  `hooks/` directory (the same base the real Claude Code plugin validator
+  uses; the repository's own guard tests and the installer now resolve it the
+  same way).
+- The hooks module itself is now a **self-contained ES bundle**: each plugin's
+  build runs `scripts/bundle-hooks.mjs` (esbuild) after `tsc`, inlining all
+  workspace dependencies. The real validator forbids hooks modules to import
+  anything but their own files and `claude-code` — no `@agentic-sdlc-kit/*`
+  workspace imports and not even `node:` builtins survive into the shipped
+  module. `sideEffects: false` on core/contracts/mod-sdk lets the bundler
+  tree-shake the workspace barrels down to the pure functions the guards use.
+- `register` is exported as a top-level **function declaration** (the
+  validator rejects `var`-bound arrow exports in bundled output).
+- `turn.step` — a streaming event — uses the required `async function*`
+  generator form; the MockRuntime drains generator handlers and uses their
+  return value.
+- `$.state` references use `{ plugin, key }` literals, and each plugin ships a
+  `contract.d.ts` type contract (declared via the `types` field of
+  `.claude-plugin/plugin.json`) naming its state keys in
+  `interface PluginState`. Manifest guard tests keep the contract and the
+  code in sync.
+- **All four plugins now pass `claude plugin validate`** (the remaining
+  icon/marketplace README notes are listing advisories, not errors).
 - `kit install --profile full-sdlc` and `--profile runtime` now link the four
   guard plugins into `<project>/.claude/plugins/` (resolving the kit's
   `plugins/` directory relative to the CLI's own location), and validate each
@@ -153,10 +175,16 @@ error that names the expected format.
 ## Verification
 
 `pnpm verify` (architecture check → build → lint → typecheck → test) passes:
-**517 tests across 11 packages** (485 → 517: +20 new tests covering the
-plugin manifests, plugin linker, YAML parser, stack detector, git scanner,
-spec parser strictness, and the full phase-gated TDD cycle including all
+**527 tests across 11 packages** (485 → 527: +42 new tests covering the
+plugin manifests and type contracts, the self-contained bundle guard, the
+plugin linker (including hooks/-relative resolution), the YAML parser, the
+stack detector, the git scanner, spec parser strictness, streaming handler
+drainage, and the full phase-gated TDD cycle including all
 invariant-violation paths).
+
+All four plugins pass the **real** Claude Code validator
+(`npx @anthropic-ai/claude-code plugin validate <plugin>`), exercised
+through the symlinks `kit install --profile runtime` creates.
 
 All versions aligned at **0.7.3** (root, packages, plugins, plugin
 manifests, CLI VERSION constant, ownership manifest entries).

@@ -332,7 +332,7 @@ function formatHelp(): string {
     'The full-sdlc and runtime profiles link the four guard plugins',
     '(sdlc-guard, secret-guard, model-router, run-observer) into',
     '.claude/plugins/. The kit repository must be built first (pnpm install &&',
-    'pnpm run build) so each plugin has dist/hooks/register.js.',
+    'pnpm run build) so each plugin has a bundled dist/hooks/register.js.',
     '',
     'Options:',
     '  --stack <id> Stack pack to activate (e.g. node-typescript, ruby-rails)',

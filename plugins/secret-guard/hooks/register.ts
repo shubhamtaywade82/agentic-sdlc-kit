@@ -7,7 +7,7 @@
 // operations. A finding does not prove redaction. The register function
 // uses the redactor which verifies completeness.
 
-import type { RegisterFn, ToolCallEvent } from '@agentic-sdlc-kit/mod-sdk';
+import type { On, ToolCallEvent } from '@agentic-sdlc-kit/mod-sdk';
 import { scanText, redactSecrets } from '@agentic-sdlc-kit/core';
 import type { RedactionPolicy } from '@agentic-sdlc-kit/contracts';
 
@@ -20,11 +20,11 @@ const DEFAULT_POLICY: RedactionPolicy = {
   ignorePaths: [],
 };
 
-function getPolicy($: { state: { get: <T>(k: string) => T | undefined } }): RedactionPolicy {
-  return $.state.get<RedactionPolicy>('secret-guard.policy') ?? DEFAULT_POLICY;
+function getPolicy($: { state: { get: <T>(ref: { plugin: string; key: string }) => T | undefined } }): RedactionPolicy {
+  return $.state.get<RedactionPolicy>({ plugin: 'secret-guard', key: 'policy' }) ?? DEFAULT_POLICY;
 }
 
-export const register: RegisterFn = (on) => {
+export function register(on: On): void {
   // Intercept Bash tool calls that touch git (commit/push) to scan the
   // staged diff before it enters history.
   on('tool.call', { tool: 'Bash' }, async ($, e: ToolCallEvent, next) => {
@@ -87,4 +87,4 @@ export const register: RegisterFn = (on) => {
     }
     return result;
   });
-};
+}

@@ -15,6 +15,24 @@ describe('MockRuntime', () => {
     expect(runtime.registrationCount('tool.call')).toBe(1);
   });
 
+  it('drains streaming handlers (async function*) and uses their return value', async () => {
+    const runtime = new MockRuntime();
+    // Streaming events (turn.step) take the generator form: yield chunks,
+    // return the result. The runtime must drain the generator.
+    const register: RegisterFn = (on) => {
+      on('turn.step', async function* ($, _e, next) {
+        $.ui.log('stream: before');
+        yield 'chunk-1';
+        yield 'chunk-2';
+        return next({ delegated: true });
+      });
+    };
+    runtime.load(register);
+    const result = await runtime.fire('turn.step', { model: 'sonnet' });
+    expect(result.forwarded).toBe(true);
+    expect(runtime.getLogs()).toContain('stream: before');
+  });
+
   it('fires an event and forwards when no handler answers', async () => {
     const runtime = new MockRuntime();
     const register: RegisterFn = (on) => {
@@ -71,8 +89,8 @@ describe('MockRuntime', () => {
     const runtime = new MockRuntime();
     const register: RegisterFn = (on) => {
       on('tool.call', async ($, e, next) => {
-        $.state.set('key', 'value');
-        const v = $.state.get<string>('key');
+        $.state.set({ plugin: 'test-mod', key: 'greeting' }, 'value');
+        const v = $.state.get<string>({ plugin: 'test-mod', key: 'greeting' });
         $.ui.log(`got ${v ?? '<missing>'}`);
         return next(e);
       });
@@ -80,6 +98,6 @@ describe('MockRuntime', () => {
     runtime.load(register);
     await runtime.fire('tool.call', { tool: 'Bash', input: {} });
     expect(runtime.getLogs()).toContain('got value');
-    expect(runtime.getState<string>('key')).toBe('value');
+    expect(runtime.getState<string>({ plugin: 'test-mod', key: 'greeting' })).toBe('value');
   });
 });

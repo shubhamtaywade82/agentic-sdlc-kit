@@ -5,7 +5,7 @@
 // Per ADR-0015: policy evaluation is in policies/ (pure functions); the
 // register function is thin and only wires events to policies.
 
-import type { RegisterFn, ToolCallEvent, ToolCheckEvent } from '@agentic-sdlc-kit/mod-sdk';
+import type { On, ToolCallEvent, ToolCheckEvent } from '@agentic-sdlc-kit/mod-sdk';
 import { classifyShellCommand } from '../policies/shell-policy.js';
 import { classifyGitCommand } from '../policies/git-policy.js';
 import { evaluateAction } from '../policies/evaluator.js';
@@ -13,13 +13,13 @@ import type { PolicyContext } from '@agentic-sdlc-kit/contracts';
 
 // Default context: interactive. The host or the installer can override
 // this by setting state.sdlc-guard.context before the first event.
-function getContext($: { state: { get: <T>(k: string) => T | undefined } }): PolicyContext {
-  const stored = $.state.get<PolicyContext>('sdlc-guard.context');
+function getContext($: { state: { get: <T>(ref: { plugin: string; key: string }) => T | undefined } }): PolicyContext {
+  const stored = $.state.get<PolicyContext>({ plugin: 'sdlc-guard', key: 'context' });
   if (stored) return stored;
   return { interactive: true };
 }
 
-export const register: RegisterFn = (on) => {
+export function register(on: On): void {
   // tool.check: permission decision (allow / ask / deny).
   on('tool.check', async ($, e: ToolCheckEvent, next) => {
     const tool = e.tool;
@@ -64,4 +64,4 @@ export const register: RegisterFn = (on) => {
     }
     return next(e);
   });
-};
+}

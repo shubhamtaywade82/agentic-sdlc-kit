@@ -56,8 +56,7 @@ describe('detectSecrets — false positives / negatives', () => {
   });
   it('detects multiple secrets in one input', () => {
     const fakeStripe = ['sk', 'test', 'abcdefghijklmnopqrstuvwx'].join('_');
-    const text =
-      `AWS_KEY=AKIAIOSFODNN7EXAMPLE\nSTRIPE=${fakeStripe}\nGITHUB=ghp_abcdefghijklmnopqrstuvwxyz0123456789AB`;
+    const text = `AWS_KEY=AKIAIOSFODNN7EXAMPLE\nSTRIPE=${fakeStripe}\nGITHUB=ghp_abcdefghijklmnopqrstuvwxyz0123456789AB`;
     const findings = detectSecrets(text, 'file-read');
     const kinds = new Set(findings.map((f) => f.kind));
     expect(kinds.has('aws-access-key')).toBe(true);

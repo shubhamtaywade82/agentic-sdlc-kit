@@ -1,6 +1,6 @@
 {
   "id": "run-observer",
-  "version": "0.7.0",
+  "version": "0.7.3",
   "hooks": ["session.start", "turn.start", "tool.call", "turn.complete"],
   "apiAccess": ["ui.log", "state.get", "state.set"],
   "filesystemAccess": [],

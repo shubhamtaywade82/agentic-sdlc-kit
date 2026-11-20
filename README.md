@@ -93,18 +93,35 @@ Executes a strict vertical-slice engineering workflow:
 
 1. **Spec**: Validates user stories and acceptance criteria.
 2. **Plan**: Computes implementation DAG and verifies acyclicity.
-3. **TDD**: Executes Red $\to$ Green $\to$ Refactor cycles per task.
+3. **TDD**: Drives phase-gated Red $\to$ Green $\to$ Refactor cycles per task,
+   with the failing test, implementation, and refactoring done by your
+   agent between gate invocations. Every gate's outcome is recorded as
+   evidence under `.ai-kit/state/feature-runs/<feature-id>.json`.
 4. **Verify**: Runs deterministic test/lint/typecheck verification.
-5. **Report**: Generates an execution report with artifact evidence.
+5. **Report**: Generates an execution report with TDD evidence.
+
+The spec and plan are authored by your agent following
+`docs/workflows/WORKFLOWS.md` (step 4: requirements-engineering, step 7:
+implementation-planning). The loaders expect:
+
+- `docs/specifications/features/<ID>/SPEC.md` starting with `# <ID>: Title`
+  (missing or malformed title lines are rejected, not defaulted)
+- `docs/plans/<ID>/plan.json` (or `PLAN.md` with an embedded JSON block)
+  matching the Task/ImplementationPlan contracts in `docs/contracts/CONTRACTS.md`
 
 ```bash
 # Validate feature spec and implementation DAG
 kit validate-spec docs/specifications/features/FEATURE-001/SPEC.md
-kit validate-plan docs/plans/FEATURE-001/PLAN.md
+kit validate-plan docs/plans/FEATURE-001/plan.json
 
-# Execute feature workflow
-kit feature FEATURE-001
-# Or run in dry-run mode:
+# Drive the phase-gated TDD loop (nothing is executed until you open a gate)
+kit feature FEATURE-001                  # start / show status
+kit feature FEATURE-001 --red TASK-001   # the failing test must FAIL here
+kit feature FEATURE-001 --green TASK-001 # after implementing: must PASS
+kit feature FEATURE-001 --refactor TASK-001
+kit feature FEATURE-001 --verify         # final regression (all tasks done)
+
+# Preview the plan without executing anything:
 kit feature FEATURE-001 --dry-run
 ```
 

@@ -1,7 +1,10 @@
 {
   "name": "sdlc-guard",
-  "version": "0.7.0",
+  "version": "0.7.3",
+  "types": "./contract.d.ts",
   "description": "Runtime governance Mod: destructive-operation protection, approval gates, migration and deployment controls. Uses the M10 policy evaluator and action classification.",
-  "author": { "name": "Agentic SDLC Kit" },
+  "author": {
+    "name": "Agentic SDLC Kit"
+  },
   "license": "MIT"
 }

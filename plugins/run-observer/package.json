@@ -1,12 +1,12 @@
 {
   "name": "@agentic-sdlc-kit/plugin-run-observer",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "description": "run-observer execution observability Mod.",
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node ../../scripts/bundle-hooks.mjs .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist *.tsbuildinfo"

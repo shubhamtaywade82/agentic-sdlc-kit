@@ -31,7 +31,7 @@ describe('sdlc-guard register', () => {
     const runtime = new MockRuntime();
     // Set non-interactive context.
     const ctx: PolicyContext = { interactive: false };
-    runtime.api.state.set('sdlc-guard.context', ctx);
+    runtime.api.state.set({ plugin: 'sdlc-guard', key: 'context' }, ctx);
     runtime.load(register);
     const result = await runtime.fire('tool.call', {
       tool: 'Bash',
@@ -56,7 +56,7 @@ describe('sdlc-guard register', () => {
   it('DENIES via tool.check in non-interactive mode', async () => {
     const runtime = new MockRuntime();
     const ctx: PolicyContext = { interactive: false };
-    runtime.api.state.set('sdlc-guard.context', ctx);
+    runtime.api.state.set({ plugin: 'sdlc-guard', key: 'context' }, ctx);
     runtime.load(register);
     const result = await runtime.fire('tool.check', {
       tool: 'Bash',

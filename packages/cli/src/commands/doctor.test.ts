@@ -20,7 +20,7 @@ describe('doctorCommand', () => {
     const r = await doctorCommand.run(ctx);
     expect(r.exitCode).toBeLessThanOrEqual(2); // 0 if healthy, 2 if not
     const text = ctx.out[0] ?? '';
-    expect(text).toContain('kit 0.7.2');
+    expect(text).toContain('kit 0.7.3');
     expect(text).toContain('node');
     expect(text).toContain('pnpm');
     expect(text).toContain('workspace');

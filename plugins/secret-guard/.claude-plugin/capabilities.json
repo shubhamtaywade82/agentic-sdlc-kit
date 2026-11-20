@@ -1,6 +1,6 @@
 {
   "id": "secret-guard",
-  "version": "0.7.0",
+  "version": "0.7.3",
   "hooks": ["tool.call"],
   "apiAccess": ["ui.log", "state.get"],
   "filesystemAccess": [],

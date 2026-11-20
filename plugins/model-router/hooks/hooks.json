@@ -1,4 +1,4 @@
 {
   "description": "model-router hooks",
-  "modules": ["./hooks/register.js"]
+  "modules": ["../dist/hooks/register.js"]
 }

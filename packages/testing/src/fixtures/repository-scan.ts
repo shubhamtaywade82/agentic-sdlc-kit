@@ -14,6 +14,7 @@ export const nodeFullstackScan: RepositoryScan = {
   hasCi: true,
   agentInstructionFiles: ['CLAUDE.md'],
   git: {
+    isRepo: true,
     branch: 'main',
     dirty: false,
     headSha: '0123456789abcdef0123456789abcdef01234567',

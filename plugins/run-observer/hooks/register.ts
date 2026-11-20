@@ -12,7 +12,7 @@
 // unlimited history.
 
 import type {
-  RegisterFn,
+  On,
   TurnStartEvent,
   TurnCompleteEvent,
   ToolCallEvent,
@@ -36,7 +36,7 @@ function redactSummary(text: string, policy: RetentionPolicy): string {
   return text.replace(/\/(?:[^/\s]+\/)+[^/\s]+/g, '<path>');
 }
 
-export const register: RegisterFn = (on) => {
+export function register(on: On): void {
   // The store is per-session; in a real Mod the host provides a stable
   // store via $.state. For the contract surface we hold it in a closure.
   const store = new TraceStore(DEFAULT_POLICY);
@@ -86,7 +86,7 @@ export const register: RegisterFn = (on) => {
       partial: e.tokensIn === undefined,
     });
     // Expose the store via $.state so kit runs can read it.
-    $.state.set('run-observer.store', store);
+    $.state.set({ plugin: 'run-observer', key: 'store' }, store);
     return next(e);
   });
-};
+}

@@ -8,7 +8,15 @@
 // The mock also implements the ModsApi surface (ui.log, fs.read/write,
 // state.get/set, http.fetch) so handlers can call `$` in tests.
 
-import type { EventName, EventOf, Matcher, ModsApi, On, RegisterFn } from '../types/events.js';
+import type {
+  EventName,
+  EventOf,
+  Matcher,
+  ModsApi,
+  On,
+  RegisterFn,
+  StateRef,
+} from '../types/events.js';
 
 interface Registration {
   event: EventName;
@@ -33,6 +41,10 @@ export class MockRuntime {
   private stateStore: Record<string, unknown> = {};
   private fsStore: Record<string, string> = {};
 
+  private static refKey(ref: StateRef): string {
+    return `${ref.plugin}.${ref.key}`;
+  }
+
   readonly api: ModsApi = {
     ui: {
       log: (msg: string) => {
@@ -51,9 +63,10 @@ export class MockRuntime {
       },
     },
     state: {
-      get: <T>(key: string): T | undefined => this.stateStore[key] as T | undefined,
-      set: <T>(key: string, value: T) => {
-        this.stateStore[key] = value;
+      get: <T>(ref: StateRef): T | undefined =>
+        this.stateStore[MockRuntime.refKey(ref)] as T | undefined,
+      set: <T>(ref: StateRef, value: T) => {
+        this.stateStore[MockRuntime.refKey(ref)] = value;
       },
     },
     http: {
@@ -113,7 +126,11 @@ export class MockRuntime {
       chain = async (ev: EventOf<N>): Promise<unknown> => {
         // The handler signature is ($, e, next). We pass our api, the event,
         // and the current next chain.
-        const result = await currentHandler(this.api as never, ev as never, currentNext as never);
+        const out = await currentHandler(this.api as never, ev as never, currentNext as never);
+        // Streaming handlers (async function*) yield chunks and return the
+        // result; drain the generator and use its return value like a
+        // normal handler's result.
+        const result = await MockRuntime.drainIfGenerator(out);
         if (result !== undefined) {
           answered = true;
           return result;
@@ -124,6 +141,27 @@ export class MockRuntime {
     }
     const value = await chain(e);
     return { value, answered, forwarded };
+  }
+
+  /**
+   * If `out` is an async generator (a streaming handler ran), drain its
+   * yielded chunks and return its return value; otherwise return `out`.
+   */
+  private static async drainIfGenerator(out: unknown): Promise<unknown> {
+    if (
+      out !== null &&
+      typeof out === 'object' &&
+      typeof (out as AsyncGenerator).next === 'function' &&
+      typeof (out as AsyncGenerator)[Symbol.asyncIterator] === 'function'
+    ) {
+      const it = (out as AsyncGenerator)[Symbol.asyncIterator]();
+      let r = await it.next();
+      while (!r.done) {
+        r = await it.next();
+      }
+      return r.value;
+    }
+    return out;
   }
 
   /**
@@ -151,8 +189,8 @@ export class MockRuntime {
   /**
    * Get the recorded state (for assertions).
    */
-  getState<T>(key: string): T | undefined {
-    return this.stateStore[key] as T | undefined;
+  getState<T>(ref: StateRef): T | undefined {
+    return this.stateStore[MockRuntime.refKey(ref)] as T | undefined;
   }
 
   private matcherMatches<N extends EventName>(

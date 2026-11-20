@@ -14,7 +14,16 @@ import path from 'node:path';
 import { Errors, type Result } from '@agentic-sdlc-kit/contracts';
 import type { TddStepRecord } from '../tdd/cycle.js';
 
-export const FEATURE_RUN_SCHEMA_VERSION = 1 as const;
+/**
+ * v2 (ADR-0018 P1): step records carry task-targeted verification
+ * metadata (command + failure classification). v1 files load lazily —
+ * their records simply lack `verification` and are treated as
+ * unclassified by the Red evidence gate (fail closed, no rewrite).
+ */
+export const FEATURE_RUN_SCHEMA_VERSION = 2 as const;
+
+/** Schema versions this build can read; new saves always write the latest. */
+const READABLE_SCHEMA_VERSIONS: readonly number[] = [1, FEATURE_RUN_SCHEMA_VERSION];
 
 /** TDD phase of a single planned task within a feature run. */
 export type TaskTddPhase = 'red' | 'green' | 'refactor' | 'completed';
@@ -60,8 +69,12 @@ export async function saveFeatureRunState(
 ): Promise<void> {
   const target = featureRunPath(projectRoot, state.featureId);
   await fs.mkdir(path.dirname(target), { recursive: true });
+  // A v1 file loaded lazily and re-saved after a new phase attempt is
+  // written in the current (v2) format; pre-existing v1 records are kept
+  // verbatim and remain subject to the fail-closed Red gate.
+  const normalized: FeatureRunState = { ...state, schemaVersion: FEATURE_RUN_SCHEMA_VERSION };
   const tmp = `${target}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(state, null, 2) + '\n', 'utf8');
+  await fs.writeFile(tmp, JSON.stringify(normalized, null, 2) + '\n', 'utf8');
   await fs.rename(tmp, target);
 }
 
@@ -72,7 +85,11 @@ export async function loadFeatureRunState(
   const target = featureRunPath(projectRoot, featureId);
   try {
     const raw = JSON.parse(await fs.readFile(target, 'utf8')) as FeatureRunState;
-    if (raw.schemaVersion !== FEATURE_RUN_SCHEMA_VERSION || typeof raw.tasks !== 'object') {
+    if (
+      !READABLE_SCHEMA_VERSIONS.includes(raw.schemaVersion) ||
+      typeof raw.tasks !== 'object' ||
+      raw.tasks === null
+    ) {
       return {
         ok: false,
         error: Errors.contractInvalid(`Corrupted feature run state at ${target}`),

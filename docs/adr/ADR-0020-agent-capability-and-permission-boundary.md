@@ -116,9 +116,11 @@ For TDD specifically, the targeted test must fail (Red) / pass (Green /
 Refactor) for the **expected reason**. A whole-suite failure, a
 compilation failure, an environment failure, an unrelated regression, or a
 malformed test must be distinguished from an expected assertion failure.
-This is a follow-up to this ADR (separate PR) and hardens the existing
-`Task.verification` contract, which already declares a per-task command
-and `expectedStatus` but is not yet consumed by `runTddPhase`.
+The task-scoped Red-evidence fix (ADR-0018, P1 refinement) enforces
+exactly this: `runTddPhase` consumes the existing `Task.verification`
+contract's per-task command, classifies the failure, and accepts only
+classification `assertion` as Red. An unclassified failure never counts
+as Red.
 
 ## Consequences
 

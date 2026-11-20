@@ -33,14 +33,19 @@ async function setupProject(): Promise<{ root: string; marker: string }> {
   await fs.mkdir(path.join(tmp, '.git'), { recursive: true });
   await fs.writeFile(path.join(tmp, '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
-  // Test command fails until the agent "implements" (creates the marker).
+  // Test command fails with a real assertion-style failure until the agent
+  // "implements" (creates the marker). The failure output must look like a
+  // test assertion failure: only classification 'assertion' establishes Red.
   const script = path.join(tmp, 'check.js');
   await fs.writeFile(
     script,
     [
       'const fs = require("node:fs");',
       `const marker = ${JSON.stringify(marker)};`,
-      'if (!fs.existsSync(marker)) { process.exit(1); }',
+      'if (!fs.existsSync(marker)) {',
+      '  console.error("AssertionError: expected marker to exist (target not implemented)");',
+      '  process.exit(1);',
+      '}',
       'process.exit(0);',
     ].join('\n'),
   );

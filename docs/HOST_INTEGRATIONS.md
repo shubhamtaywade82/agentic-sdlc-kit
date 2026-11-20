@@ -30,9 +30,16 @@ Claude Code is the primary supported host runtime with native runtime plugin (Mo
 Claude Code discovers plugins via `.claude-plugin/plugin.json` and `hooks/hooks.json`. To enable the 4 guard plugins for your repository:
 
 ```bash
-# From your target project repository:
+# From your target project repository (kit repo must be built: pnpm install && pnpm run build)
 kit install --profile full-sdlc --stack node-typescript
 ```
+
+This links `sdlc-guard`, `secret-guard`, `model-router`, and `run-observer` into
+your project's `.claude/plugins/` directory. Each plugin's `hooks/hooks.json`
+declares `./dist/hooks/register.js` — the compiled hook module — and the
+installer validates that path before linking, so a plugin is never installed
+in a broken state (if the kit repo is not built yet, the installer says so
+and links nothing for that plugin).
 
 Or manually link the plugins in your project's `.claude/` directory:
 
@@ -44,12 +51,21 @@ ln -s /path/to/agentic-sdlc-kit/plugins/model-router .claude/plugins/model-route
 ln -s /path/to/agentic-sdlc-kit/plugins/run-observer .claude/plugins/run-observer
 ```
 
+(With manual links, run `pnpm install && pnpm run build` in the kit repository
+first so each plugin has `dist/hooks/register.js`.)
+
 ### Step 2: How Claude Code Uses the Kit
 
 - **Tool Interception**: When Claude Code attempts tool calls (e.g. bash commands or file writes), `sdlc-guard` stops destructive commands and `secret-guard` redacts API keys.
-- **Workflow Execution**: In the Claude Code chat session, instruct Claude:
+- **Workflow Execution**: The feature workflow is phase-gated — the agent
+  writes code between gate invocations, and the kit verifies each gate:
   ```
-  Run `kit feature FEATURE-001` to implement the authenticated login feature according to the plan.
+  Run `kit feature FEATURE-001` to start the run, then write the failing
+  test for TASK-101 and run `kit feature FEATURE-001 --red TASK-101`.
+  After the red gate passes, implement the minimum change and run
+  `kit feature FEATURE-001 --green TASK-101`, then refactor and run
+  `kit feature FEATURE-001 --refactor TASK-101`. Repeat per task, then
+  `kit feature FEATURE-001 --verify`.
   ```
 
 ---

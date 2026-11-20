@@ -155,3 +155,28 @@ export class ProcessVerificationRunner implements VerificationRunner {
     return { ok: true, value: report };
   }
 }
+
+/**
+ * Run ONE command (e.g. a task's TDD verification command) and wrap the
+ * outcome in a Check. Uses the same safe execution rules as the profile
+ * runner: shell: false, argument arrays, bounded timeouts, capped output.
+ */
+export async function runSingleCommandCheck(
+  id: string,
+  cmd: ReadonlyArray<string>,
+  opts: { cwd?: string; timeoutMs?: number; maxOutputBytes?: number } = {},
+): Promise<Check> {
+  const outcome = await executeProcess(
+    [...cmd],
+    opts.cwd ?? process.cwd(),
+    opts.timeoutMs ?? 60_000,
+    opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+  );
+  return {
+    id,
+    status: outcome.status,
+    command: [...cmd],
+    durationMs: outcome.durationMs,
+    evidence: outcome.output ? [outcome.output.slice(-2000)] : [],
+  };
+}

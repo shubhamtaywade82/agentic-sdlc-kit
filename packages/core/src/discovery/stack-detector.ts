@@ -113,14 +113,33 @@ async function checkRails(
   tests: string[],
 ): Promise<void> {
   const hasGemfile = await fileExists(path.join(root, 'Gemfile'));
-  const hasRailsApp = await fileExists(path.join(root, 'config/application.rb'));
-  if (hasGemfile || hasRailsApp) {
-    stacks.push('ruby-rails');
-    if (!managers.includes('bundler')) managers.push('bundler');
-    const hasRspec =
-      (await fileExists(path.join(root, '.rspec'))) || (await fileExists(path.join(root, 'spec')));
-    if (hasRspec && !tests.includes('rspec')) tests.push('rspec');
+  const hasRailsApp = await fileExists(path.join(root, 'config', 'application.rb'));
+  const hasRailsScript = await fileExists(path.join(root, 'bin', 'rails'));
+
+  // Rails evidence: a Rails app layout, or an explicit rails gem. A plain
+  // Ruby project (Gemfile without rails) must NOT be mislabeled as Rails.
+  let hasRailsGem = false;
+  if (hasGemfile) {
+    try {
+      const gemfile = await fs.readFile(path.join(root, 'Gemfile'), 'utf8');
+      hasRailsGem = /^\s*gem\s+['"]rails['"].*$/m.test(gemfile);
+    } catch {
+      hasRailsGem = false;
+    }
   }
+
+  if (hasRailsApp || hasRailsScript || hasRailsGem) {
+    stacks.push('ruby-rails');
+  } else if (hasGemfile || (await fileExists(path.join(root, 'Gemfile.lock')))) {
+    stacks.push('ruby');
+  } else {
+    return;
+  }
+
+  if (!managers.includes('bundler')) managers.push('bundler');
+  const hasRspec =
+    (await fileExists(path.join(root, '.rspec'))) || (await fileExists(path.join(root, 'spec')));
+  if (hasRspec && !tests.includes('rspec')) tests.push('rspec');
 }
 
 async function checkPython(
@@ -131,10 +150,47 @@ async function checkPython(
 ): Promise<void> {
   const hasPyproject = await fileExists(path.join(root, 'pyproject.toml'));
   const hasReqs = await fileExists(path.join(root, 'requirements.txt'));
-  if (hasPyproject || hasReqs) {
-    stacks.push('python');
-    if (!managers.includes('pip')) managers.push('pip');
-    if (!tests.includes('pytest')) tests.push('pytest');
+  if (!hasPyproject && !hasReqs) return;
+
+  stacks.push('python');
+
+  // Package manager: derive from actual markers, don't default blindly.
+  let pyprojectText = '';
+  if (hasPyproject) {
+    try {
+      pyprojectText = await fs.readFile(path.join(root, 'pyproject.toml'), 'utf8');
+    } catch {
+      pyprojectText = '';
+    }
+  }
+  const hasPoetryLock = await fileExists(path.join(root, 'poetry.lock'));
+  const hasUvLock = await fileExists(path.join(root, 'uv.lock'));
+  if (hasPoetryLock || /\[tool\.poetry\]/.test(pyprojectText)) {
+    if (!managers.includes('poetry')) managers.push('poetry');
+  } else if (hasUvLock) {
+    if (!managers.includes('uv')) managers.push('uv');
+  } else if (!managers.includes('pip')) {
+    managers.push('pip');
+  }
+
+  // Test framework: report pytest only when there is actual evidence of
+  // it — a dependency mention or config file. A stdlib-unittest (or
+  // test-free) project must not be reported as pytest.
+  const hasPytestConfig =
+    (await fileExists(path.join(root, 'pytest.ini'))) ||
+    (await fileExists(path.join(root, 'conftest.py')));
+  let requirementsText = '';
+  if (hasReqs) {
+    try {
+      requirementsText = await fs.readFile(path.join(root, 'requirements.txt'), 'utf8');
+    } catch {
+      requirementsText = '';
+    }
+  }
+  const mentionsPytest =
+    /(^|\n)\s*[-\w[\]]*\s*pytest\b/.test(requirementsText) || /pytest\b/.test(pyprojectText);
+  if ((hasPytestConfig || mentionsPytest) && !tests.includes('pytest')) {
+    tests.push('pytest');
   }
 }
 

@@ -1,4 +1,6 @@
 // packages/core/src/discovery/repository-scanner.test.ts
+import { promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FileSystemRepositoryScanner, StubRepositoryScanner } from './repository-scanner.js';
@@ -37,7 +39,27 @@ describe('FileSystemRepositoryScanner', () => {
     expect(scan.entryPoints).toContain('src/index.js');
     expect(scan.hasMigrations).toBe(false);
     expect(scan.hasCi).toBe(false);
+    // The fixture lives inside the kit git repository, so git state must
+    // report the real repo — never a fabricated branch/commit.
+    expect(scan.git.isRepo).toBe(true);
     expect(scan.git.headSha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('reports isRepo: false (not a fabricated branch) for a non-git folder', async () => {
+    const scanner = new FileSystemRepositoryScanner();
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-nogit-'));
+    try {
+      await fs.writeFile(path.join(tmp, 'package.json'), '{"name":"x","version":"1.0.0"}');
+      const res = await scanner.scan(tmp);
+      expect(res.ok).toBe(true);
+      if (!res.ok) return;
+      // No .git anywhere: the scanner must say so, not invent main/0000000.
+      expect(res.value.git.isRepo).toBe(false);
+      expect(res.value.git.branch).toBe('');
+      expect(res.value.git.headSha).toBe('');
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
   });
 
   it('returns DISCOVERY_FAILED for non-existent path', async () => {
@@ -61,6 +83,7 @@ describe('FileSystemRepositoryScanner', () => {
     expect(scan.hasCi).toBe(true);
     expect(scan.agentInstructionFiles).toContain('AGENTS.md');
     expect(scan.agentInstructionFiles).toContain('GEMINI.md');
+    expect(scan.git.isRepo).toBe(true);
     expect(scan.git.branch.length).toBeGreaterThan(0);
     expect(scan.git.headSha).toMatch(/^[0-9a-f]{40}$/);
   });

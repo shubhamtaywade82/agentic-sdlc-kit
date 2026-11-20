@@ -12,7 +12,7 @@ const baseScan = (overrides: Partial<RepositoryScan> = {}): RepositoryScan => ({
   hasMigrations: false,
   hasCi: true,
   agentInstructionFiles: [],
-  git: { branch: 'main', dirty: false, headSha: '0'.repeat(40) },
+  git: { isRepo: true, branch: 'main', dirty: false, headSha: '0'.repeat(40) },
   ...overrides,
 });
 

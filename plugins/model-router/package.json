@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/plugin-model-router",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "description": "model-router model + effort routing Mod.",
   "license": "MIT",

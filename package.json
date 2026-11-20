@@ -1,6 +1,6 @@
 {
   "name": "agentic-sdlc-kit",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
   "description": "Runtime-independent Agentic SDLC Kit. M0+M1 foundation: contracts, core, cli, testing, and the Claude Code adapter boundary.",
   "license": "MIT",

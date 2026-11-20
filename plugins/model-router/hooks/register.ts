@@ -3,7 +3,9 @@
 // model-router: model + effort routing for main turns (turn.step) and
 // subagents (agent.spawn).
 //
-// Host contract (official docs, verified November 2026):
+// Host contract (official engine declarations, verified against
+// @anthropic-ai/claude-code 2.1.329 — see
+// .claude-plugin/types/claude-code/index.d.ts):
 //   - turn.step STREAMS: the hook is an async generator. Delegation is
 //     `const result = yield* next(e)` (forwarding every chunk) and a
 //     rewrite is `yield* next({ ...e, model })` — returning next(e)
@@ -11,18 +13,20 @@
 //     the stream, so the generator form is not optional.
 //   - agent.spawn: rewrite with `next({ ...e, model })`; e.resume is set
 //     for resumed runs, whose changes the host IGNORES — skip them.
-//
-// Per post-M7 §6 the router starts in suggest-only mode: it logs its
-// recommendation and changes nothing unless the policy says otherwise.
-// The default policy's complexity/risk inputs are the heuristic baseline
-// (medium/low) — there is no prompt classifier wired in this milestone,
-// and suggest-only mode makes that honest: nothing is silently rerouted.
+//   - state flows through the official atom/read/update helpers. NOTE:
+//     an offline `claude plugin validate` run types the atom ref against
+//     an EMPTY PluginState (its checker does not merge this plugin's
+//     contract) and so flags the atom() line above the same way it flags
+//     Claude Code's own turn-band example mod — the real engine lays the
+//     merged declarations at .claude-plugin/types/claude-code/index.d.ts
+//     and the same line typechecks cleanly there.
 //
 // Static-analysis rules honored here: full $.x.y(...) calls; string-literal
 // event names; `$` passed only to getPolicy, a top-level function of this
-// file; imports are relative files of this plugin plus 'claude-code' types.
+// file; imports are relative files of this plugin plus 'claude-code'.
 
-import type { AgentSpawnEvent, ModsApi, On, TurnStepEvent } from 'claude-code';
+import type { AgentSpawnInput, EngineInterface, On, TurnStepInput } from 'claude-code';
+import { atom, read } from 'claude-code';
 import type { RoutingContext, RoutingPolicy } from '../policies/types';
 import { route } from '../policies/router';
 
@@ -77,8 +81,12 @@ const DEFAULT_POLICY: RoutingPolicy = {
   suggestOnly: true,
 };
 
-function getPolicy($: ModsApi): RoutingPolicy {
-  return $.state.get<RoutingPolicy>({ plugin: 'model-router', key: 'policy' }) ?? DEFAULT_POLICY;
+// The policy state key, declared in contract.d.ts. read() resolves to
+// the stored policy or the module default (initial) when unset.
+const POLICY = atom({ plugin: 'model-router', key: 'policy' } as const, DEFAULT_POLICY);
+
+async function getPolicy($: EngineInterface): Promise<RoutingPolicy> {
+  return read($, POLICY);
 }
 
 function buildContext(scope: 'main-turn' | 'subagent'): RoutingContext {
@@ -96,9 +104,10 @@ function buildContext(scope: 'main-turn' | 'subagent'): RoutingContext {
 }
 
 export function register(on: On): void {
-  // turn.step: main-turn model + effort routing (streaming event).
-  on('turn.step', async function* ($, e: TurnStepEvent, next) {
-    const policy = getPolicy($);
+  // turn.step: main-turn model + effort routing (streaming event). The
+  // effort rewrite keeps the official union (level names or a number).
+  on('turn.step', async function* ($, e: TurnStepInput, next) {
+    const policy = await getPolicy($);
     const decision = route(buildContext('main-turn'), policy);
     if (policy.suggestOnly) {
       $.ui.log(
@@ -113,10 +122,10 @@ export function register(on: On): void {
   });
 
   // agent.spawn: subagent model routing.
-  on('agent.spawn', async ($, e: AgentSpawnEvent, next) => {
+  on('agent.spawn', async ($, e: AgentSpawnInput, next) => {
     // Resumed runs ignore event changes — do not touch them.
     if (e.resume) return next(e);
-    const policy = getPolicy($);
+    const policy = await getPolicy($);
     // Preserve an explicit model selection (post-M7 §6 invariant).
     if (e.model !== undefined) {
       $.ui.log(`model-router: subagent ${e.name ?? '<unnamed>'} keeps explicit model ${e.model}`);

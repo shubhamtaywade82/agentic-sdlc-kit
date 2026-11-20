@@ -1,26 +1,38 @@
 // packages/mod-sdk/src/types/events.ts
 //
-// Typed event surface for Claude Code Mods, matching the official docs
-// (code.claude.com/docs/en/plugins/mods — verified November 2026).
+// Typed event surface for Claude Code Mods. Name-maps to the official
+// engine declarations (verified November 2026 against
+// @anthropic-ai/claude-code 2.1.329 by probing `claude plugin validate`,
+// whose type checker runs against the engine's own declarations — see
+// plugins/<name>/.claude-plugin/types/claude-code/index.d.ts):
+//   - ModsApi        ≡ the official EngineInterface (the `$` argument)
+//   - *Event         ≡ the official *Input (ToolCallEvent ≡ ToolCallInput,
+//                       AgentSpawnEvent ≡ AgentSpawnInput, ...)
+//   - ToolCallResult ≡ the official ToolCallResult<T>
 //
 // These shapes describe what the REAL host passes to a Mod:
 //   - tool.call: the tool's arguments are FIELDS of the event
-//     (e.command for Bash, e.file_path + e.content for Write, ...).
-//   - tool.check: the arguments are under e.input; the hook answers with
-//     { decision: 'allow' | 'ask' | 'deny', reason? }.
+//     (e.command for Bash, e.file_path + e.content for Write, ...);
+//     tool.check carries them under e.input (untyped there officially).
 //   - turn.step streams: the hook is an async generator delegating with
-//     `const result = yield* next(e)`.
+//     `const result = yield* next(e)`; the result carries the answering
+//     model under result.usage.model.
 //   - turn.start identifies the turn with e.turnId; turn.complete carries
 //     e.answer / e.durationMs / e.usage / e.isAborted / e.agentId.
+//   - $.clock.now / $.session.id / $.session.cwd / $.state.get are ASYNC
+//     on the official engine; state reads resolve to StateRead<T>, whose
+//     `.value` unwraps the stored value. MockRuntime mirrors all of this.
 //   - on(...) returns a registration whose .catch(handler) runs when the
 //     hook throws or times out (fail-closed error handling).
 //
-// When deployed in a real Claude Code environment, the host's `on` is what
-// actually dispatches events; the SDK's types are advisory. The installed
-// Claude Code version's type declarations are the final authority (per
-// RESEARCH.md §3 caveat). See ADR-0014.
+// The kit keeps its own export names above (ADR-0014: runtime-independent
+// core); the plugins' hooks import the OFFICIAL names from 'claude-code'
+// instead, vendored per plugin. When deployed in a real Claude Code
+// environment, the engine lays its own declarations at
+// .claude-plugin/types/claude-code/index.d.ts and they are the final
+// authority.
 
-// ─── Tool events ───────────────────────────────────────────────────────────
+// ─── Tool events ────────────────────────────────────────────────────────
 export interface ToolCallEvent {
   tool: string;
   // Tool arguments are fields of the event itself. Common built-ins:
@@ -59,12 +71,15 @@ export interface ToolCheckResult {
   reason?: string;
 }
 
-// ─── Turn events ───────────────────────────────────────────────────────────
+// ─── Turn events ────────────────────────────────────────────────────────
 export interface TurnUsage {
   input_tokens?: number;
   output_tokens?: number;
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+  // The model that actually answered (always present on the official
+  // engine; optional here only because queued test results may omit it).
+  model?: string;
 }
 export interface TurnStepEvent {
   // The current model and effort; the Mod can rewrite these.
@@ -76,8 +91,9 @@ export interface TurnStepEvent {
   request?: unknown;
 }
 export interface TurnStepResult {
-  usage?: TurnUsage;
-  model?: string;
+  // The answering turn's usage (carries the model under usage.model on
+  // the official engine); the official engine may deliver null.
+  usage?: TurnUsage | null;
   [key: string]: unknown;
 }
 export interface TurnStartEvent {
@@ -108,7 +124,7 @@ export interface AgentSpawnEvent {
   resume?: boolean;
 }
 
-// ─── Session / command events ──────────────────────────────────────────────
+// ─── Session / command events ────────────────────────────────────────────
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the host event carries no known fields
 export interface SessionStartEvent {
   // Fires once per loaded mod before the first prompt, and again on
@@ -123,7 +139,7 @@ export interface CommandRunEvent {
   args?: string;
 }
 
-// ─── Event name → event type map ───────────────────────────────────────────
+// ─── Event name → event type map ─────────────────────────────────────────
 export interface EventMap {
   'tool.call': ToolCallEvent;
   'tool.check': ToolCheckEvent;
@@ -139,12 +155,20 @@ export interface EventMap {
 export type EventName = keyof EventMap;
 export type EventOf<N extends EventName> = EventMap[N];
 
-// ─── Mods API ──────────────────────────────────────────────────────────────
+// ─── Mods API ───────────────────────────────────────────────────────────
 // The `$` argument passed to every handler: the mods API methods grouped in
 // namespaces (official surface, subset used by this kit's mods).
 export interface StateRef {
   plugin: string;
   key: string;
+}
+
+// What $.state.get resolves to on the official engine: the stored value
+// (or undefined) behind `.value`. The official engine additionally types
+// the ref against the merged PluginState; the kit's mirror keeps the ref
+// permissive so the same hooks typecheck standalone.
+export interface StateRead<T> {
+  value: T | undefined;
 }
 
 export interface ProcessResult {
@@ -176,24 +200,21 @@ export interface ModsApi {
     run: (args: ReadonlyArray<string>) => Promise<ProcessResult>;
   };
   command: {
-    register: (cmd: {
-      name: string;
-      description: string;
-      argumentHint?: string;
-    }) => Promise<void>;
+    register: (cmd: { name: string; description: string; argumentHint?: string }) => Promise<void>;
   };
   session: {
-    id: () => string;
-    cwd: () => string;
+    id: () => Promise<string>;
+    cwd: () => Promise<string>;
   };
   clock: {
-    now: () => number;
+    now: () => Promise<number>;
   };
   // State references use { plugin, key } literals so the host can list the
-  // values a module reads and writes.
+  // values a module reads and writes. Reads resolve to StateRead<T>
+  // (unwrap with `.value`), matching the official engine.
   state: {
-    get: <T>(ref: StateRef) => T | undefined;
-    set: <T>(ref: StateRef, value: T) => void;
+    get: <T>(ref: StateRef) => Promise<StateRead<T>>;
+    set: <T>(ref: StateRef, value: T) => Promise<void>;
   };
   // The host's HTTP fetch, gated by the `networkAccess` capability.
   http: {
@@ -201,7 +222,7 @@ export interface ModsApi {
   };
 }
 
-// ─── Handler shape ─────────────────────────────────────────────────────────
+// ─── Handler shape ───────────────────────────────────────────────────────
 // A handler receives ($, e, next). It MUST return either:
 //   - a result object WITHOUT calling next — this answers the event,
 //   - the return value of next(e) or next(modifiedEvent) — observe/rewrite,
@@ -221,7 +242,7 @@ export type StreamHandler<N extends EventName> = (
   next: (e: EventOf<N>) => AsyncGenerator<unknown, unknown, unknown>,
 ) => AsyncGenerator<unknown, unknown, unknown>;
 
-// ─── Matchers and the `on` function ────────────────────────────────────────
+// ─── Matchers and the `on` function ───────────────────────────────────────
 // A matcher is an object whose fields are compared with the event's; each
 // field can be a value, an array of allowed values, or a RegExp.
 export interface Matcher {

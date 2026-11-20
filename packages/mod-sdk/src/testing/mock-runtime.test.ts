@@ -138,13 +138,13 @@ describe('MockRuntime', () => {
     expect(runtime.getLogs()).toContain('hello from handler');
   });
 
-  it('supports $.state.get and $.state.set', async () => {
+  it('supports $.state.get and $.state.set (async, StateRead-wrapped)', async () => {
     const runtime = new MockRuntime();
     const register: RegisterFn = (on) => {
       on('tool.call', async ($, e, next) => {
-        $.state.set({ plugin: 'test-mod', key: 'greeting' }, 'value');
-        const v = $.state.get<string>({ plugin: 'test-mod', key: 'greeting' });
-        $.ui.log(`got ${v ?? '<missing>'}`);
+        await $.state.set({ plugin: 'test-mod', key: 'greeting' }, 'value');
+        const read = await $.state.get<string>({ plugin: 'test-mod', key: 'greeting' });
+        $.ui.log(`got ${read.value ?? '<missing>'}`);
         return next(e);
       });
     };
@@ -222,12 +222,15 @@ describe('MockRuntime', () => {
     expect(skipped.answered).toBe(false);
   });
 
-  it('mocks $.clock.now and $.session.id', async () => {
+  it('mocks the async $.clock.now / $.session.id / $.session.cwd', async () => {
     const runtime = new MockRuntime(1_000_000);
     runtime.setSession('S-42', '/repo');
     const register: RegisterFn = (on) => {
       on('session.start', async ($, _e, next) => {
-        $.ui.log(`t=${$.clock.now()} s=${$.session.id()} cwd=${$.session.cwd()}`);
+        const t = await $.clock.now();
+        const s = await $.session.id();
+        const cwd = await $.session.cwd();
+        $.ui.log(`t=${t} s=${s} cwd=${cwd}`);
         return next(_e);
       });
     };

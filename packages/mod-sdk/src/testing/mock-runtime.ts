@@ -5,9 +5,10 @@
 // recommends ("packages/testing should make event middleware testable
 // without starting a Claude Code session").
 //
-// The mock mirrors the REAL host contract (official docs, verified
-// November 2026), so a test that passes here exercises the shapes Claude
-// Code actually delivers:
+// The mock mirrors the REAL host contract (verified against
+// @anthropic-ai/claude-code 2.1.329 — see types/events.ts header), so a
+// test that passes here exercises the shapes Claude Code actually
+// delivers:
 //   - tool.call events carry the tool's arguments as fields (e.command),
 //     tool.check carries them under e.input;
 //   - on(...) returns a registration with .catch(handler); when a hook
@@ -16,7 +17,10 @@
 //   - turn.step's next is an async generator, so `yield* next(e)` works;
 //   - $.ui.ask / $.process.run / $.clock.now / $.session.id are mocked
 //     explicitly (tests queue answers and process results) — nothing is
-//     fabricated behind the test's back.
+//     fabricated behind the test's back;
+//   - $.clock.now / $.session.id / $.session.cwd / $.state.get / $.state.set
+//     are ASYNC and state reads resolve to StateRead<T> (unwrap `.value`),
+//     exactly as on the official engine.
 
 import type {
   EventName,
@@ -25,6 +29,7 @@ import type {
   ModsApi,
   On,
   RegisterFn,
+  StateRead,
   StateRef,
 } from '../types/events.js';
 
@@ -146,21 +151,21 @@ export class MockRuntime {
       },
     },
     session: {
-      id: () => this.sessionIdentifier,
-      cwd: () => this.sessionCwd,
+      id: async () => this.sessionIdentifier,
+      cwd: async () => this.sessionCwd,
     },
     clock: {
-      now: () => this.clockNowMs,
+      now: async () => this.clockNowMs,
     },
     state: {
-      get: <T>(ref: StateRef): T | undefined => {
+      get: async <T>(ref: StateRef): Promise<StateRead<T>> => {
         const key = MockRuntime.refKey(ref);
         if (this.poisonedStateKeys.has(key)) {
           throw new Error(`mock state: ${key} is poisoned`);
         }
-        return this.stateStore[key] as T | undefined;
+        return { value: this.stateStore[key] as T | undefined };
       },
-      set: <T>(ref: StateRef, value: T): void => {
+      set: async <T>(ref: StateRef, value: T): Promise<void> => {
         this.stateStore[MockRuntime.refKey(ref)] = value;
       },
     },
@@ -368,7 +373,9 @@ export class MockRuntime {
   }
 
   /** Queue $.process.run results, in order (FIFO). */
-  queueProcessResults(...results: Array<{ stdout: string; stderr?: string; exitCode?: number }>): void {
+  queueProcessResults(
+    ...results: Array<{ stdout: string; stderr?: string; exitCode?: number }>
+  ): void {
     this.processResults.push(
       ...results.map((r) => ({
         stdout: r.stdout,
@@ -398,7 +405,7 @@ export class MockRuntime {
     this.hostChunks = [...chunks];
   }
 
-  /** Set the mock clock (ms since epoch) — $.clock.now() returns it. */
+  /** Set the mock clock (ms since epoch) — `await $.clock.now()` returns it. */
   setNow(nowMs: number): void {
     this.clockNowMs = nowMs;
   }
@@ -413,7 +420,7 @@ export class MockRuntime {
     return this.clockNowMs;
   }
 
-  /** Set the session identity $.session.id() returns. */
+  /** Set the session identity `await $.session.id()` returns. */
   setSession(sessionId: string, cwd: string = '/project'): void {
     this.sessionIdentifier = sessionId;
     this.sessionCwd = cwd;
@@ -423,7 +430,10 @@ export class MockRuntime {
     return `${ref.plugin}.${ref.key}`;
   }
 
-  private matcherMatches<N extends EventName>(matcher: Matcher | undefined, e: EventOf<N>): boolean {
+  private matcherMatches<N extends EventName>(
+    matcher: Matcher | undefined,
+    e: EventOf<N>,
+  ): boolean {
     if (!matcher) return true;
     if (matcher.tool !== undefined) {
       const tool = (e as unknown as { tool?: unknown }).tool;

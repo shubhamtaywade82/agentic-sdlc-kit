@@ -11,6 +11,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./claude-code-shim": {
+      "types": "./dist/claude-code-shim.d.ts",
+      "import": "./dist/claude-code-shim.js"
     }
   },
   "files": [

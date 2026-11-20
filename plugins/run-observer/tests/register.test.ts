@@ -2,8 +2,9 @@
 //
 // Behavioral tests against the MockRuntime, which mirrors the REAL host
 // contract: turn.start carries e.turnId; turn.complete carries e.usage;
-// turn.step streams (yield* delegation) and its result carries usage +
-// model; timestamps come from $.clock.now() — never a frozen epoch value.
+// turn.step streams (yield* delegation) and its result carries the
+// answering model under result.usage.model; timestamps come from
+// `await $.clock.now()` — never a frozen epoch value.
 import { describe, expect, it } from 'vitest';
 import { MockRuntime } from '@agentic-sdlc-kit/mod-sdk';
 import { register } from '../hooks/register';
@@ -56,13 +57,17 @@ describe('run-observer register', () => {
   it('records turn.step results (model + usage) via yield* delegation', async () => {
     const runtime = new MockRuntime();
     runtime.load(register);
-    runtime.setHostResult({ model: 'sonnet', usage: { input_tokens: 10, output_tokens: 5 } });
+    // Official TurnStepResult shape: the answering model rides under
+    // result.usage.model.
+    runtime.setHostResult({ usage: { input_tokens: 10, output_tokens: 5, model: 'sonnet' } });
     runtime.setHostChunks(['a', 'b']);
     const result = await runtime.fire('turn.step', { model: 'sonnet' });
     // The observer passed the stream through untouched.
     expect(result.forwarded).toBe(true);
     expect(result.chunks).toEqual(['a', 'b']);
-    expect(result.value).toEqual({ model: 'sonnet', usage: { input_tokens: 10, output_tokens: 5 } });
+    expect(result.value).toEqual({
+      usage: { input_tokens: 10, output_tokens: 5, model: 'sonnet' },
+    });
     // ...and recorded what came back.
     runtime.advanceClock(1);
     await runtime.fire('turn.complete', { answer: 'x', durationMs: 1 });
@@ -99,7 +104,7 @@ describe('run-observer register', () => {
     const runtime = new MockRuntime();
     runtime.load(register);
     // Break the observer's own recording: the store key is fine, but a
-    // poisoned clock makes $.clock.now() throw inside observe().
+    // poisoned clock makes `await $.clock.now()` throw inside observe().
     // The handler must swallow the error and still forward the event.
     const originalNow = Object.getOwnPropertyDescriptor(runtime.api.clock, 'now');
     expect(originalNow).toBeDefined();

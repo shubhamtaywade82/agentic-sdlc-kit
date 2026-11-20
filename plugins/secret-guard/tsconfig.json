@@ -17,6 +17,11 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["hooks/**/*.ts", "policies/**/*.ts", "contract.d.ts"],
-  "exclude": ["tests/**/*.ts", "node_modules", "dist", ".claude-plugin"]
+  "include": [
+    "hooks/**/*.ts",
+    "policies/**/*.ts",
+    "contract.d.ts",
+    ".claude-plugin/types/**/*.d.ts"
+  ],
+  "exclude": ["tests/**/*.ts", "node_modules", "dist"]
 }

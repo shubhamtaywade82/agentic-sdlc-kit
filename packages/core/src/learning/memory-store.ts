@@ -12,6 +12,23 @@ import type { MemoryEntry, MemoryType } from '@agentic-sdlc-kit/contracts';
 
 const MEMORY_FILE = 'state/memory.json';
 
+/**
+ * Wilson score interval lower bound (default z = 1.96, i.e. 95%).
+ *
+ * Used instead of the raw success ratio so that confidence is
+ * sample-size aware: one success out of one application yields ~0.21,
+ * not 1.0. A memory must earn trust with evidence volume (ADR-0018).
+ */
+export function wilsonLowerBound(successes: number, total: number, z = 1.96): number {
+  if (total <= 0 || successes < 0) return 0;
+  const phat = Math.min(1, successes / total);
+  const z2 = z * z;
+  const denominator = 1 + z2 / total;
+  const centre = phat + z2 / (2 * total);
+  const margin = z * Math.sqrt((phat * (1 - phat) + z2 / (4 * total)) / total);
+  return Math.max(0, (centre - margin) / denominator);
+}
+
 export class MemoryStore {
   private readonly entries = new Map<string, MemoryEntry>();
 
@@ -44,7 +61,9 @@ export class MemoryStore {
     if (!existing) return;
     const appliedCount = existing.appliedCount + 1;
     const successCount = existing.successCount + (succeeded ? 1 : 0);
-    const confidence = Math.min(1, Math.max(0, successCount / appliedCount));
+    // Calibrated confidence: Wilson 95% lower bound, rounded to 4 decimals
+    // to keep persisted values stable and human-readable.
+    const confidence = Math.round(wilsonLowerBound(successCount, appliedCount) * 10_000) / 10_000;
 
     this.entries.set(id, {
       ...existing,

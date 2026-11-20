@@ -1,13 +1,14 @@
 // plugins/model-router/tests/manifest.test.ts
 //
-// Guards the Claude Code plugin contract, mirroring the two rules
-// `claude plugin validate` enforces for modules declared in hooks/hooks.json:
-//   1. module paths resolve relative to the hooks/ DIRECTORY (the directory
-//      containing hooks.json), not the plugin root;
-//   2. the shipped hooks module must be self-contained: it may import its
-//      own files (relative paths), node: builtins, and "claude-code" —
-//      nothing else (this is why the build bundles register.ts with
-//      scripts/bundle-hooks.mjs instead of shipping plain tsc output).
+// Guards the Claude Code plugin contract for model-router, mirroring what
+// `claude plugin validate` and the host loader enforce (official docs,
+// verified November 2026): modules resolve relative to hooks/ and ship as
+// TypeScript source (loaded directly — no build step); the module graph is
+// self-contained (relative imports + 'claude-code' only); the TypeScript
+// is erasable; event names are string literals registered once per
+// matcher; turn.step uses the async-generator form (the event streams).
+// model-router never gates a call (suggest/rewrite only), so no .catch
+// fail-closed chain applies.
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -26,74 +27,99 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
-// Import specifiers a hooks module may use: its own files (relative paths)
-// and the host SDK — NOTHING else, not even node: builtins. Anything more
-// makes the plugin unloadable in Claude Code ("a hooks module imports its
-// own files by relative path and 'claude-code', nothing else").
 function allowedSpecifier(spec: string): boolean {
   return spec.startsWith('.') || spec.startsWith('/') || spec === 'claude-code';
 }
 
-describe('hooks manifest', () => {
-  it('declares modules that resolve relative to the hooks/ directory', async () => {
-    const manifest = JSON.parse(
-      await fs.readFile(path.join(hooksDir, 'hooks.json'), 'utf8'),
-    ) as { modules?: unknown };
-    expect(Array.isArray(manifest.modules)).toBe(true);
-    const modules = manifest.modules as string[];
-    expect(modules.length).toBeGreaterThan(0);
-
-    for (const mod of modules) {
-      // The shipped layout compiles TypeScript to dist/ (a sibling of
-      // hooks/), so the declared path points UP out of hooks/ — never at a
-      // .ts source. Claude Code resolves it against hooks/, so we do too.
-      expect(mod.startsWith('../dist/')).toBe(true);
-
-      const resolved = path.resolve(hooksDir, mod);
-      expect(path.basename(resolved)).toBe('register.js');
-
-      // The TypeScript source for the compiled module must exist.
-      const src = path.join(
-        pluginRoot,
-        mod.replace(/^(\.\.\/)+dist\//, '').replace(/\.js$/, '.ts'),
-      );
-      expect(await exists(src)).toBe(true);
-
-      // When the plugin has been built (pnpm run build runs before tests in
-      // `pnpm verify`), the compiled module must exist at the declared path.
-      if (await exists(path.join(pluginRoot, 'dist'))) {
-        expect(await exists(resolved)).toBe(true);
+async function collectGraph(entry: string): Promise<string[]> {
+  const seen = new Set<string>();
+  const queue = [entry];
+  while (queue.length > 0) {
+    const file = queue.pop()!;
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const source = await fs.readFile(file, 'utf8');
+    const specifiers = [...source.matchAll(/(?:from\s*|import\s*)(['"])([^'"]+)\1/g)].map(
+      (m) => m[2] as string,
+    );
+    for (const spec of specifiers) {
+      if (!allowedSpecifier(spec) || spec === 'claude-code') continue;
+      const resolved = path.resolve(path.dirname(file), spec);
+      for (const candidate of [`${resolved}.ts`, `${resolved}.tsx`, resolved, path.join(resolved, 'index.ts')]) {
+        if ((await exists(candidate)) && !candidate.endsWith('.js')) {
+          queue.push(candidate);
+          break;
+        }
       }
+    }
+  }
+  return [...seen];
+}
+
+describe('hooks manifest', () => {
+  it('declares the TypeScript source module, resolvable relative to hooks/', async () => {
+    const manifest = JSON.parse(await fs.readFile(path.join(hooksDir, 'hooks.json'), 'utf8')) as {
+      description?: unknown;
+      modules?: unknown;
+    };
+    expect(typeof manifest.description).toBe('string');
+    expect(manifest.description).not.toBe('');
+    expect(manifest.modules).toEqual(['./register.ts']);
+    expect(await exists(path.resolve(hooksDir, './register.ts'))).toBe(true);
+  });
+
+  it('ships a self-contained module graph (relative imports + claude-code only)', async () => {
+    const graph = await collectGraph(path.join(hooksDir, 'register.ts'));
+    expect(graph.length).toBeGreaterThan(1); // register.ts + the router policy
+    for (const file of graph) {
+      const source = await fs.readFile(file, 'utf8');
+      const specifiers = [...source.matchAll(/(?:from\s*|import\s*)(['"])([^'"]+)\1/g)].map(
+        (m) => m[2] as string,
+      );
+      const forbidden = specifiers.filter((spec) => !allowedSpecifier(spec));
+      expect(forbidden, `${path.relative(pluginRoot, file)} imports ${forbidden.join(', ')}`).toEqual(
+        [],
+      );
+      expect(source, `${path.relative(pluginRoot, file)} uses dynamic import()`).not.toMatch(
+        /(?<!\.)\bimport\s*\(/,
+      );
     }
   });
 
-  it('ships a self-contained hooks module (no bare imports)', async () => {
-    const built = path.join(pluginRoot, 'dist', 'hooks', 'register.js');
-    if (!(await exists(built))) {
-      // Not built in this checkout; the layout test above still guards the
-      // manifest. `pnpm verify` builds before testing, so CI covers this.
-      return;
+  it('ships erasable TypeScript (no enums or namespaces)', async () => {
+    const graph = await collectGraph(path.join(hooksDir, 'register.ts'));
+    for (const file of graph) {
+      const source = await fs.readFile(file, 'utf8');
+      expect(source, `${path.relative(pluginRoot, file)} declares an enum`).not.toMatch(
+        /^\s*(export\s+)?(const\s+)?enum\s/m,
+      );
+      expect(source, `${path.relative(pluginRoot, file)} declares a namespace`).not.toMatch(
+        /^\s*(export\s+)?namespace\s/m,
+      );
     }
-    const code = await fs.readFile(built, 'utf8');
-    const forbidden = [
-      ...code.matchAll(/(?:from\s*|import\s*)(['"])([^'"]+)\1/g),
-    ]
-      .map((m) => m[2])
-      .filter((spec) => !allowedSpecifier(spec));
-    expect(forbidden).toEqual([]);
+  });
+
+  it('registers turn.step and agent.spawn once each, with string-literal names', async () => {
+    const source = await fs.readFile(path.join(hooksDir, 'register.ts'), 'utf8');
+    const eventNames = [...source.matchAll(/\bon\(\s*['"]([^'"]+)['"]/g)].map((m) => m[1] as string);
+    expect(eventNames).toEqual(['turn.step', 'agent.spawn']);
+  });
+
+  it('uses the async-generator form for the streaming turn.step event', async () => {
+    const source = await fs.readFile(path.join(hooksDir, 'register.ts'), 'utf8');
+    // The streaming delegation: yield* next(...) — forwarding chunks and
+    // returning the finished result (returning next(e) without yielding
+    // would hand the host a generator object instead of the stream).
+    expect(source).toMatch(/on\('turn\.step',\s*async function\*/);
+    expect(source).toMatch(/yield\* next\(/);
   });
 
   it('declares every $.state key it uses in the type contract', async () => {
-    // The real Claude Code validator requires every state reference
-    // { plugin, key } used by the hooks module to be named in the
-    // contract that plugin.json's "types" field points at. This test
-    // keeps the contract and the code in sync.
     const manifest = JSON.parse(
       await fs.readFile(path.join(pluginRoot, '.claude-plugin', 'plugin.json'), 'utf8'),
     ) as { types?: string };
     expect(typeof manifest.types).toBe('string');
     expect(manifest.types?.endsWith('.d.ts')).toBe(true);
-    // No '..': the contract must stay inside the plugin directory.
     expect(manifest.types?.includes('..')).toBe(false);
 
     const contractPath = path.resolve(pluginRoot, manifest.types ?? '');
@@ -106,11 +132,8 @@ describe('hooks manifest', () => {
     for (const ref of refs) {
       const [, pluginName, key] = ref;
       expect(pluginName).toBe(path.basename(pluginRoot));
-      // The contract must name this key under the plugin's PluginState
-      // entry. We check that both the plugin name and the key appear.
       expect(contract).toContain(pluginName);
       expect(contract).toContain(key);
     }
   });
 });
-

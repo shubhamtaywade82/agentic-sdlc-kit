@@ -87,8 +87,9 @@ export const evolveCommand: Command = {
     }
 
     // Run Evolution Lab benchmarks for each hypothesis.
-    // The benchmark runner is a concrete implementation that evaluates
-    // the profile's test command as a proxy for task pass rate.
+    // The benchmark runner reports `notImplemented` when the Evolution
+    // Lab environment (M32) is unavailable; those experiments come back
+    // with verdict 'not-run' and are NEVER reported as completed (ADR-0018).
     const reports = [];
     for (const hyp of hypotheses) {
       const runner = createBenchmarkRunner(ctx.cwd);
@@ -99,25 +100,29 @@ export const evolveCommand: Command = {
       }
     }
 
-    // Evaluate metrics based on actual experiment results.
-    const totalGain = reports.reduce((sum, r) => sum + Math.max(0, r.heldOutGain), 0);
-    const avgGain = reports.length > 0 ? totalGain / reports.length : 0;
-    const totalRegressions = reports.reduce((sum, r) => sum + r.regressions, 0);
-    const totalTokens = reports.reduce((sum, r) => sum + r.learningCostTokens, 0);
-
-    const metrics = evaluateEvolutionMetrics({
-      heldOutGain: avgGain,
-      learningCostTokens: totalTokens,
-      totalTasks: experiences.length,
-      regressions: totalRegressions,
-      memoriesRetrieved: distilled.length,
-      memoriesApplied: distilled.length,
-    });
+    // Honest metrics: computed ONLY from experiments that actually
+    // executed. Not-run benchmarks contribute nothing.
+    const executed = reports.filter((r) => r.verdict !== 'not-run');
+    const notRun = reports.length - executed.length;
+    const metrics =
+      executed.length > 0
+        ? evaluateEvolutionMetrics({
+            heldOutGain:
+              executed.reduce((sum, r) => sum + Math.max(0, r.heldOutGain), 0) / executed.length,
+            learningCostTokens: executed.reduce((sum, r) => sum + r.learningCostTokens, 0),
+            totalTasks: experiences.length,
+            regressions: executed.reduce((sum, r) => sum + r.regressions, 0),
+            memoriesRetrieved: distilled.length,
+            memoriesApplied: distilled.length,
+          })
+        : null;
 
     const output = {
       experiencesLoaded: experiences.length,
       distilledLessons: distilled.length,
       hypothesesGenerated: hypotheses.length,
+      benchmarksExecuted: executed.length,
+      benchmarksNotRun: notRun,
       experiments: reports,
       metrics,
     };
@@ -133,18 +138,14 @@ export const evolveCommand: Command = {
 };
 
 /**
- * Create a benchmark runner that evaluates the project's test command
- * as a proxy for task pass rate. This is a real implementation (not a
- * constant) — it runs the actual verification command and measures
- * pass/fail.
+ * Create a benchmark runner for the CLI surface. The isolated Evolution
+ * Lab environment (M32) is a separate workspace that is not available
+ * here, so both evaluations honestly report `notImplemented` — which the
+ * lab surfaces as verdict 'not-run' instead of fabricated metrics.
  */
 function createBenchmarkRunner(_projectRoot: string) {
   return {
     async evaluateBaseline() {
-      // In a real Evolution Lab, this would run the baseline kit version
-      // against benchmark fixtures. For the CLI surface, we report that
-      // the baseline evaluation requires the Evolution Lab environment
-      // (M32) which is a separate workspace.
       return { passRate: 0, tokens: 0, notImplemented: true };
     },
     async evaluateCandidate() {
@@ -157,21 +158,34 @@ function formatSummary(out: {
   experiencesLoaded: number;
   distilledLessons: number;
   hypothesesGenerated: number;
+  benchmarksExecuted: number;
+  benchmarksNotRun: number;
   experiments: unknown[];
-  metrics: ReturnType<typeof evaluateEvolutionMetrics>;
+  metrics: ReturnType<typeof evaluateEvolutionMetrics> | null;
 }): string {
+  // Honest status: if nothing executed, the lab is NOT RUN — never COMPLETED.
+  const labStatus =
+    out.benchmarksExecuted === 0
+      ? 'NOT RUN (benchmark environment unavailable)'
+      : `COMPLETED (${out.benchmarksExecuted} of ${out.experiments.length} benchmarks executed)`;
   const lines: string[] = [
-    'Evolution Lab:      COMPLETED',
+    `Evolution Lab:      ${labStatus}`,
     `Experiences Loaded: ${out.experiencesLoaded}`,
     `Distilled Lessons:  ${out.distilledLessons}`,
-    `Hypotheses:         ${out.hypothesesGenerated}`,
-    `Experiments Run:    ${out.experiments.length}`,
-    `Held-Out Gain:      +${(out.metrics.heldOutGain * 100).toFixed(1)}%`,
-    `Learning Cost:      ${out.metrics.learningCost} tokens`,
-    `Efficiency:         ${out.metrics.learningEfficiency}`,
-    `Regression Rate:    ${out.metrics.regressionRate}`,
-    `Memory Reuse Rate:  ${(out.metrics.memoryReuseRate * 100).toFixed(0)}%`,
+    `Hypotheses:         ${out.hypothesesGenerated}${out.benchmarksNotRun > 0 ? ' (proposals pending benchmark evidence)' : ''}`,
+    `Experiments:        ${out.benchmarksExecuted} executed, ${out.benchmarksNotRun} not run`,
   ];
+  if (out.metrics) {
+    lines.push(
+      `Held-Out Gain:      +${(out.metrics.heldOutGain * 100).toFixed(1)}%`,
+      `Learning Cost:      ${out.metrics.learningCost} tokens`,
+      `Efficiency:         ${out.metrics.learningEfficiency}`,
+      `Regression Rate:    ${out.metrics.regressionRate}`,
+      `Memory Reuse Rate:  ${(out.metrics.memoryReuseRate * 100).toFixed(0)}%`,
+    );
+  } else {
+    lines.push('Metrics:            withheld (no executed benchmarks)');
+  }
   return lines.join('\n') + '\n';
 }
 

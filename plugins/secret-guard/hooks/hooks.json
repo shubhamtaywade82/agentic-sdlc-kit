@@ -1,4 +1,4 @@
 {
-  "description": "secret-guard hooks",
-  "modules": ["../dist/hooks/register.js"]
+  "description": "secret-guard hooks: scans Write/Edit/NotebookEdit content, the staged diff before git commit/push, and tool results — refusing or redacting secrets. Fail closed via .catch.",
+  "modules": ["./register.ts"]
 }

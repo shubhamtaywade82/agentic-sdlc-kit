@@ -1,11 +1,17 @@
 {
   "id": "secret-guard",
-  "version": "0.7.3",
-  "hooks": ["tool.call"],
-  "apiAccess": ["ui.log", "state.get"],
+  "version": "0.8.0",
+  "hooks": [
+    "tool.call"
+  ],
+  "apiAccess": [
+    "ui.log",
+    "process.run",
+    "state.get"
+  ],
   "filesystemAccess": [],
   "networkAccess": false,
-  "processExecution": false,
+  "processExecution": true,
   "modifiesPrompts": false,
   "modifiesToolCalls": true,
   "modifiesModels": false,

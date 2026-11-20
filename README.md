@@ -89,16 +89,13 @@ kit init .
 
 ### 2. Incremental Feature Workflow (`kit feature`)
 
-Executes a strict vertical-slice engineering workflow:
+Executes a strict vertical-slice engineering workflow with an **evidence-gated TDD loop** (ADR-0018):
 
 1. **Spec**: Validates user stories and acceptance criteria.
 2. **Plan**: Computes implementation DAG and verifies acyclicity.
-3. **TDD**: Drives phase-gated Red $\to$ Green $\to$ Refactor cycles per task,
-   with the failing test, implementation, and refactoring done by your
-   agent between gate invocations. Every gate's outcome is recorded as
-   evidence under `.ai-kit/state/feature-runs/<feature-id>.json`.
-4. **Verify**: Runs deterministic test/lint/typecheck verification.
-5. **Report**: Generates an execution report with TDD evidence.
+3. **TDD**: Phase-driven Red $\to$ Green $\to$ Refactor per task. The agent writes tests and implementations between invocations; the kit runs verification, records evidence, and refuses to advance when a phase invariant is broken.
+4. **Verify**: Audits the persisted evidence chain, then runs deterministic test/lint/typecheck verification.
+5. **Report**: Generates an execution report with per-task TDD evidence.
 
 The spec and plan are authored by your agent following
 `docs/workflows/WORKFLOWS.md` (step 4: requirements-engineering, step 7:
@@ -107,23 +104,28 @@ implementation-planning). The loaders expect:
 - `docs/specifications/features/<ID>/SPEC.md` starting with `# <ID>: Title`
   (missing or malformed title lines are rejected, not defaulted)
 - `docs/plans/<ID>/plan.json` (or `PLAN.md` with an embedded JSON block)
-  matching the Task/ImplementationPlan contracts in `docs/contracts/CONTRACTS.md`
+  matching the Task/ImplementationPlan contracts in `docs/contracts/CONTRACTS.md`.
+  The plan's `featureId` must match the requested feature id.
 
 ```bash
 # Validate feature spec and implementation DAG
 kit validate-spec docs/specifications/features/FEATURE-001/SPEC.md
 kit validate-plan docs/plans/FEATURE-001/plan.json
 
-# Drive the phase-gated TDD loop (nothing is executed until you open a gate)
-kit feature FEATURE-001                  # start / show status
-kit feature FEATURE-001 --red TASK-001   # the failing test must FAIL here
-kit feature FEATURE-001 --green TASK-001 # after implementing: must PASS
-kit feature FEATURE-001 --refactor TASK-001
-kit feature FEATURE-001 --verify         # final regression (all tasks done)
+# Drive the TDD phases (the agent implements between calls)
+kit feature FEATURE-001 start
+kit feature FEATURE-001 red TASK-001      # verification MUST fail
+#   ... write the failing test, then implement TASK-001 ...
+kit feature FEATURE-001 green TASK-001    # verification MUST pass
+kit feature FEATURE-001 refactor TASK-001 # verification MUST pass again
+kit feature FEATURE-001 verify            # audits evidence + final verification
 
 # Preview the plan without executing anything:
-kit feature FEATURE-001 --dry-run
+kit feature FEATURE-001 verify --dry-run
 ```
+
+Completion is blocked until every task has a persisted, complete
+Red(failed) $\to$ Green(passed) $\to$ Refactor(passed) evidence chain.
 
 ### 3. Disciplined Bug Fixing (`kit fix`)
 
@@ -182,7 +184,10 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 | **`model-router`** | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
 | **`run-observer`** | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
 
-Install plugins into your runtime environment:
+Install plugins into your runtime environment (the kit repository must be
+built first — `pnpm install && pnpm run build` — so each plugin has a
+self-contained `dist/hooks/register.js`; the installer validates the hooks
+module paths before linking and reports per-plugin results):
 
 ```bash
 kit install --profile full-sdlc --stack node-typescript

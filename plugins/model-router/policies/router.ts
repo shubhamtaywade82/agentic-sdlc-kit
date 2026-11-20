@@ -12,7 +12,7 @@ import type {
   RoutingDecision,
   RoutingPolicy,
   RoutingRule,
-} from '@agentic-sdlc-kit/contracts';
+} from './types';
 
 export function findMatchingRule(
   ctx: RoutingContext,

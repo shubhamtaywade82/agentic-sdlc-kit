@@ -143,6 +143,7 @@ export const installCommand: Command = {
       stackInfo = pack ? pack.name : stackName;
     }
 
+    // Plugin-enabled profiles also link the runtime guard plugins.
     const withPlugins = PROFILES_WITH_PLUGINS.has(installProfile);
 
     // In dry-run mode, print the plan and exit without writing.
@@ -185,16 +186,13 @@ export const installCommand: Command = {
       // preserved is false because we did not skip it.
       ownershipEntries.push({
         packageId: 'agentic-sdlc-kit',
-        packageVersion: '0.7.3',
+        packageVersion: '0.8.0',
         path: op.path,
         sha256: op.sha256,
         installedAt: now,
         preserved: false,
       });
     }
-
-    // Write ownership manifest so kit uninstall knows what we own.
-    const manifestPath = path.join(ctx.cwd, '.ai-kit', 'ownership-manifest.json');
 
     // Link the runtime guard plugins for plugin-enabled profiles. This is
     // what HOST_INTEGRATIONS.md documents: the plugins land in
@@ -204,11 +202,24 @@ export const installCommand: Command = {
       pluginResults = await linkRuntimePlugins(ctx.cwd);
       for (const pr of pluginResults) {
         if (pr.status === 'linked' || pr.status === 'already-linked') {
+          // Ownership hash for a plugin link: the content hash of the
+          // linked plugin's identity file (what the symlink resolves to),
+          // NOT the hash of the path string.
+          let pluginHash = '';
+          try {
+            const pluginJson = await fs.readFile(
+              path.join(pr.linkPath, '.claude-plugin', 'plugin.json'),
+              'utf8',
+            );
+            pluginHash = await sha256(pluginJson);
+          } catch {
+            pluginHash = await sha256(`${pr.name}:${pr.status}`);
+          }
           ownershipEntries.push({
             packageId: 'agentic-sdlc-kit',
-            packageVersion: '0.7.3',
+            packageVersion: '0.8.0',
             path: path.relative(ctx.cwd, pr.linkPath),
-            sha256: await sha256(pr.linkPath),
+            sha256: pluginHash,
             installedAt: now,
             preserved: pr.status === 'already-linked',
           });
@@ -216,6 +227,8 @@ export const installCommand: Command = {
       }
     }
 
+    // Write ownership manifest so kit uninstall knows what we own.
+    const manifestPath = path.join(ctx.cwd, '.ai-kit', 'ownership-manifest.json');
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
     const manifest = {
       schemaVersion: 1,
@@ -265,7 +278,7 @@ function formatDryRun(plan: DryRunPlan): string {
     lines.push(`  ${op.kind.padEnd(20)} ${op.path}`);
   }
   if (plan.plugins.length > 0) {
-    lines.push('  link                  .claude/plugins/ (' + plan.plugins.join(', ') + ')');
+    lines.push(`  link${' '.repeat(17)}.claude/plugins/ (${plan.plugins.join(', ')})`);
   }
   lines.push('');
   lines.push(`${plan.operations.length} operation(s) planned. Run without --dry-run to execute.`);
@@ -307,7 +320,7 @@ function formatResult(r: InstallResult): string {
       } else if (p.status === 'already-linked') {
         lines.push(`    ~ ${p.name} (already linked)`);
       } else {
-        // not-built / not-found: a plugin the profile promised but could
+        // incomplete / not-found: a plugin the profile promised but could
         // not deliver. Report loudly; never claim it is installed.
         lines.push(`    ! ${p.name}: ${p.status} — ${p.detail ?? ''}`);
       }
@@ -331,8 +344,9 @@ function formatHelp(): string {
     '',
     'The full-sdlc and runtime profiles link the four guard plugins',
     '(sdlc-guard, secret-guard, model-router, run-observer) into',
-    '.claude/plugins/. The kit repository must be built first (pnpm install &&',
-    'pnpm run build) so each plugin has a bundled dist/hooks/register.js.',
+    '.claude/plugins/. Claude Code loads each plugin\'s TypeScript hooks',
+    'module (hooks/register.ts) directly, so the plugins work from a fresh',
+    'clone of the kit repository with no build step.',
     '',
     'Options:',
     '  --stack <id> Stack pack to activate (e.g. node-typescript, ruby-rails)',

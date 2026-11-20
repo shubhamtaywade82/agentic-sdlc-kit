@@ -1,8 +1,15 @@
 {
   "id": "sdlc-guard",
-  "version": "0.7.3",
-  "hooks": ["tool.call", "tool.check"],
-  "apiAccess": ["ui.log", "state.get"],
+  "version": "0.8.0",
+  "hooks": [
+    "tool.call",
+    "tool.check"
+  ],
+  "apiAccess": [
+    "ui.log",
+    "ui.ask",
+    "state.get"
+  ],
   "filesystemAccess": [],
   "networkAccess": false,
   "processExecution": false,

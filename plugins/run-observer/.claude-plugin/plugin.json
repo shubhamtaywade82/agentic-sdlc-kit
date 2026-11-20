@@ -1,6 +1,6 @@
 {
   "name": "run-observer",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "types": "./contract.d.ts",
   "description": "Execution observability Mod: collect session/turn/tool events, persist run reports, redact sensitive output, CLI-first observability via kit runs.",
   "author": {

@@ -1,4 +1,4 @@
 {
-  "description": "run-observer hooks",
-  "modules": ["../dist/hooks/register.js"]
+  "description": "run-observer hooks: pass-through telemetry for session.start, turn.start, turn.step (streaming observer), tool.call and turn.complete — real $.clock.now() timestamps, never blocks the chain.",
+  "modules": ["./register.ts"]
 }

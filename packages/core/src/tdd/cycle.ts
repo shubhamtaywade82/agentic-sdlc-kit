@@ -14,11 +14,29 @@ export interface TddStepRecord {
   readonly evidence?: string;
 }
 
+/**
+ * Persisted state of a TDD session, used to resume a session across
+ * process boundaries (the agent implements between workflow invocations,
+ * so the session must survive process exits — ADR-0018).
+ */
+export interface TddSessionSnapshot {
+  readonly phase: TddPhase;
+  readonly records: readonly TddStepRecord[];
+}
+
 export class TddSession {
   private phase: TddPhase = 'red';
   private readonly records: TddStepRecord[] = [];
 
-  constructor(readonly taskId: string) {}
+  constructor(
+    readonly taskId: string,
+    snapshot?: TddSessionSnapshot,
+  ) {
+    if (snapshot) {
+      this.phase = snapshot.phase;
+      this.records.push(...snapshot.records);
+    }
+  }
 
   getCurrentPhase(): TddPhase {
     return this.phase;

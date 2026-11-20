@@ -169,6 +169,11 @@ describe('evolveCommand (M31-M33)', () => {
       // The output should reference the real distilled data, not demo data.
       expect(ctx.out[0]).toContain('Experiences Loaded: 2');
       expect(ctx.out[0]).toContain('Distilled Lessons:  1');
+      // The benchmark environment is not implemented, so the lab must say
+      // so instead of reporting COMPLETED with empty numbers (ADR-0018).
+      expect(ctx.out[0]).toContain('NOT RUN');
+      expect(ctx.out[0]).toContain('0 executed, 1 not run');
+      expect(ctx.out[0]).not.toContain('Evolution Lab:      COMPLETED');
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }

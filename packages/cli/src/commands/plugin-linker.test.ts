@@ -3,6 +3,10 @@
 // Tests the runtime plugin linking introduced to make `kit install` do what
 // docs/HOST_INTEGRATIONS.md documents: the four guard plugins land in
 // <project>/.claude/plugins/ with hooks module paths that actually resolve.
+//
+// The shipped manifests declare `./register.ts` (TypeScript source, loaded
+// directly by Claude Code — no build step), so the fixtures below write a
+// register.ts source file, not a dist bundle.
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,26 +18,26 @@ import {
   validatePluginHooks,
 } from './plugin-linker.js';
 
-async function makeFakeKit(kitRoot: string, built: boolean): Promise<void> {
+async function makeFakeKit(kitRoot: string, complete: boolean): Promise<void> {
   for (const name of RUNTIME_PLUGIN_NAMES) {
     const pluginDir = path.join(kitRoot, 'plugins', name);
     await fs.mkdir(path.join(pluginDir, '.claude-plugin'), { recursive: true });
     await fs.mkdir(path.join(pluginDir, 'hooks'), { recursive: true });
     await fs.writeFile(
       path.join(pluginDir, '.claude-plugin', 'plugin.json'),
-      JSON.stringify({ name, version: '0.7.3', description: `${name} test plugin` }),
+      JSON.stringify({ name, version: '0.8.0', description: `${name} test plugin` }),
       'utf8',
     );
     await fs.writeFile(
       path.join(pluginDir, 'hooks', 'hooks.json'),
-      JSON.stringify({ description: `${name} hooks`, modules: ['../dist/hooks/register.js'] }),
+      JSON.stringify({ description: `${name} hooks`, modules: ['./register.ts'] }),
       'utf8',
     );
-    if (built) {
-      await fs.mkdir(path.join(pluginDir, 'dist', 'hooks'), { recursive: true });
+    if (complete) {
+      // The shipped layout: TypeScript source inside hooks/, committed.
       await fs.writeFile(
-        path.join(pluginDir, 'dist', 'hooks', 'register.js'),
-        'export const register = () => {};\n',
+        path.join(pluginDir, 'hooks', 'register.ts'),
+        'export function register(): void {}\n',
         'utf8',
       );
     }
@@ -41,7 +45,7 @@ async function makeFakeKit(kitRoot: string, built: boolean): Promise<void> {
 }
 
 describe('plugin-linker', () => {
-  it('links all four built plugins and the hooks modules resolve through the link', async () => {
+  it('links all four plugins and the hooks modules resolve through the link', async () => {
     const kitRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-kitroot-'));
     const project = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-project-'));
     try {
@@ -55,7 +59,7 @@ describe('plugin-linker', () => {
         const throughLink = path.resolve(
           path.dirname(r.linkPath),
           path.basename(r.linkPath),
-          'dist/hooks/register.js',
+          'hooks/register.ts',
         );
         await expect(fs.access(throughLink)).resolves.toBeUndefined();
       }
@@ -68,15 +72,15 @@ describe('plugin-linker', () => {
     }
   });
 
-  it('reports not-built (with fix instructions) when dist/hooks/register.js is missing', async () => {
+  it('reports incomplete (with fix instructions) when the hooks module is missing', async () => {
     const kitRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-kitroot-'));
     const project = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-project-'));
     try {
       await makeFakeKit(kitRoot, false);
       const results = await linkRuntimePlugins(project, kitRoot);
       for (const r of results) {
-        expect(r.status).toBe('not-built');
-        expect(r.detail).toContain('pnpm run build');
+        expect(r.status).toBe('incomplete');
+        expect(r.detail).toContain('incomplete');
         // And crucially: no symlink was created for a broken plugin.
         await expect(fs.lstat(r.linkPath)).rejects.toThrow();
       }
@@ -93,7 +97,7 @@ describe('plugin-linker', () => {
       const dir = path.join(kitRoot, 'plugins', 'sdlc-guard');
       const res = await validatePluginHooks(dir);
       expect(res.ok).toBe(false);
-      expect(res.missing).toContain('../dist/hooks/register.js');
+      expect(res.missing).toContain('./register.ts');
     } finally {
       await fs.rm(kitRoot, { recursive: true, force: true });
     }
@@ -102,20 +106,18 @@ describe('plugin-linker', () => {
   it('validatePluginHooks resolves module paths relative to the hooks/ directory (like Claude Code)', async () => {
     const kitRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-kitroot-'));
     try {
-      // A manifest whose path is correct ONLY when resolved relative to
-      // hooks/ (relative to the plugin root it would miss). Claude Code
-      // resolves against hooks/, and so must the kit.
+      // A manifest whose path resolves only against hooks/: the module
+      // lives next to the manifest, not at the plugin root.
       const pluginDir = path.join(kitRoot, 'plugins', 'sdlc-guard');
       await fs.mkdir(path.join(pluginDir, 'hooks'), { recursive: true });
-      await fs.mkdir(path.join(pluginDir, 'dist', 'hooks'), { recursive: true });
       await fs.writeFile(
-        path.join(pluginDir, 'dist', 'hooks', 'register.js'),
-        'export const register = () => {};',
+        path.join(pluginDir, 'hooks', 'register.ts'),
+        'export function register(): void {}',
         'utf8',
       );
       await fs.writeFile(
         path.join(pluginDir, 'hooks', 'hooks.json'),
-        JSON.stringify({ modules: ['../dist/hooks/register.js'] }),
+        JSON.stringify({ modules: ['./register.ts'] }),
         'utf8',
       );
       const res = await validatePluginHooks(pluginDir);

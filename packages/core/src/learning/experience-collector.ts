@@ -8,24 +8,48 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ExperienceRecord, VerificationReport } from '@agentic-sdlc-kit/contracts';
-import { redactSecrets } from '../secret-guard/redactor.js';
-import type { RedactionPolicy } from '@agentic-sdlc-kit/contracts';
-
-const DEFAULT_REDACTION_POLICY: RedactionPolicy = {
-  schemaVersion: 1,
-  placeholderFormat: '[REDACTED:<kind>:<id>]',
-  redactPartial: true,
-  redactRepeated: true,
-  maxInputBytes: 1_000_000,
-  ignorePaths: [],
-};
+import { DEFAULT_REDACTION_POLICY, redactSecrets } from '../secret-guard/redactor.js';
 
 const EXPERIENCES_FILE = 'state/experiences.json';
+
+/** Maximum length of a persisted failure summary (bounded evidence, not dumps). */
+const FAILURE_SUMMARY_MAX_CHARS = 500;
+/** Maximum length of a single check detail line inside the summary. */
+const CHECK_DETAIL_MAX_CHARS = 200;
 
 function redact(text: string | undefined): string | undefined {
   if (text === undefined) return undefined;
   const result = redactSecrets(text, DEFAULT_REDACTION_POLICY, 'tool-output');
   return result.redactedText;
+}
+
+function firstLine(text: string): string {
+  return text.split('\n').find((l) => l.trim().length > 0)?.trim() ?? '';
+}
+
+/**
+ * Build a failure summary from the actual failing checks: check id plus
+ * the first error line or output excerpt. This replaces the previous
+ * bare status string (`"failed"`), which carried no evidence (ADR-0018).
+ */
+function buildFailureSummary(verification: VerificationReport | undefined): string | undefined {
+  if (!verification || verification.status === 'passed') return undefined;
+
+  const failedChecks = verification.checks.filter((c) => c.status === 'failed');
+  const parts = failedChecks.map((c) => {
+    const raw = c.errors?.[0] ?? c.evidence?.[0] ?? 'no output captured';
+    const detail = firstLine(raw).slice(0, CHECK_DETAIL_MAX_CHARS);
+    return `${c.id}: ${detail}`;
+  });
+  if (parts.length === 0) {
+    parts.push(`${verification.status}: no failed-check detail captured`);
+  }
+
+  let summary = parts.join(' | ');
+  if (summary.length > FAILURE_SUMMARY_MAX_CHARS) {
+    summary = `${summary.slice(0, FAILURE_SUMMARY_MAX_CHARS)}…[truncated]`;
+  }
+  return redact(summary);
 }
 
 export interface CollectorInput {
@@ -52,11 +76,8 @@ export class ExperienceCollector {
       stack: input.stack,
       outcome: isSuccess ? 'success' : 'failure',
       phases: input.phases,
-      // Redact any failure summary and human correction text to prevent
-      // secret leakage into learning records (M11 invariant).
-      failureSummary: redact(
-        input.verification?.status !== 'passed' ? input.verification?.status : undefined,
-      ),
+      // Bounded, redacted evidence from the failing checks (M11 + ADR-0018).
+      failureSummary: buildFailureSummary(input.verification),
       humanCorrection: redact(input.humanCorrection),
       timestamp: new Date().toISOString(),
     };

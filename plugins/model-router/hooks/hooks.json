@@ -1,4 +1,4 @@
 {
-  "description": "model-router hooks",
-  "modules": ["../dist/hooks/register.js"]
+  "description": "model-router hooks: turn.step (streaming generator, yield* delegation) and agent.spawn routing. Suggest-only by default; skips resumed runs and preserves explicit models.",
+  "modules": ["./register.ts"]
 }

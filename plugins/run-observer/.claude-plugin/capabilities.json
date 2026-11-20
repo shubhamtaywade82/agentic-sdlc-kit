@@ -1,8 +1,21 @@
 {
   "id": "run-observer",
-  "version": "0.7.3",
-  "hooks": ["session.start", "turn.start", "tool.call", "turn.complete"],
-  "apiAccess": ["ui.log", "state.get", "state.set"],
+  "version": "0.8.0",
+  "hooks": [
+    "session.start",
+    "turn.start",
+    "turn.step",
+    "tool.call",
+    "turn.complete"
+  ],
+  "apiAccess": [
+    "ui.log",
+    "ui.status",
+    "session.id",
+    "clock.now",
+    "state.get",
+    "state.set"
+  ],
   "filesystemAccess": [],
   "networkAccess": false,
   "processExecution": false,

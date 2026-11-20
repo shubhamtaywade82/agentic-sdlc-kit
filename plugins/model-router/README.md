@@ -4,10 +4,15 @@ Model + effort routing Mod for the Agentic SDLC Kit.
 
 ## What it does
 
-- **`turn.step`**: classifies the current main-turn request (complexity ×
-  risk) and applies the routing policy to select model + effort.
-- **`agent.spawn`**: applies the routing policy to subagent spawns. If the
-  subagent already has an explicit model, preserves it.
+- **`turn.step`** (a streaming event): classifies the current main-turn
+  request (complexity × risk) and applies the routing policy to select
+  model + effort. The hook is an async generator that delegates with
+  `const result = yield* next(e)` and rewrites with
+  `yield* next({ ...e, model, effort })` — returning `next(e)` without
+  yielding would hand the host a generator object instead of the stream.
+- **`agent.spawn`**: applies the routing policy to fresh subagent spawns.
+  If the subagent already has an explicit model, preserves it; resumed
+  runs (`e.resume`) are skipped entirely (the host ignores their changes).
 
 ## The complexity/risk distinction
 

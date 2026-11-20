@@ -1,6 +1,6 @@
 {
   "name": "agentic-sdlc-kit",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "private": true,
   "description": "Runtime-independent Agentic SDLC Kit. M0+M1 foundation: contracts, core, cli, testing, and the Claude Code adapter boundary.",
   "license": "MIT",
@@ -31,8 +31,8 @@
     "@types/node": "^20.14.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "esbuild": "^0.28.2",
     "eslint": "^9.0.0",
+    "esbuild": "^0.28.2",
     "prettier": "^3.3.0",
     "tsx": "^4.7.0",
     "typescript": "^5.5.0",

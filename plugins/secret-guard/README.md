@@ -4,22 +4,32 @@ Secret protection Mod for the Agentic SDLC Kit.
 
 ## What it does
 
-- **`tool.call` (Bash, git commit/push)**: scans staged changes before they
-  enter git history. (M11 ships the scanning contract; the full git-diff
-  integration lands with the host SDK wiring in M10.)
-- **`tool.call` (Write)**: scans file content before writing. Blocks writes
-  that contain detected secrets. **Fail-closed**: if the scanner errors, the
-  write is denied (never silently written unscanned).
-- **`tool.call` (post-execution)**: redacts secrets from tool output before
-  the model sees them. Uses the M11 redactor which verifies that every
-  detected value was actually removed from the output.
+- **`tool.call` (Bash, git commit/push)**: runs
+  `$.process.run(['git','diff','--cached'])` and scans the staged diff
+  BEFORE the command runs — a secret in what is about to be committed
+  refuses the commit. If the diff cannot be read, the operation is
+  refused (fail closed: unverifiable is not verified-clean).
+- **`tool.call` (Write / NotebookEdit / Edit)**: scans the content being
+  written (`e.content` / `e.new_source` / `e.new_string`) before the write.
+  Blocks writes that contain detected secrets. **Fail-closed**: a scanner
+  error or a too-large-to-scan input denies the write (never silently
+  written unscanned).
+- **`tool.call` (post-execution)**: redacts secrets from a tool result's
+  text (the field the model reads) after `await next(e)`. Uses the
+  redactor which verifies that every detected value was actually removed
+  from the output.
+- Every gating registration chains `.catch` so an internal error or
+  timeout REFUSES the action instead of letting it through.
 
 ## Architecture
 
-Per ADR-0011: the detection and redaction logic lives in
-`packages/core/src/secret-guard/` (runtime-independent, pure functions,
-unit-tested). The Mod's `hooks/register.ts` is thin: it wires events to
-the core functions and translates outcomes into host decisions.
+Per ADR-0011, detection and redaction are runtime-independent pure
+functions — unit-tested in `policies/detect.test.ts`. Because a Claude
+Code hooks module may only import its own files (plus `claude-code`
+types), the M11 detector/scanner/redactor is VENDORED into
+`policies/detect.ts` and must stay behaviorally compatible with
+`packages/core`. The Mod's `hooks/register.ts` is thin: it wires events
+to the policy functions and translates outcomes into host decisions.
 
 ## The detection vs. redaction distinction
 
@@ -40,12 +50,12 @@ fail-closed (deny) so unscanned content is never written.
 ## Capability manifest
 
 - hooks: `tool.call`
-- apiAccess: `ui.log`, `state.get`
+- apiAccess: `ui.log`, `process.run`, `state.get`
+- processExecution: true
 - modifiesToolCalls: true
 
 ## What is NOT here yet
 
-- `fs.write` event interception (the host SDK exposes this; M10 wires it).
-- Git staged-diff scanning (requires running `git diff --cached` via the
-  host; M11 ships the contract).
 - Gitleaks integration (optional extended scanner; M11-03).
+- Redaction of non-text result fields (currently only the `text` the
+  model reads is rewritten).

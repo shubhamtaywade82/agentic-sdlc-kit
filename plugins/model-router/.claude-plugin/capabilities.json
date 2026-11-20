@@ -1,6 +1,6 @@
 {
   "id": "model-router",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "hooks": ["turn.step", "agent.spawn"],
   "apiAccess": ["ui.log", "state.get"],
   "filesystemAccess": [],

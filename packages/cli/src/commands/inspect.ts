@@ -49,6 +49,8 @@ function formatSummary(scan: RepositoryScan): string {
     `Migrations:    ${scan.hasMigrations ? 'yes' : 'no'}`,
     `CI Pipeline:   ${scan.hasCi ? 'yes' : 'no'}`,
     `Instructions:  ${scan.agentInstructionFiles.join(', ') || '(none)'}`,
+    // Never fabricate git state: outside a work tree the scanner reports
+    // isRepo: false, and we say so instead of printing branch=main/0000000.
     scan.git.isRepo
       ? `Git Status:    branch=${scan.git.branch || '(detached)'}, dirty=${scan.git.dirty}, commit=${scan.git.headSha.slice(0, 7)}`
       : 'Git Status:    (not a git repository)',

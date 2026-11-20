@@ -1,29 +1,52 @@
 // packages/core/src/workflows/feature-workflow.test.ts
 //
-// Tests the phase-gated TDD feature workflow. The task's verification
-// command is `node -e "...existsSync('done.txt') ? 0 : 1"`: it fails until
-// "done.txt" exists. The tests create/remove that marker between gates to
-// simulate the agent writing the failing test, implementing, and
-// refactoring — proving the gates react to REAL process outcomes.
+// Tests for the phase-driven TDD feature workflow (ADR-0018):
+// evidence-gated Red -> Green -> Refactor with persisted run state.
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { serializeProfileYaml } from '../project-profile/serializer.js';
-import { generateSpecMarkdown, scaffoldSpecification } from '../specification/scaffolder.js';
-import { runFeatureWorkflow } from './feature-workflow.js';
-import { loadFeatureState } from './feature-state.js';
+import { scaffoldSpecification } from '../specification/scaffolder.js';
+import {
+  finalizeFeatureRun,
+  getFeatureRunState,
+  runFeatureWorkflow,
+  runTddPhase,
+  startFeatureRun,
+} from './feature-workflow.js';
 
-// Fails until <root>/done.txt exists — like a test that fails until the
-// feature is implemented.
-const GATE_CMD = [
-  'node',
-  '-e',
-  "const fs=require('fs');process.exit(fs.existsSync('done.txt')?0:1)",
-];
+interface TestProject {
+  readonly root: string;
+  readonly marker: string;
+}
 
-async function makeProject(withDoneMarker = false): Promise<string> {
-  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-feature-test-'));
+/**
+ * Scaffold a project whose test command fails until a marker file exists.
+ * The marker simulates the agent implementing the task between phases:
+ * Red runs with the marker absent (must fail); the test creates the marker
+ * to simulate implementation; Green/Refactor then pass.
+ */
+async function setupProject(taskIds: readonly string[]): Promise<TestProject> {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-tdd-workflow-'));
+  const marker = path.join(tmp, '.done');
+
+  await fs.mkdir(path.join(tmp, '.git'), { recursive: true });
+  await fs.writeFile(path.join(tmp, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+
+  const script = path.join(tmp, 'check.js');
+  await fs.writeFile(
+    script,
+    [
+      'const fs = require("node:fs");',
+      `const marker = ${JSON.stringify(marker)};`,
+      'if (!fs.existsSync(marker)) {',
+      '  console.error("MARKER MISSING: target not implemented");',
+      '  process.exit(1);',
+      '}',
+      'process.exit(0);',
+    ].join('\n'),
+  );
 
   const aiKitDir = path.join(tmp, '.ai-kit');
   await fs.mkdir(aiKitDir, { recursive: true });
@@ -31,250 +54,303 @@ async function makeProject(withDoneMarker = false): Promise<string> {
     path.join(aiKitDir, 'project.yml'),
     serializeProfileYaml({
       schemaVersion: 1,
-      name: 'test-feature-app',
+      name: 'test-tdd-app',
       stack: ['node-typescript'],
-      commands: { test: [['node', '-e', 'process.exit(0)']] },
+      commands: { test: [['node', script]] },
     }),
   );
 
-  const specFeaturesDir = path.join(tmp, 'docs', 'specifications', 'features');
   await scaffoldSpecification({
     id: 'FEATURE-001',
     title: 'RBAC System',
-    targetDir: specFeaturesDir,
+    targetDir: path.join(tmp, 'docs', 'specifications', 'features'),
   });
 
   const planDir = path.join(tmp, 'docs', 'plans', 'FEATURE-001');
   await fs.mkdir(planDir, { recursive: true });
   const plan = {
     featureId: 'FEATURE-001',
-    tasks: [
-      {
-        id: 'TASK-001',
-        description: 'Implement role models',
-        acceptanceCriteria: ['Roles exist'],
-        verification: { command: GATE_CMD, expectedStatus: 'passed' },
-        dependencies: [],
-        likelyFiles: ['src/roles.ts'],
-        estimatedScope: 's',
-        risk: 'low',
-      },
-    ],
+    tasks: taskIds.map((id) => ({
+      id,
+      description: `Implement ${id}`,
+      acceptanceCriteria: [`${id} works`],
+      verification: { command: ['node', script], expectedStatus: 'passed' },
+      dependencies: [],
+      likelyFiles: [`src/${id}.ts`],
+      estimatedScope: 's',
+      risk: 'low',
+    })),
     edges: [],
-    verticalSlices: [['TASK-001']],
+    verticalSlices: taskIds.map((id) => [id]),
   };
   await fs.writeFile(path.join(planDir, 'plan.json'), JSON.stringify(plan, null, 2));
 
-  if (withDoneMarker) await fs.writeFile(path.join(tmp, 'done.txt'), '', 'utf8');
-  return tmp;
+  return { root: tmp, marker };
 }
 
-describe('runFeatureWorkflow (phase-gated TDD)', () => {
-  it('drives a full red -> green -> refactor cycle with real evidence', async () => {
-    const tmp = await makeProject();
+async function completeTask(
+  project: TestProject,
+  taskId: string,
+): Promise<void> {
+  const base = { featureId: 'FEATURE-001', projectRoot: project.root };
+  const red = await runTddPhase({ ...base, taskId, phase: 'red' });
+  expect(red.ok).toBe(true);
+  await fs.writeFile(project.marker, '');
+  const green = await runTddPhase({ ...base, taskId, phase: 'green' });
+  expect(green.ok).toBe(true);
+  const refactor = await runTddPhase({ ...base, taskId, phase: 'refactor' });
+  expect(refactor.ok).toBe(true);
+}
+
+describe('startFeatureRun', () => {
+  it('initializes every planned task in the red phase', async () => {
+    const project = await setupProject(['TASK-001', 'TASK-002']);
     try {
-      // Start: no evidence, first task awaiting red.
-      const start = await runFeatureWorkflow({
+      const res = await startFeatureRun({
         featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'start',
-      });
-      expect(start.ok).toBe(true);
-      if (start.ok) {
-        expect(start.value.status).toBe('awaiting-red');
-        expect(start.value.currentTaskId).toBe('TASK-001');
-        expect(start.value.tasksExecuted).toEqual([]);
-        expect(start.value.nextAction).toContain('--red TASK-001');
-      }
-
-      // Red gate: no done.txt yet, so the verification command FAILS.
-      // That is exactly what TDD requires before implementing.
-      const red = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'red',
-        taskId: 'TASK-001',
-      });
-      expect(red.ok).toBe(true);
-      if (red.ok) {
-        expect(red.value.status).toBe('awaiting-implementation');
-        expect(red.value.tdd[0]?.red?.status).toBe('failed');
-        expect(red.value.nextAction).toContain('--green TASK-001');
-      }
-
-      // "Implement": create the marker the gate command looks for.
-      await fs.writeFile(path.join(tmp, 'done.txt'), '', 'utf8');
-
-      const green = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'green',
-        taskId: 'TASK-001',
-      });
-      expect(green.ok).toBe(true);
-      if (green.ok) {
-        expect(green.value.status).toBe('awaiting-refactor');
-        expect(green.value.tdd[0]?.green?.status).toBe('passed');
-      }
-
-      // Refactor: behavior stays green -> task completes, and because it is
-      // the last task the final regression runs immediately.
-      const refactor = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'refactor',
-        taskId: 'TASK-001',
-      });
-      expect(refactor.ok).toBe(true);
-      if (refactor.ok) {
-        expect(refactor.value.tasksExecuted).toEqual(['TASK-001']);
-        expect(refactor.value.verification?.status).toBe('passed');
-        expect(refactor.value.status).toBe('completed');
-      }
-
-      // The persisted state carries all three evidence records.
-      const state = await loadFeatureState(tmp, 'FEATURE-001');
-      expect(state?.tasks['TASK-001']?.red?.status).toBe('failed');
-      expect(state?.tasks['TASK-001']?.green?.status).toBe('passed');
-      expect(state?.tasks['TASK-001']?.refactor?.status).toBe('passed');
-      expect(state?.finalVerification?.status).toBe('passed');
-    } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it('BLOCKS the red gate when verification passes (no failing test)', async () => {
-    // done.txt exists from the start, so the gate command passes — the
-    // "failing test" does not fail. The old workflow reported this as a
-    // PASSED feature; the phase gate must refuse to advance.
-    const tmp = await makeProject(true);
-    try {
-      await runFeatureWorkflow({ featureId: 'FEATURE-001', projectRoot: tmp, action: 'start' });
-      const red = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'red',
-        taskId: 'TASK-001',
-      });
-      expect(red.ok).toBe(false);
-      if (!red.ok) {
-        expect(red.error.message).toContain('Red phase invariant violated');
-      }
-      // State unchanged: still awaiting red, no evidence recorded.
-      const state = await loadFeatureState(tmp, 'FEATURE-001');
-      expect(state?.tasks['TASK-001']?.phase).toBe('awaiting-red');
-      expect(state?.tasks['TASK-001']?.red).toBeUndefined();
-    } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it('keeps awaiting-implementation when the green gate fails', async () => {
-    const tmp = await makeProject();
-    try {
-      await runFeatureWorkflow({ featureId: 'FEATURE-001', projectRoot: tmp, action: 'start' });
-      await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'red',
-        taskId: 'TASK-001',
-      });
-      // No done.txt: implementation "not done yet".
-      const green = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'green',
-        taskId: 'TASK-001',
-      });
-      expect(green.ok).toBe(false);
-      if (!green.ok) expect(green.error.message).toContain('Green phase failed');
-      const state = await loadFeatureState(tmp, 'FEATURE-001');
-      expect(state?.tasks['TASK-001']?.phase).toBe('awaiting-implementation');
-    } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it('rejects gates driven out of order', async () => {
-    const tmp = await makeProject();
-    try {
-      await runFeatureWorkflow({ featureId: 'FEATURE-001', projectRoot: tmp, action: 'start' });
-      // Green before red:
-      const green = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'green',
-        taskId: 'TASK-001',
-      });
-      expect(green.ok).toBe(false);
-      if (!green.ok) expect(green.error.message).toContain("phase 'awaiting-red'");
-    } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it('blocks final verification until every task has full evidence', async () => {
-    const tmp = await makeProject();
-    try {
-      await runFeatureWorkflow({ featureId: 'FEATURE-001', projectRoot: tmp, action: 'start' });
-      const verify = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'verify',
-      });
-      expect(verify.ok).toBe(false);
-      if (!verify.ok) {
-        expect(verify.error.message).toContain('lack full TDD evidence');
-      }
-    } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it('dry-run executes nothing and writes no state', async () => {
-    const tmp = await makeProject();
-    try {
-      const res = await runFeatureWorkflow({
-        featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'start',
-        dryRun: true,
+        projectRoot: project.root,
       });
       expect(res.ok).toBe(true);
       if (res.ok) {
-        expect(res.value.status).toBe('planned');
-        expect(res.value.tasksPlanned).toEqual(['TASK-001']);
-        // "Executed" is empty in a dry run — nothing ran.
-        expect(res.value.tasksExecuted).toEqual([]);
+        expect(res.value.tasks['TASK-001']?.phase).toBe('red');
+        expect(res.value.tasks['TASK-002']?.phase).toBe('red');
       }
-      const state = await loadFeatureState(tmp, 'FEATURE-001');
-      expect(state).toBeNull();
     } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
+      await fs.rm(project.root, { recursive: true, force: true });
     }
   });
 
-  it('rejects a spec whose id does not match the requested feature', async () => {
-    const tmp = await makeProject();
+  it('rejects a second start to protect accumulated evidence', async () => {
+    const project = await setupProject(['TASK-001']);
     try {
-      // Overwrite the FEATURE-001 spec with a schema-valid spec whose id
-      // is FEATURE-002 — the directory contents belong to another feature.
-      await fs.writeFile(
-        path.join(tmp, 'docs', 'specifications', 'features', 'FEATURE-001', 'SPEC.md'),
-        generateSpecMarkdown('FEATURE-002', 'Other Feature'),
-        'utf8',
-      );
-      const res = await runFeatureWorkflow({
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      const again = await startFeatureRun({
         featureId: 'FEATURE-001',
-        projectRoot: tmp,
-        action: 'start',
+        projectRoot: project.root,
+      });
+      expect(again.ok).toBe(false);
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('runTddPhase (real TDD handoff)', () => {
+  it('records red only when verification actually fails, with output evidence', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      const red = await runTddPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        phase: 'red',
+      });
+      expect(red.ok).toBe(true);
+      if (red.ok) {
+        const task = red.value.tasks['TASK-001'];
+        expect(task?.phase).toBe('green');
+        expect(task?.records).toHaveLength(1);
+        expect(task?.records[0]?.status).toBe('failed');
+        expect(task?.records[0]?.evidence).toContain('MARKER MISSING');
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a red phase where the test already passes (invariant violation)', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      // Simulate an agent that wrote a test that cannot fail.
+      await fs.writeFile(project.marker, '');
+      const red = await runTddPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        phase: 'red',
+      });
+      expect(red.ok).toBe(false);
+      if (!red.ok) expect(red.error.message).toContain('Red phase invariant violated');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks green until the agent actually makes verification pass', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      const base = { featureId: 'FEATURE-001', projectRoot: project.root };
+      await startFeatureRun(base);
+      await runTddPhase({ ...base, taskId: 'TASK-001', phase: 'red' });
+
+      // No implementation happened: green must fail and stay in green phase.
+      const early = await runTddPhase({ ...base, taskId: 'TASK-001', phase: 'green' });
+      expect(early.ok).toBe(false);
+
+      // Agent implements; now green succeeds and refactor completes.
+      await fs.writeFile(project.marker, '');
+      const green = await runTddPhase({ ...base, taskId: 'TASK-001', phase: 'green' });
+      expect(green.ok).toBe(true);
+      if (green.ok) {
+        const task = green.value.tasks['TASK-001'];
+        expect(task?.phase).toBe('refactor');
+        expect(task?.records.at(-1)?.status).toBe('passed');
+      }
+
+      const refactor = await runTddPhase({ ...base, taskId: 'TASK-001', phase: 'refactor' });
+      expect(refactor.ok).toBe(true);
+      if (refactor.ok) {
+        const task = refactor.value.tasks['TASK-001'];
+        expect(task?.phase).toBe('completed');
+        // 4 records: red:failed, green:failed (blocked attempt), green:passed,
+        // refactor:passed — failed attempts are persisted as real evidence.
+        expect(task?.records).toHaveLength(4);
+        expect(task?.records[1]).toMatchObject({ phase: 'green', status: 'failed' });
+        // Refactor must re-run verification, not fabricate a status.
+        expect(task?.records[3]?.evidence).toContain('test:passed');
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects phase invocations out of order', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      const res = await runTddPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        phase: 'green',
       });
       expect(res.ok).toBe(false);
       if (!res.ok) {
-        expect(res.error.message).toContain('does not match requested feature');
+        expect(res.error.message).toContain('Phase mismatch');
+        expect(res.error.message).toContain("'red'");
       }
     } finally {
-      await fs.rm(tmp, { recursive: true, force: true });
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects red evidence when no check actually executed (vacuous evidence)', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      // A profile with no commands is valid but runs nothing.
+      const profilePath = path.join(project.root, '.ai-kit', 'project.yml');
+      await fs.writeFile(
+        profilePath,
+        [
+          'schemaVersion: 1',
+          'name: test-tdd-app',
+          'stack:',
+          '  - node-typescript',
+          'commands: {}',
+          '',
+        ].join('\n'),
+      );
+      const base = { featureId: 'FEATURE-001', projectRoot: project.root };
+      await startFeatureRun(base);
+      const res = await runTddPhase({ ...base, taskId: 'TASK-001', phase: 'red' });
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.error.message).toContain('no check actually executed');
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('persists run state across invocations (the handoff boundary)', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      const base = { featureId: 'FEATURE-001', projectRoot: project.root };
+      await startFeatureRun(base);
+      await runTddPhase({ ...base, taskId: 'TASK-001', phase: 'red' });
+
+      // A fresh invocation (separate process in real usage) reloads state.
+      const state = await getFeatureRunState(project.root, 'FEATURE-001');
+      expect(state.ok).toBe(true);
+      if (state.ok) {
+        expect(state.value.tasks['TASK-001']?.phase).toBe('green');
+        expect(state.value.tasks['TASK-001']?.records).toHaveLength(1);
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('finalizeFeatureRun (evidence gate)', () => {
+  it('fails when any task lacks a complete evidence chain', async () => {
+    const project = await setupProject(['TASK-001', 'TASK-002']);
+    try {
+      const base = { featureId: 'FEATURE-001', projectRoot: project.root };
+      await startFeatureRun(base);
+      await completeTask(project, 'TASK-001');
+      // TASK-002 untouched.
+
+      const res = await finalizeFeatureRun(base);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.error.message).toContain('TDD evidence missing');
+        expect(res.error.message).toContain('TASK-002');
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('produces a passed report with the full evidence chain', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      const base = { featureId: 'FEATURE-001', projectRoot: project.root };
+      await startFeatureRun(base);
+      await completeTask(project, 'TASK-001');
+
+      const res = await finalizeFeatureRun(base);
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.value.status).toBe('passed');
+        expect(res.value.tddEvidence).toHaveLength(1);
+        expect(res.value.tddEvidence[0]?.records).toHaveLength(3);
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('runFeatureWorkflow (one-shot audit mode)', () => {
+  it('refuses to report success without a persisted evidence chain', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      const res = await runFeatureWorkflow({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        dryRun: false,
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error.message).toContain('TDD evidence missing');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('passes only after the phase driver completed every task', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      const base = { featureId: 'FEATURE-001', projectRoot: project.root, dryRun: false };
+      await startFeatureRun(base);
+      await completeTask(project, 'TASK-001');
+      const res = await runFeatureWorkflow(base);
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value.status).toBe('passed');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
     }
   });
 });

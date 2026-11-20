@@ -90,23 +90,33 @@ silently fabricated**.
 `hooks/hooks.json` declaring `"modules": ["./hooks/register.js"]` — a
 path that never existed (neither in a fresh clone nor after `pnpm run
 build`), so `claude plugin validate` rejected every plugin. The manifests
-now declare `../dist/hooks/register.js`, resolved relative to the `hooks/`
-directory exactly as the Claude Code plugin validator resolves it, and the
-build bundles each entry with `scripts/bundle-hooks.mjs` (esbuild) into a
-self-contained ES module that imports nothing but its own files and
-`claude-code` — the validator's hard rule. `register` is now a top-level
-function declaration, `turn.step` uses the streaming generator form, and
-every `$.state` reference uses `{ plugin, key }` literals named in each
-plugin's `contract.d.ts` (via `plugin.json`'s `types` field).
+now declare `./register.ts` — the TypeScript source, committed in the
+repository — because Claude Code loads `.ts` hooks modules directly, with
+no build step (official docs, verified November 2026); a fresh clone
+validates as-is. The shipped module graph is self-contained per the
+validator's hard rule (own files by relative path + the `claude-code`
+bare import for types): the plugins vendor their policy types and the
+secret detector locally instead of importing workspace packages. The
+hooks were also rewritten onto the real host API: `tool.call` reads the
+tool's arguments as fields of the event (`e.command` for Bash,
+`e.file_path`/`e.content`/`e.new_string` for writes), `tool.check` reads
+`e.input` and answers `{ decision, reason }`, `turn.step` delegates with
+`const result = yield* next(e)`, turn fields use `e.turnId` /
+`e.answer` / `e.durationMs` / `e.usage` / `e.isAborted`, approvals ask
+through `$.ui.ask` (defaulting to Refuse when nobody answers), every
+gating registration chains `.catch` (fail closed), and `secret-guard`
+really scans the staged diff via `$.process.run(['git','diff','--cached'])`
+before a commit instead of logging a scan that never happened.
 
 **`kit install` links the plugins it promises (P0).** The `full-sdlc` and
 `runtime` profiles claimed runtime governance but never touched the
 plugins. They now link all four guard plugins into
 `<project>/.claude/plugins/` (new `plugin-linker.ts`), validating each
-hooks module path **before** linking — an unbuilt kit repo produces an
-explicit per-plugin warning and links nothing, never a silent broken
-install. Plugin links appear in dry-run plans, install output, and the
-ownership manifest.
+hooks module path **before** linking — an incomplete plugin directory
+produces an explicit per-plugin warning and links nothing, never a silent
+broken install. Plugin links appear in dry-run plans, install output, and
+the ownership manifest. Because the hooks modules ship as TypeScript
+source, linking works straight from a fresh clone (no build needed).
 
 **Honest git state.** `kit inspect` on a folder with no `.git` reported
 `branch=main, commit=0000000` — fabricated. `GitState` gains `isRepo`;

@@ -8,7 +8,7 @@
 // patterns; the full Bash command parser is out of scope (the host's
 // approval flow handles anything we classify as require-approval).
 
-import type { ClassifiedAction } from '@agentic-sdlc-kit/contracts';
+import type { ClassifiedAction } from './types';
 
 interface Pattern {
   regex: RegExp;

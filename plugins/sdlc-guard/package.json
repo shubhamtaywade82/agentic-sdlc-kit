@@ -6,17 +6,13 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ../../scripts/bundle-hooks.mjs .",
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
-  "dependencies": {
-    "@agentic-sdlc-kit/contracts": "workspace:*",
-    "@agentic-sdlc-kit/core": "workspace:*",
-    "@agentic-sdlc-kit/mod-sdk": "workspace:*"
-  },
   "devDependencies": {
+    "@agentic-sdlc-kit/mod-sdk": "workspace:*",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   }

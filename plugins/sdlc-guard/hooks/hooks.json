@@ -1,4 +1,4 @@
 {
-  "description": "sdlc-guard hooks",
-  "modules": ["../dist/hooks/register.js"]
+  "description": "sdlc-guard hooks: destructive Bash command governance on tool.call and tool.check, with $.ui.ask approval and fail-closed .catch handling.",
+  "modules": ["./register.ts"]
 }

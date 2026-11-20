@@ -30,25 +30,32 @@ Claude Code is the primary supported host runtime with native runtime plugin (Mo
 Claude Code discovers plugins via `.claude-plugin/plugin.json` and `hooks/hooks.json`. To enable the 4 guard plugins for your repository:
 
 ```bash
-# From your target project repository (kit repo must be built: pnpm install && pnpm run build):
+# From your target project repository:
 kit install --profile full-sdlc --stack node-typescript
 ```
 
 This links `sdlc-guard`, `secret-guard`, `model-router`, and `run-observer` into
 your project's `.claude/plugins/` directory. Each plugin's `hooks/hooks.json`
-declares `../dist/hooks/register.js` — the compiled hook module, resolved
-relative to the `hooks/` directory exactly as the Claude Code plugin
-validator resolves it — and the installer validates that path before linking,
-so a plugin is never installed in a broken state (if the kit repo is not built
-yet, the installer says so and links nothing for that plugin).
+declares `./register.ts` — the TypeScript source, committed in the repository —
+resolved relative to the `hooks/` directory exactly as the Claude Code plugin
+validator resolves it. The installer validates that path before linking, so a
+plugin is never installed in a broken state (an incomplete plugin directory
+produces an explicit warning and links nothing).
 
 All four plugins pass `claude plugin validate`:
 
-- the hooks module is a self-contained ES bundle (built by
-  `scripts/bundle-hooks.mjs` after `tsc`): it imports nothing but its own
-  files and `claude-code` — no workspace packages, not even `node:` builtins;
+- Claude Code loads `.ts` hooks modules directly — no build step — so the
+  linked plugins work straight from a fresh clone of the kit repository;
+- the hooks module graph is self-contained: it imports its own files by
+  relative path plus the `claude-code` bare import for types — no workspace
+  packages, no `node:` builtins (the plugins vendor their policy types and
+  the secret detector locally);
 - `register` is exported as a top-level function declaration;
-- `turn.step` (a streaming event) uses the `async function*` generator form;
+- `turn.step` (a streaming event) uses the `async function*` generator form
+  delegating with `const result = yield* next(e)`;
+- the event shapes match the real host: `tool.call` carries tool arguments
+  as fields of the event, `tool.check` answers `{ decision, reason }`, and
+  gating hooks chain `.catch` so an error refuses the action (fail closed);
 - every `$.state` reference uses `{ plugin, key }` literals and is named in
   the plugin's type contract (`contract.d.ts`, declared via the `types`
   field of `.claude-plugin/plugin.json`).
@@ -63,8 +70,8 @@ ln -s /path/to/agentic-sdlc-kit/plugins/model-router .claude/plugins/model-route
 ln -s /path/to/agentic-sdlc-kit/plugins/run-observer .claude/plugins/run-observer
 ```
 
-(With manual links, run `pnpm install && pnpm run build` in the kit repository
-first so each plugin has `dist/hooks/register.js`.)
+(Manual links work from a fresh clone: the hooks modules are TypeScript
+source loaded directly by Claude Code — nothing to build.)
 
 ### Step 2: How Claude Code Uses the Kit
 

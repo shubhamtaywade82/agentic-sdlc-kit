@@ -3,7 +3,7 @@
 // Classifies git commands into ClassifiedAction values. Separate from
 // shell-policy.ts because git has its own command structure.
 
-import type { ClassifiedAction } from '@agentic-sdlc-kit/contracts';
+import type { ClassifiedAction } from './types';
 
 export function classifyGitCommand(command: string): ClassifiedAction | null {
   // git push --force

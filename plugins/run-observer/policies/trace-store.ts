@@ -7,7 +7,7 @@
 // Modeled after Mission Control (RESEARCH.md §4): hierarchical runtime
 // tree with bounded state.
 
-import type { ObserverEvent, RetentionPolicy } from '@agentic-sdlc-kit/contracts';
+import type { ObserverEvent, RetentionPolicy } from './types';
 
 interface RunRecord {
   runId: string;

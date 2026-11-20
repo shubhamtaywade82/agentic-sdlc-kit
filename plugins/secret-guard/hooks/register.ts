@@ -1,92 +1,138 @@
 // plugins/secret-guard/hooks/register.ts
 //
-// Secret Guard Mod: intercepts tool calls and results to detect and redact
-// secrets. Uses the M11 detector and redactor from core.
+// secret-guard: keeps secrets out of files, git history, and the model's
+// context. Three real gates on tool.call:
 //
-// Per RESEARCH.md §5 (M11): detection and redaction are different
-// operations. A finding does not prove redaction. The register function
-// uses the redactor which verifies completeness.
+//   1. Write / NotebookEdit / Edit — scan the content being written
+//      (e.content / e.new_source / e.new_string; tool arguments are FIELDS
+//      of a tool.call event) and refuse the write when a secret matches.
+//   2. Bash `git commit` / `git push` — read the staged diff with
+//      $.process.run(['git','diff','--cached']) and scan it BEFORE the
+//      command runs; a secret in the diff refuses the commit.
+//   3. Tool results — after `await next(e)`, redact secrets from the
+//      result's text (the field the model reads) and return the copy.
+//
+// Every gating registration chains .catch(...) so an internal error or
+// timeout REFUSES the action (fail closed) — the host would otherwise skip
+// a failed hook and let the write/commit through.
+//
+// Static-analysis rules honored here: full $.x.y(...) calls; string-literal
+// event names; `$` passed only to getPolicy, a top-level function of this
+// file; imports are relative files of this plugin plus the 'claude-code'
+// types.
 
-import type { On, ToolCallEvent } from '@agentic-sdlc-kit/mod-sdk';
-import { scanText, redactSecrets } from '@agentic-sdlc-kit/core';
-import type { RedactionPolicy } from '@agentic-sdlc-kit/contracts';
+import type { ModsApi, On, ToolCallEvent } from 'claude-code';
+import { DEFAULT_REDACTION_POLICY, redactSecrets, scanText } from '../policies/detect';
+import type { RedactionPolicy } from '../policies/detect';
 
-const DEFAULT_POLICY: RedactionPolicy = {
-  schemaVersion: 1,
-  placeholderFormat: '[REDACTED:<kind>:<id>]',
-  redactPartial: true,
-  redactRepeated: true,
-  maxInputBytes: 1_000_000,
-  ignorePaths: [],
-};
+function getPolicy($: ModsApi): RedactionPolicy {
+  return $.state.get<RedactionPolicy>({ plugin: 'secret-guard', key: 'policy' }) ?? DEFAULT_REDACTION_POLICY;
+}
 
-function getPolicy($: {
-  state: { get: <T>(ref: { plugin: string; key: string }) => T | undefined };
-}): RedactionPolicy {
-  return $.state.get<RedactionPolicy>({ plugin: 'secret-guard', key: 'policy' }) ?? DEFAULT_POLICY;
+/** Scan content about to be written; returns a deny reason or null. */
+function scanWrite($: ModsApi, content: string, filePath?: string): string | null {
+  const policy = getPolicy($);
+  const result = scanText(content, policy, 'file-write', filePath);
+  if (result.outcome === 'findings') {
+    $.ui.log(
+      `secret-guard: blocked write to ${filePath ?? '<unknown>'} — ${result.findings.length} secret(s) detected`,
+    );
+    return (
+      `secret-guard: refusing to write ${filePath ?? 'file'}: ${result.findings.length} possible ` +
+      `secret(s) detected (${result.findings.map((f) => f.kind).join(', ')}). Move the value to an ` +
+      'environment variable or secret manager, then retry.'
+    );
+  }
+  if (result.outcome === 'failed') {
+    // INVARIANT: scanner failure is NOT a clean result. Fail closed for
+    // writes so an unscanned file is never written.
+    $.ui.log('secret-guard: scanner failed; fail-closed for write');
+    return 'secret-guard: scanner failed; refusing to write unscanned content';
+  }
+  if (result.outcome === 'skipped-too-large') {
+    // "Too large to scan" is suspicious for a write: refuse rather than
+    // wave an unread file through.
+    $.ui.log('secret-guard: content too large to scan; refusing (fail closed)');
+    return 'secret-guard: content too large to scan; refusing to write unverified content';
+  }
+  return null;
 }
 
 export function register(on: On): void {
-  // Intercept Bash tool calls that touch git (commit/push) to scan the
-  // staged diff before it enters history.
-  on('tool.call', { tool: 'Bash' }, async ($, e: ToolCallEvent, next) => {
-    const command = (e.input as { command?: unknown }).command;
-    if (typeof command !== 'string') return next(e);
-    // Only inspect git commit / git push.
-    if (!/\bgit\s+(commit|push)\b/.test(command)) return next(e);
-    // The actual diff content is not in the command string; in a real Mod
-    // we'd run `git diff --cached` via $.fs or the host. For the contract
-    // surface, we log that we would scan and forward.
-    $.ui.log('secret-guard: scanning staged changes before git operation');
+  // 1. Writes: Write (e.file_path + e.content) and NotebookEdit
+  //    (e.notebook_path + e.new_source).
+  on('tool.call', { tool: ['Write', 'NotebookEdit'] }, async ($, e: ToolCallEvent, next) => {
+    const path = e.file_path ?? e.notebook_path;
+    const content = e.content ?? e.new_source;
+    if (typeof content !== 'string' || content === '') return next(e);
+    const deny = scanWrite($, content, typeof path === 'string' ? path : undefined);
+    if (deny !== null) return { deny };
     return next(e);
-  });
+  }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 
-  // Intercept Edit / Write tool calls to scan the content being written.
-  on('tool.call', { tool: 'Write' }, async ($, e: ToolCallEvent, next) => {
-    const content = (e.input as { content?: unknown }).content;
-    const path = (e.input as { path?: unknown }).path;
-    if (typeof content !== 'string') return next(e);
+  // 1b. Edits: scan the replacement text (e.new_string).
+  on('tool.call', { tool: 'Edit' }, async ($, e: ToolCallEvent, next) => {
+    const path = e.file_path;
+    const content = e.new_string;
+    if (typeof content !== 'string' || content === '') return next(e);
+    const deny = scanWrite($, content, typeof path === 'string' ? path : undefined);
+    if (deny !== null) return { deny };
+    return next(e);
+  }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
+
+  // 2. Git: scan the staged diff before a commit or push enters history.
+  on('tool.call', { tool: 'Bash' }, async ($, e: ToolCallEvent, next) => {
+    const command = e.command;
+    if (typeof command !== 'string') return next(e);
+    if (!/\bgit\s+(commit|push)\b/.test(command)) return next(e);
+    // Read what is about to be committed — before the command runs.
+    const diff = await $.process.run(['git', 'diff', '--cached']);
+    if (diff.exitCode !== 0) {
+      // Could not read the staged changes (not a repo, git error): fail
+      // closed — an unverifiable commit is not a verified-clean one.
+      $.ui.log('secret-guard: could not read staged changes; refusing git operation');
+      return {
+        deny:
+          'secret-guard: could not read the staged changes (git diff --cached failed), so they ' +
+          'were not scanned for secrets. Run git add and retry from a git repository.',
+      };
+    }
     const policy = getPolicy($);
-    const filePath = typeof path === 'string' ? path : undefined;
-    const result = scanText(content, policy, 'file-write', filePath);
+    const result = scanText(diff.stdout, policy, 'git-staged');
     if (result.outcome === 'findings') {
       $.ui.log(
-        `secret-guard: blocked Write to ${filePath ?? '<unknown>'} — ${result.findings.length} secret(s) detected`,
+        `secret-guard: blocked git operation — ${result.findings.length} secret(s) in staged changes`,
       );
       return {
-        deny: `secret-guard: refusing to write file with ${result.findings.length} detected secret(s); redact or move to a secret manager`,
+        deny:
+          `secret-guard: the staged changes contain ${result.findings.length} possible secret(s) ` +
+          `(${result.findings.map((f) => f.kind).join(', ')}). Unstage the secret, move it to an ` +
+          'environment variable or secret manager, and retry. If a real key was committed, rotate it.',
       };
     }
     if (result.outcome === 'failed') {
-      // INVARIANT: scanner failure is NOT a clean result. Fail-closed for
-      // writes (deny) so we never silently write an unscanned file.
-      $.ui.log('secret-guard: scanner failed; fail-closed for Write');
-      return { deny: 'secret-guard: scanner failed; refusing to write unscanned content' };
-    }
-    if (result.outcome === 'skipped-too-large') {
-      $.ui.log('secret-guard: Write content too large to scan; forwarding');
-      // For writes, "too large" is suspicious; we forward but log loudly.
-      return next(e);
+      $.ui.log('secret-guard: staged-diff scan failed; refusing git operation');
+      return { deny: 'secret-guard: staged-diff scan failed; refusing to let the commit proceed unverified' };
     }
     return next(e);
-  });
+  }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 
-  // Intercept tool results to redact secrets from output before the model
-  // sees them. This is the "Observe + Rewrite" pattern from RESEARCH.md §1.
-  // The host calls our handler with the result; we rewrite it.
+  // 3. Tool results: after the tool ran, redact secrets from the text the
+  //    model reads. A denied call (r.deny) passes through untouched.
   on('tool.call', async ($, e: ToolCallEvent, next) => {
-    const result = await next(e);
-    // If the result is a string, redact it.
-    if (typeof result === 'string') {
-      const policy = getPolicy($);
-      const redacted = redactSecrets(result, policy, 'tool-output');
+    const r = (await next(e)) as { deny?: unknown; text?: unknown } | undefined;
+    if (r === null || typeof r !== 'object') return r;
+    if (r.deny !== undefined) return r;
+    if (typeof r.text !== 'string') return r;
+    const policy = getPolicy($);
+    const redacted = redactSecrets(r.text, policy, 'tool-output');
+    if (redacted.findings.length > 0) {
+      $.ui.log(`secret-guard: redacted ${redacted.findings.length} secret(s) from ${e.tool} output`);
       if (!redacted.fullyRedacted) {
-        $.ui.log(
-          `secret-guard: WARNING — ${redacted.findings.length} finding(s) not fully redacted in tool output`,
-        );
+        $.ui.log('secret-guard: WARNING — redaction could not be verified as complete');
       }
-      return redacted.redactedText;
+      return { ...r, text: redacted.redactedText };
     }
-    return result;
+    return r;
   });
 }

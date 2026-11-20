@@ -7,10 +7,11 @@
 // discovers them via `<plugin>/.claude-plugin/plugin.json` and loads their
 // hook modules from the paths declared in `hooks/hooks.json`.
 //
-// IMPORTANT (verified against `claude plugin validate`): module paths in
+// IMPORTANT (official docs, verified November 2026): module paths in
 // hooks/hooks.json resolve relative to the hooks/ DIRECTORY (where the
-// manifest lives), not the plugin root — so the shipped manifest declares
-// `../dist/hooks/register.js`.
+// manifest lives), and Claude Code loads `.ts` hooks modules DIRECTLY —
+// no build step. The shipped manifests therefore declare `./register.ts`
+// (source committed in the repository), so a fresh clone validates as-is.
 //
 // This module:
 //   1. Locates the kit's `plugins/` directory relative to the CLI's own
@@ -39,7 +40,7 @@ export interface PluginLinkResult {
   name: string;
   /** Where the symlink was created (or already existed) inside the project. */
   linkPath: string;
-  status: 'linked' | 'already-linked' | 'not-built' | 'not-found';
+  status: 'linked' | 'already-linked' | 'incomplete' | 'not-found';
   detail?: string;
 }
 
@@ -140,7 +141,10 @@ export async function linkRuntimePlugins(
 
     // Validate hooks modules BEFORE linking so we never install a plugin
     // whose hook module path is broken (which is what the Claude Code
-    // plugin validator would reject).
+    // plugin validator would reject). The shipped manifests point at
+    // TypeScript source inside the repository, so a missing module means
+    // an incomplete plugin directory (bad clone, partial copy) — not a
+    // missing build.
     //
     // Note: validatePluginHooks resolves module paths relative to the
     // hooks/ directory — mirroring the real Claude Code validator — so a
@@ -150,10 +154,10 @@ export async function linkRuntimePlugins(
       results.push({
         name,
         linkPath,
-        status: 'not-built',
+        status: 'incomplete',
         detail:
           `hooks module(s) ${hooks.missing.join(', ')} not found under ${pluginDir}. ` +
-          'Run `pnpm install && pnpm run build` in the kit repository, then re-run `kit install`.',
+          'The plugin directory is incomplete — reinstall or repair the kit repository, then re-run `kit install`.',
       });
       continue;
     }

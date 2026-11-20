@@ -141,14 +141,10 @@ importers:
         version: 2.1.9(@types/node@20.19.43)
 
   plugins/model-router:
-    dependencies:
-      '@agentic-sdlc-kit/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
+    devDependencies:
       '@agentic-sdlc-kit/mod-sdk':
         specifier: workspace:*
         version: link:../../packages/mod-sdk
-    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -157,14 +153,10 @@ importers:
         version: 2.1.9(@types/node@20.19.43)
 
   plugins/run-observer:
-    dependencies:
-      '@agentic-sdlc-kit/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
+    devDependencies:
       '@agentic-sdlc-kit/mod-sdk':
         specifier: workspace:*
         version: link:../../packages/mod-sdk
-    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -173,17 +165,10 @@ importers:
         version: 2.1.9(@types/node@20.19.43)
 
   plugins/sdlc-guard:
-    dependencies:
-      '@agentic-sdlc-kit/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@agentic-sdlc-kit/core':
-        specifier: workspace:*
-        version: link:../../packages/core
+    devDependencies:
       '@agentic-sdlc-kit/mod-sdk':
         specifier: workspace:*
         version: link:../../packages/mod-sdk
-    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -192,17 +177,10 @@ importers:
         version: 2.1.9(@types/node@20.19.43)
 
   plugins/secret-guard:
-    dependencies:
-      '@agentic-sdlc-kit/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@agentic-sdlc-kit/core':
-        specifier: workspace:*
-        version: link:../../packages/core
+    devDependencies:
       '@agentic-sdlc-kit/mod-sdk':
         specifier: workspace:*
         version: link:../../packages/mod-sdk
-    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3

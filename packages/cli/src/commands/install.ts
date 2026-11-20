@@ -320,7 +320,7 @@ function formatResult(r: InstallResult): string {
       } else if (p.status === 'already-linked') {
         lines.push(`    ~ ${p.name} (already linked)`);
       } else {
-        // not-built / not-found: a plugin the profile promised but could
+        // incomplete / not-found: a plugin the profile promised but could
         // not deliver. Report loudly; never claim it is installed.
         lines.push(`    ! ${p.name}: ${p.status} — ${p.detail ?? ''}`);
       }
@@ -344,8 +344,9 @@ function formatHelp(): string {
     '',
     'The full-sdlc and runtime profiles link the four guard plugins',
     '(sdlc-guard, secret-guard, model-router, run-observer) into',
-    '.claude/plugins/. The kit repository must be built first (pnpm install &&',
-    'pnpm run build) so each plugin has a bundled dist/hooks/register.js.',
+    '.claude/plugins/. Claude Code loads each plugin\'s TypeScript hooks',
+    'module (hooks/register.ts) directly, so the plugins work from a fresh',
+    'clone of the kit repository with no build step.',
     '',
     'Options:',
     '  --stack <id> Stack pack to activate (e.g. node-typescript, ruby-rails)',

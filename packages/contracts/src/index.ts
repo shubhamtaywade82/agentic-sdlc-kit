@@ -48,3 +48,6 @@ export * from './evaluation/index.js';
 // M27–M35 self-evolution surface:
 export * from './learning/index.js';
 export * from './evolution/index.js';
+
+// M36 agent execution surface (ADR-0019, ADR-0020):
+export * from './agent/index.js';

@@ -125,11 +125,19 @@ verdicts checked and state persisted):
   order lacks a complete Red→Green→Refactor evidence chain, the run
   fails with `tddEvidenceMissing` instead of reporting success.
 
-Known trade-off (accepted for P0): Red/Green semantics use the
-report-level status across all profile commands (test, lint, typecheck,
-build). A test-targeting refinement (per-check phase attribution) is
-P1 work. The recorded output excerpts make the Red failure auditable
-by a human or reviewing agent.
+P1 refinement (landed — task-scoped Red evidence): Red/Green/Refactor
+phase gates now run the TASK'S OWN `verification.command` from the plan,
+not the whole project profile, and classify the observed failure.
+Only a failure classified `assertion` (the targeted test ran, was
+discovered, and failed at an assertion) establishes Red; compilation,
+dependency, discovery, environment, timeout, and unclassified failures
+are persisted as rejected attempts without advancing the phase — prefer
+a false-negative Red over a false-positive Red. Each step record carries
+the verification metadata (task id, command, classification, reason).
+Evidence records written by the pre-P1 engine (no verification metadata)
+are treated as unclassified and cannot complete a chain (fail closed,
+lazy migration). The full profile is still audited once at `verify`
+(finalize), where whole-project status remains the gate.
 
 ### 2. Honest Evolution Lab reporting
 

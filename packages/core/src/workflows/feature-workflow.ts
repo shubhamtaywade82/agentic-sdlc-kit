@@ -29,9 +29,9 @@ import {
 import { FileSystemRepositoryScanner } from '../discovery/repository-scanner.js';
 import { loadSpecification } from '../specification/parser.js';
 import { loadPlan } from '../planning/parser.js';
-import { TddSession, type TddStepRecord } from '../tdd/cycle.js';
+import { TddSession, type TddStepRecord, type TddStepVerification } from '../tdd/cycle.js';
 import { DEFAULT_REDACTION_POLICY, redactSecrets } from '../secret-guard/redactor.js';
-import { ProcessVerificationRunner } from '../verification/process-runner.js';
+import { ProcessVerificationRunner, type ProcessResult } from '../verification/process-runner.js';
 import { parseProfileFromYaml } from '../project-profile/serializer.js';
 import {
   FEATURE_RUN_SCHEMA_VERSION,
@@ -53,6 +53,12 @@ export interface TddPhaseRequest {
   readonly projectRoot: string;
   readonly taskId: string;
   readonly phase: 'red' | 'green' | 'refactor';
+  /**
+   * Bounded execution time for the task's verification command
+   * (default 60s). Exceeding it classifies the attempt as `timeout`,
+   * which never satisfies a phase invariant.
+   */
+  readonly timeoutMs?: number;
 }
 
 export interface FeatureRunReport {
@@ -144,37 +150,48 @@ async function loadFeatureContext(opts: FeatureWorkflowOptions): Promise<Result<
 }
 
 /**
- * Human-auditable, bounded evidence line for a verification run:
- * per-check statuses plus a redacted excerpt of the first failing
- * check's output (the Red failure must be inspectable, not asserted).
+ * Human-auditable, bounded evidence line for a task-targeted phase
+ * verification: exit code, failure classification, and a redacted
+ * excerpt of the output tail. Same redaction and excerpt bound as
+ * profile-level evidence.
  */
-function evidenceFromReport(report: VerificationReport): string {
-  const parts = report.checks.map((c) => `${c.id}:${c.status}`);
-  const failed = report.checks.find((c) => c.status === 'failed');
-  let excerpt = '';
-  if (failed) {
-    const raw = failed.errors?.[0] ?? failed.evidence?.[0] ?? '';
-    const flat = raw.replace(/\s+/g, ' ').trim().slice(-300);
-    if (flat) {
-      excerpt = redactSecrets(flat, DEFAULT_REDACTION_POLICY, 'tool-output').redactedText;
-    }
-  }
-  return `checks [${parts.join(', ')}]${excerpt ? ` — ${excerpt}` : ''}`;
+function evidenceFromProcessResult(result: ProcessResult): string {
+  const flat = result.output.replace(/\s+/g, ' ').trim().slice(-300);
+  const excerpt = flat
+    ? redactSecrets(flat, DEFAULT_REDACTION_POLICY, 'tool-output').redactedText
+    : 'no output';
+  const classification = result.classification === null ? 'none' : result.classification;
+  return `exit=${result.exitCode ?? 'none'} classification=${classification} — ${excerpt}`;
 }
 
-/** A complete chain is Red(failed) then Green(passed) then Refactor(passed), in order. */
+/**
+ * A complete chain is Red(failed, classified `assertion`) then
+ * Green(passed) then Refactor(passed), in order, each step verified by
+ * the task's own verification command (ADR-0018 P1). Records written
+ * by the pre-v2 engine (no `verification` metadata) do not count —
+ * their evidence is unclassified and therefore cannot establish Red.
+ */
 function hasCompleteChain(records: readonly TddStepRecord[]): boolean {
-  const expected: Array<{ phase: string; status: 'failed' | 'passed' }> = [
-    { phase: 'red', status: 'failed' },
-    { phase: 'green', status: 'passed' },
-    { phase: 'refactor', status: 'passed' },
-  ];
-  let cursor = 0;
+  const isQualifyingRed = (r: TddStepRecord): boolean =>
+    r.phase === 'red' &&
+    r.status === 'failed' &&
+    r.verification?.classification === 'assertion';
+  const isQualifyingPass = (r: TddStepRecord): boolean =>
+    r.status === 'passed' && r.verification !== undefined && r.verification.classification === null;
+
+  let expectRed = true;
+  let stage: 'green' | 'refactor' = 'green';
   for (const r of records) {
-    const want = expected[cursor];
-    if (want && r.phase === want.phase && r.status === want.status) cursor++;
+    if (expectRed) {
+      if (isQualifyingRed(r)) expectRed = false;
+      continue;
+    }
+    if (r.phase === stage && isQualifyingPass(r)) {
+      if (stage === 'green') stage = 'refactor';
+      else return true;
+    }
   }
-  return cursor === expected.length;
+  return false;
 }
 
 function tddEvidenceMissing(featureId: string, taskIds: readonly string[]): Result<never> {
@@ -254,37 +271,78 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
     };
   }
 
-  const profileRes = await loadProfile(opts.projectRoot);
-  if (!profileRes.ok) return profileRes;
+  // The phase gate verifies the TASK'S OWN verification command, not the
+  // whole project profile (ADR-0018 P1: task-scoped Red evidence). The
+  // plan is the authority for what that command is; a plan we cannot
+  // load, or a task missing from it, fails closed.
+  const planRes = await loadPlan(path.join(opts.projectRoot, 'docs', 'plans', opts.featureId));
+  if (!planRes.ok) return planRes;
 
-  // Real verification only: a dry run cannot produce Red/Green evidence.
-  const runner = new ProcessVerificationRunner();
-  const verifyRes = await runner.run(profileRes.value, {
-    cwd: opts.projectRoot,
-    dryRun: false,
-  });
-  if (!verifyRes.ok) return verifyRes;
-
-  // Vacuous-evidence guard: a report with zero executed checks (empty
-  // command set, or everything skipped/blocked) must NOT satisfy the Red
-  // invariant — "nothing ran" is not "the test failed" (ADR-0018).
-  const executedChecks = verifyRes.value.checks.filter(
-    (c) => c.status === 'passed' || c.status === 'failed',
-  );
-  if (executedChecks.length === 0) {
+  const taskDef = planRes.value.plan.tasks.find((t) => t.id === opts.taskId);
+  if (!taskDef) {
     return {
       ok: false,
-      error: Errors.verificationFailed(
-        `Phase evidence requires at least one executed check, but verification ran none ` +
-          `(${verifyRes.value.checks.length} check(s), all skipped or blocked) — ` +
-          `no check actually executed for ${opts.phase} of ${opts.taskId}`,
+      error: Errors.contractInvalid(
+        `Task '${opts.taskId}' exists in the run state but not in the plan for ` +
+          `${opts.featureId} — the plan and run state have diverged; refusing to verify`,
+      ),
+    };
+  }
+  if (!taskDef.verification || taskDef.verification.command.length === 0) {
+    return {
+      ok: false,
+      error: Errors.contractInvalid(
+        `Task '${opts.taskId}' has no verification command in the plan — ` +
+          `phase evidence requires a targeted verification (fail closed)`,
       ),
     };
   }
 
-  const status = verifyRes.value.status === 'passed' ? 'passed' : 'failed';
+  // Real verification only: a dry run cannot produce Red/Green evidence.
+  const runner = new ProcessVerificationRunner();
+  const runRes = await runner.runCommand(taskDef.verification.command, {
+    cwd: opts.projectRoot,
+    ...(opts.timeoutMs !== undefined ? { timeoutMs: opts.timeoutMs } : {}),
+  });
+  if (!runRes.ok) return runRes;
+  const result = runRes.value;
+
+  const status: 'passed' | 'failed' = result.exitCode === 0 ? 'passed' : 'failed';
+  const verification: TddStepVerification = {
+    taskId: opts.taskId,
+    command: taskDef.verification.command,
+    classification: result.classification,
+    reason: result.reason,
+  };
+  const evidence = evidenceFromProcessResult(result);
+
   const session = new TddSession(opts.taskId, { phase: task.phase, records: task.records });
-  const advanceRes = session.advance({ status, evidence: evidenceFromReport(verifyRes.value) });
+
+  // Red classification gate (ADR-0018 P1): a failed command establishes
+  // Red ONLY when the failure is a real assertion failure of the
+  // targeted test. Compilation, dependency, discovery, environment,
+  // timeout, and unclassified failures are recorded as rejected attempts
+  // (real, auditable evidence) but do NOT advance the phase. Prefer a
+  // false-negative Red over a false-positive Red.
+  if (opts.phase === 'red' && status === 'failed' && result.classification !== 'assertion') {
+    session.recordRejected({ status, evidence, verification });
+    task.phase = session.getCurrentPhase();
+    task.records = [...session.getHistory()];
+    state.updatedAt = new Date().toISOString();
+    await saveFeatureRunState(opts.projectRoot, state);
+    return {
+      ok: false,
+      error: Errors.verificationFailed(
+        `Red phase evidence rejected for ${opts.taskId}: the targeted verification ` +
+          `failed with classification '${result.classification}' (${result.reason}). ` +
+          `Only an assertion failure establishes Red — fix the underlying problem ` +
+          `(compile error, missing dependency, missing test, environment, or timeout) ` +
+          `and run red again.`,
+      ),
+    };
+  }
+
+  const advanceRes = session.advance({ status, evidence, verification });
 
   // Persist the attempt either way: a failed phase attempt (e.g. Green
   // before the implementation actually works) is real, auditable evidence.

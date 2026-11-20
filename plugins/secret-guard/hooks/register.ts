@@ -26,7 +26,10 @@ import { DEFAULT_REDACTION_POLICY, redactSecrets, scanText } from '../policies/d
 import type { RedactionPolicy } from '../policies/detect';
 
 function getPolicy($: ModsApi): RedactionPolicy {
-  return $.state.get<RedactionPolicy>({ plugin: 'secret-guard', key: 'policy' }) ?? DEFAULT_REDACTION_POLICY;
+  return (
+    $.state.get<RedactionPolicy>({ plugin: 'secret-guard', key: 'policy' }) ??
+    DEFAULT_REDACTION_POLICY
+  );
 }
 
 /** Scan content about to be written; returns a deny reason or null. */
@@ -112,7 +115,9 @@ export function register(on: On): void {
     }
     if (result.outcome === 'failed') {
       $.ui.log('secret-guard: staged-diff scan failed; refusing git operation');
-      return { deny: 'secret-guard: staged-diff scan failed; refusing to let the commit proceed unverified' };
+      return {
+        deny: 'secret-guard: staged-diff scan failed; refusing to let the commit proceed unverified',
+      };
     }
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
@@ -127,12 +132,20 @@ export function register(on: On): void {
     const policy = getPolicy($);
     const redacted = redactSecrets(r.text, policy, 'tool-output');
     if (redacted.findings.length > 0) {
-      $.ui.log(`secret-guard: redacted ${redacted.findings.length} secret(s) from ${e.tool} output`);
+      $.ui.log(
+        `secret-guard: redacted ${redacted.findings.length} secret(s) from ${e.tool} output`,
+      );
       if (!redacted.fullyRedacted) {
         $.ui.log('secret-guard: WARNING — redaction could not be verified as complete');
       }
       return { ...r, text: redacted.redactedText };
     }
     return r;
-  });
+    // Fail closed: if redaction itself throws, never surface the unverified
+    // tool output to the model — refuse instead. (This registration is the
+    // only one in secret-guard that previously lacked a .catch; the three
+    // pre/post-write and git gates above already chain .catch.)
+  }).catch(() => ({
+    deny: 'secret-guard: redaction failed — refusing to surface unverified tool output (fail closed)',
+  }));
 }

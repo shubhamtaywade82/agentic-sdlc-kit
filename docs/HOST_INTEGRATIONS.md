@@ -55,7 +55,11 @@ All four plugins pass `claude plugin validate`:
   delegating with `const result = yield* next(e)`;
 - the event shapes match the real host: `tool.call` carries tool arguments
   as fields of the event, `tool.check` answers `{ decision, reason }`, and
-  gating hooks chain `.catch` so an error refuses the action (fail closed);
+  every gating registration chains `.catch` so an error is handled
+  explicitly: safety hooks (`sdlc-guard`, `secret-guard`) refuse the action
+  (fail closed), while routing and telemetry hooks (`model-router`,
+  `run-observer`) fall back to pass-through so a non-safety bug never blocks
+  the agent;
 - every `$.state` reference uses `{ plugin, key }` literals and is named in
   the plugin's type contract (`contract.d.ts`, declared via the `types`
   field of `.claude-plugin/plugin.json`).

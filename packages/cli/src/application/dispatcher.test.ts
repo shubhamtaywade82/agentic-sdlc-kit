@@ -24,7 +24,7 @@ describe('dispatcher', () => {
     const ctx = makeCtx(['--version']);
     const r = await dispatch(ctx);
     expect(r.exitCode).toBe(0);
-    expect(r.message).toBe('0.7.1');
+    expect(r.message).toBe('0.7.2');
     expect(r.command).toBe('version');
   });
 
@@ -33,7 +33,7 @@ describe('dispatcher', () => {
     const ctx = makeCtx(['-v']);
     const r = await dispatch(ctx);
     expect(r.exitCode).toBe(0);
-    expect(r.message).toBe('0.7.1');
+    expect(r.message).toBe('0.7.2');
   });
 
   it('handles --help', async () => {
@@ -74,7 +74,7 @@ describe('dispatcher', () => {
     const r = await dispatch(ctx);
     expect(r.exitCode).toBe(0);
     expect(r.command).toBe('doctor');
-    expect(ctx.out[0]).toContain('kit 0.7.1');
+    expect(ctx.out[0]).toContain('kit 0.7.2');
     expect(ctx.out[0]).toContain('node');
   });
 

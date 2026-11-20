@@ -3,6 +3,7 @@
 # This file is what `kit init` (M2) would produce after inspecting the
 # fixture. It is committed alongside the fixture so the kit can validate
 # its generator output against it without modifying the fixture.
+# Verified against real `kit init` output at 0.7.2 (Node v24.22.3).
 #
 # Commands are argument arrays, never shell strings (CONTRACTS.md §2.1).
 # The M6 executor runs them with shell: false.
@@ -10,10 +11,10 @@
 schemaVersion: 1
 name: fixture-node-fullstack
 stack:
-  - node-typescript
+  - node
 commands:
   test:
-    - ['node', '--test', 'tests/']
+    - ['node', '--test']
   # No lint / typecheck / build configured for this fixture (it has no
   # TypeScript compiler, no linter, no build step). The M6 verification
   # runner will report these categories as `skipped`, never `passed`.

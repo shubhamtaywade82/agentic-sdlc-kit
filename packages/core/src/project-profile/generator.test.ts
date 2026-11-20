@@ -45,7 +45,7 @@ describe('generateProfile', () => {
     const r = generateProfile(baseScan({ testFrameworks: ['node:test'] }));
     expect(r.ok).toBe(true);
     if (r.ok) {
-      expect(r.value.commands.test).toEqual([['node', '--test', 'tests/']]);
+      expect(r.value.commands.test).toEqual([['node', '--test']]);
     }
   });
 

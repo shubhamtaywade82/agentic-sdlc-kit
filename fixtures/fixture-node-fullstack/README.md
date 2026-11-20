@@ -34,7 +34,7 @@ fixture-node-fullstack/
 ```bash
 cd fixtures/fixture-node-fullstack
 node src/index.js         # starts on http://localhost:3000
-node --test tests/        # runs the 3 tests
+node --test               # runs the 3 tests (auto-discovery)
 ```
 
 The fixture has **no dependencies**. It uses Node's built-in `http` and

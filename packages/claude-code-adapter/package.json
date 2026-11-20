@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/claude-code-adapter",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Architectural boundary between Claude Code (host runtime) and the runtime-independent core. M1: boundary declaration only; host SDK is NOT imported until M10.",
   "license": "MIT",
   "type": "module",

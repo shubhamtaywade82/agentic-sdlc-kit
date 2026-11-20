@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/contracts",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Shared contracts (types + zod schemas) for the Agentic SDLC Kit. Depends on nothing.",
   "license": "MIT",
   "type": "module",

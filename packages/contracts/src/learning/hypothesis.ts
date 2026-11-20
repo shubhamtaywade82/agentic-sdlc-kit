@@ -23,7 +23,10 @@ export const ExperimentReportSchema = z.object({
   heldOutGain: z.number(),
   learningCostTokens: z.number().nonnegative(),
   regressions: z.number().int().nonnegative(),
-  verdict: z.enum(['promoted', 'rejected', 'inconclusive']),
+  // 'not-run': the benchmark environment was unavailable, so nothing was
+  // measured. It must never be reported as a completed experiment
+  // (ADR-0018: honest reporting over theater).
+  verdict: z.enum(['promoted', 'rejected', 'inconclusive', 'not-run']),
   completedAt: z.string().min(1),
 });
 

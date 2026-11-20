@@ -89,24 +89,30 @@ kit init .
 
 ### 2. Incremental Feature Workflow (`kit feature`)
 
-Executes a strict vertical-slice engineering workflow:
+Executes a strict vertical-slice engineering workflow with an **evidence-gated TDD loop** (ADR-0018):
 
 1. **Spec**: Validates user stories and acceptance criteria.
 2. **Plan**: Computes implementation DAG and verifies acyclicity.
-3. **TDD**: Executes Red $\to$ Green $\to$ Refactor cycles per task.
-4. **Verify**: Runs deterministic test/lint/typecheck verification.
-5. **Report**: Generates an execution report with artifact evidence.
+3. **TDD**: Phase-driven Red $\to$ Green $\to$ Refactor per task. The agent writes tests and implementations between invocations; the kit runs verification, records evidence, and refuses to advance when a phase invariant is broken.
+4. **Verify**: Audits the persisted evidence chain, then runs deterministic test/lint/typecheck verification.
+5. **Report**: Generates an execution report with per-task TDD evidence.
 
 ```bash
 # Validate feature spec and implementation DAG
 kit validate-spec docs/specifications/features/FEATURE-001/SPEC.md
 kit validate-plan docs/plans/FEATURE-001/PLAN.md
 
-# Execute feature workflow
-kit feature FEATURE-001
-# Or run in dry-run mode:
-kit feature FEATURE-001 --dry-run
+# Drive the TDD phases (the agent implements between calls)
+kit feature FEATURE-001 start
+kit feature FEATURE-001 red TASK-001      # verification MUST fail
+#   ... write the failing test, then implement TASK-001 ...
+kit feature FEATURE-001 green TASK-001    # verification MUST pass
+kit feature FEATURE-001 refactor TASK-001 # verification MUST pass again
+kit feature FEATURE-001 verify            # audits evidence + final verification
 ```
+
+Completion is blocked until every task has a persisted, complete
+Red(failed) $\to$ Green(passed) $\to$ Refactor(passed) evidence chain.
 
 ### 3. Disciplined Bug Fixing (`kit fix`)
 

@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/core",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Runtime-independent core: workflow engine, project-profile generator/validator, artifacts writer, policy evaluator, verification runner.",
   "license": "MIT",
   "type": "module",

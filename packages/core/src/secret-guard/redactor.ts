@@ -24,6 +24,20 @@ export interface RedactionResult {
 }
 
 /**
+ * Default policy for redacting kit state before it is persisted under
+ * .ai-kit/ (experiences, memory, TDD run evidence). Shared so every
+ * persisted surface applies the same hygiene (M11 invariant).
+ */
+export const DEFAULT_REDACTION_POLICY: RedactionPolicy = {
+  schemaVersion: 1,
+  placeholderFormat: '[REDACTED:<kind>:<id>]',
+  redactPartial: true,
+  redactRepeated: true,
+  maxInputBytes: 1_000_000,
+  ignorePaths: [],
+};
+
+/**
  * Replace every detected secret value in the input with a placeholder.
  * The placeholder format is controlled by the RedactionPolicy.
  */

@@ -49,7 +49,10 @@ ln -s /path/to/agentic-sdlc-kit/plugins/run-observer .claude/plugins/run-observe
 - **Tool Interception**: When Claude Code attempts tool calls (e.g. bash commands or file writes), `sdlc-guard` stops destructive commands and `secret-guard` redacts API keys.
 - **Workflow Execution**: In the Claude Code chat session, instruct Claude:
   ```
-  Run `kit feature FEATURE-001` to implement the authenticated login feature according to the plan.
+  Drive the TDD feature workflow for FEATURE-001: run `kit feature FEATURE-001 start`,
+  then for each task write the failing test, run `kit feature FEATURE-001 red <task>`,
+  implement, run `green <task>`, refactor, run `refactor <task>`, and finally
+  `kit feature FEATURE-001 verify`.
   ```
 
 ---
@@ -110,7 +113,7 @@ description: Use the Agentic SDLC Kit to inspect projects, run TDD feature workf
 When working on features, bug fixes, or quality verification:
 
 1. Initialize/inspect projects: `kit inspect .` / `kit init .`
-2. For new features: `kit validate-spec <path>` then `kit feature <id>`
+2. For new features: `kit validate-spec <path>` then drive the TDD phases with `kit feature <id> start|red|green|refactor|verify`
 3. For bug fixes: `kit fix <issue-id>`
 4. Before completing any turn with code changes, run: `kit verify`
 ```

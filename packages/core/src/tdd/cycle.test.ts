@@ -34,4 +34,21 @@ describe('TddSession', () => {
     expect(session.getCurrentPhase()).toBe('completed');
     expect(session.getHistory()).toHaveLength(3);
   });
+
+  it('resumes from a persisted snapshot without losing history', () => {
+    const first = new TddSession('TASK-001');
+    first.advance({ status: 'failed', evidence: 'red evidence' });
+    first.advance({ status: 'passed', evidence: 'green evidence' });
+
+    const resumed = new TddSession('TASK-001', {
+      phase: first.getCurrentPhase(),
+      records: first.getHistory(),
+    });
+    expect(resumed.getCurrentPhase()).toBe('refactor');
+    expect(resumed.getHistory()).toHaveLength(2);
+
+    const r = resumed.advance({ status: 'passed', evidence: 'refactor evidence' });
+    expect(r.ok).toBe(true);
+    expect(resumed.getHistory()).toHaveLength(3);
+  });
 });

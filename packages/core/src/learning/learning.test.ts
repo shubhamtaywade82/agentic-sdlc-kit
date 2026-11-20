@@ -47,8 +47,15 @@ describe('Continuous Learning and Self-Evolution Engine (M27-M35)', () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe('MEM-001');
 
+    // Wilson 95% lower bound: one success out of one application is
+    // ~0.21, not 1.0 — a memory must earn trust with sample size.
     store.recordApplication('MEM-001', true);
-    expect(store.get('MEM-001')?.confidence).toBe(1);
+    expect(store.get('MEM-001')?.confidence).toBeCloseTo(0.2065, 3);
+
+    for (let i = 0; i < 49; i++) store.recordApplication('MEM-001', true);
+    const confident = store.get('MEM-001')?.confidence ?? 0;
+    expect(confident).toBeGreaterThan(0.9);
+    expect(confident).toBeLessThanOrEqual(1);
   });
 
   it('distills recurring failure patterns into semantic lessons (M30)', () => {
@@ -96,6 +103,59 @@ describe('Continuous Learning and Self-Evolution Engine (M27-M35)', () => {
     ]);
     expect(hypotheses).toHaveLength(1);
     expect(hypotheses[0]?.targetSkill).toBe('tdd-bdd');
+  });
+
+  it('captures failing-check evidence in failure summaries (M28)', () => {
+    const collector = new ExperienceCollector();
+    const exp = collector.record({
+      workflowId: 'WF-9',
+      featureId: 'FEATURE-X',
+      stack: 'node-typescript',
+      phases: [{ name: 'tdd', status: 'failed', durationMs: 120 }],
+      verification: {
+        schemaVersion: 1,
+        runId: 'run-1',
+        status: 'failed',
+        checks: [
+          {
+            id: 'test',
+            status: 'failed',
+            command: ['node', '--test'],
+            evidence: ['AssertionError: expected role count 3 to equal 5'],
+          },
+        ],
+      },
+    });
+    expect(exp.outcome).toBe('failure');
+    expect(exp.failureSummary).toBeDefined();
+    expect(exp.failureSummary).toContain('test');
+    expect(exp.failureSummary).toContain('AssertionError');
+  });
+
+  it('marks experiments not-run when the benchmark environment is unavailable (M32)', async () => {
+    const lab = new EvolutionLab();
+    const hypothesis = {
+      id: 'HYP-009',
+      targetSkill: 'tdd-bdd',
+      problemObserved: 'Integration gap',
+      proposedChange: 'Require boundary tests',
+      expectedBenefit: 'Higher pass rate',
+      riskLevel: 'low' as const,
+      benchmarkTasks: ['TASK-A'],
+    };
+    const unavailableRunner = {
+      async evaluateBaseline() {
+        return { passRate: 0, tokens: 0, notImplemented: true };
+      },
+      async evaluateCandidate() {
+        return { passRate: 0, tokens: 0, regressions: 0, notImplemented: true };
+      },
+    };
+
+    const report = await lab.runExperiment(hypothesis, unavailableRunner);
+    expect(report.verdict).toBe('not-run');
+    expect(report.heldOutGain).toBe(0);
+    expect(report.learningCostTokens).toBe(0);
   });
 
   it('runs evolution lab benchmark experiments and decides promotion (M32)', async () => {

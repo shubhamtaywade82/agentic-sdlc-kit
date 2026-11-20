@@ -129,5 +129,8 @@ export function register(on: On): void {
     }
     $.ui.log(`model-router: apply subagent ${e.name ?? '<unnamed>'} model=${decision.model}`);
     return next({ ...e, model: decision.model });
-  });
+    // Fail open: routing is advisory, never a safety gate. If the handler or
+    // the downstream chain throws, return nothing so the host proceeds with
+    // the original, un-routed spawn instead of blocking it.
+  }).catch(() => undefined);
 }

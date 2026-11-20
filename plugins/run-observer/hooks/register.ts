@@ -109,10 +109,8 @@ export function register(on: On): void {
   on('turn.step', async function* ($, e: TurnStepEvent, next) {
     const result = yield* next(e);
     await observe($, 'turn-step', () => {
-      const usage = (result as { usage?: { input_tokens?: number; output_tokens?: number } })
-        .usage;
-      const model =
-        (result as { model?: string }).model ?? e.model ?? undefined;
+      const usage = (result as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+      const model = (result as { model?: string }).model ?? e.model ?? undefined;
       record(store, currentRunId, $.clock.now(), 'turn-step', `model=${model ?? '?'}`, {
         ...(model !== undefined ? { model } : {}),
         ...(usage?.input_tokens !== undefined ? { tokensIn: usage.input_tokens } : {}),
@@ -128,12 +126,26 @@ export function register(on: On): void {
     const result = await next(e);
     await observe($, 'tool-call', () => {
       const r = result as { deny?: unknown; isError?: unknown } | undefined;
-      const ok = !(r !== null && typeof r === 'object' && (r.isError !== undefined || r.deny !== undefined));
+      const ok = !(
+        r !== null &&
+        typeof r === 'object' &&
+        (r.isError !== undefined || r.deny !== undefined)
+      );
       const durationMs = $.clock.now() - startedAt;
-      record(store, currentRunId, $.clock.now(), 'tool-call', `tool=${e.tool} ok=${ok} ${durationMs}ms`);
+      record(
+        store,
+        currentRunId,
+        $.clock.now(),
+        'tool-call',
+        `tool=${e.tool} ok=${ok} ${durationMs}ms`,
+      );
     });
     return result;
-  });
+    // Fail open: an observer must never block the chain. observe() already
+    // swallows this plugin's own recording errors; this .catch is the final
+    // net so any residual throw still yields "no result" (the host proceeds
+    // with the tool's own outcome) instead of aborting the call.
+  }).catch(() => undefined);
 
   on('turn.complete', async ($, e: TurnCompleteEvent, next) => {
     await observe($, 'turn-complete', () => {
@@ -147,7 +159,9 @@ export function register(on: On): void {
         partial: usage === undefined,
       });
       // Surface a live status line under the prompt.
-      $.ui.status(`kit: ${store.getRun(currentRunId)?.events.length ?? 0} events · run=${currentRunId}`);
+      $.ui.status(
+        `kit: ${store.getRun(currentRunId)?.events.length ?? 0} events · run=${currentRunId}`,
+      );
     });
     // Expose the store via $.state so kit runs can read it.
     $.state.set({ plugin: 'run-observer', key: 'store' }, store);

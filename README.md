@@ -184,10 +184,11 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 | **`model-router`** | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
 | **`run-observer`** | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
 
-Install plugins into your runtime environment (the kit repository must be
-built first — `pnpm install && pnpm run build` — so each plugin has a
-self-contained `dist/hooks/register.js`; the installer validates the hooks
-module paths before linking and reports per-plugin results):
+Install plugins into your runtime environment. Each plugin ships its hooks
+as TypeScript source (`hooks/register.ts`) that Claude Code loads directly —
+no build step is required, so linking works straight from a fresh clone.
+The installer validates each hooks module path before linking and reports
+per-plugin results:
 
 ```bash
 kit install --profile full-sdlc --stack node-typescript

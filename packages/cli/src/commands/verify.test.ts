@@ -68,4 +68,50 @@ describe('verifyCommand', () => {
       await fs.rm(tmp, { recursive: true, force: true });
     }
   });
+
+  it('surfaces schema issues when the profile fails validation (no bare error)', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-cli-verify-schema-'));
+    try {
+      const aiKitDir = path.join(tmp, '.ai-kit');
+      await fs.mkdir(aiKitDir, { recursive: true });
+      // stack: [] violates the contract (min 1 entry) — the CLI must say
+      // WHY, not just "failed schema validation".
+      await fs.writeFile(
+        path.join(aiKitDir, 'project.yml'),
+        ['schemaVersion: 1', 'name: "x"', 'stack: []', ''].join('\n'),
+        'utf8',
+      );
+      const ctx = makeCtx([], tmp);
+      const r = await verifyCommand.run(ctx);
+      expect(r.exitCode).toBe(1);
+      expect(ctx.err[0]).toContain('failed schema validation');
+      expect(ctx.err[0]).toContain('stack');
+      expect(ctx.err[0]).toContain('at least one entry');
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('hints at the expected commands shape when zero checks are configured', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-cli-verify-zero-'));
+    try {
+      const aiKitDir = path.join(tmp, '.ai-kit');
+      await fs.mkdir(aiKitDir, { recursive: true });
+      const profile: ProjectProfile = {
+        schemaVersion: 1,
+        name: 'zero-checks-app',
+        stack: ['node-typescript'],
+        commands: {},
+      };
+      await fs.writeFile(path.join(aiKitDir, 'project.yml'), serializeProfileYaml(profile), 'utf8');
+
+      const ctx = makeCtx([], tmp);
+      const r = await verifyCommand.run(ctx);
+      expect(r.exitCode).toBe(1);
+      expect(ctx.out[0]).toContain('(none configured)');
+      expect(ctx.out[0]).toContain('commands:');
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
 });

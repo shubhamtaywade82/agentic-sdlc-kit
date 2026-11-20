@@ -118,8 +118,20 @@ export function parseSpecificationMarkdown(md: string): Result<FeatureSpecificat
   const sections = extractSections(md);
   const header = sections.get('header') ?? '';
   const titleMatch = /^#\s+([A-Z]+-[0-9]+):\s*(.+)$/m.exec(header);
-  const id = titleMatch?.[1] ?? 'FEATURE-001';
-  const title = titleMatch?.[2]?.trim() ?? 'Untitled Feature';
+  // A spec without a well-formed title line is malformed. Defaulting the id
+  // to FEATURE-001 silently mismatches the requested feature and hides the
+  // problem, so this is a hard error.
+  if (!titleMatch || !titleMatch[1] || !titleMatch[2]) {
+    return {
+      ok: false,
+      error: Errors.specInvalid(
+        'Specification must start with a level-1 heading of the form "# FEATURE-NNN: Title" ' +
+          '(e.g. "# FEATURE-001: RBAC System").',
+      ),
+    };
+  }
+  const id = titleMatch[1];
+  const title = titleMatch[2].trim();
 
   const candidate: FeatureSpecification = {
     id,

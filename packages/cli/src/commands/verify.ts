@@ -35,8 +35,22 @@ export const verifyCommand: Command = {
 
     const profileRes = parseProfileYaml(yamlContent);
     if (!profileRes.ok) {
-      ctx.stderr(`kit verify: ${profileRes.error.message}\n`);
-      return { exitCode: 1, message: profileRes.error.message };
+      // Surface the structured issues (e.g. zod paths) when present — a
+      // bare "failed schema validation" with no reasons hides the cause.
+      const issues = profileRes.error.details?.issues;
+      let msg = profileRes.error.message;
+      if (Array.isArray(issues) && issues.length > 0) {
+        const rendered = issues
+          .map((i) => {
+            const issue = i as { path?: unknown; message?: unknown };
+            const at = typeof issue.path === 'string' && issue.path ? ` at '${issue.path}'` : '';
+            return `${at}: ${String(issue.message ?? 'invalid')}`.trim();
+          })
+          .join('; ');
+        msg = `${msg} (${rendered})`;
+      }
+      ctx.stderr(`kit verify: ${msg}\n`);
+      return { exitCode: 1, message: msg };
     }
 
     const runner = new ProcessVerificationRunner();
@@ -67,6 +81,17 @@ function formatReportSummary(report: VerificationReport): string {
     const dur = c.durationMs !== undefined ? ` (${c.durationMs}ms)` : '';
     const cmdStr = c.command ? ` [${c.command.join(' ')}]` : '';
     lines.push(`  - ${c.id.padEnd(12)} ${c.status.toUpperCase()}${dur}${cmdStr}`);
+  }
+  if (report.checks.length === 0) {
+    // Zero checks usually means the profile's commands were not parsed.
+    // Surface the likely cause instead of a bare BLOCKED.
+    lines.push('  (none configured)');
+    lines.push('');
+    lines.push('  No verification commands were found. Check that');
+    lines.push('  .ai-kit/project.yml has a commands section, e.g.:');
+    lines.push('    commands:');
+    lines.push('      test:');
+    lines.push("        - ['node', '--test']");
   }
   return lines.join('\n') + '\n';
 }

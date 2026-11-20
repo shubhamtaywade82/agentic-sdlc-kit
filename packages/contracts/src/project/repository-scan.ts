@@ -9,9 +9,13 @@
 import { z } from 'zod';
 
 export const GitStateSchema = z.object({
-  branch: z.string().min(1),
+  /** Whether the scanned root is inside a git work tree at all. */
+  isRepo: z.boolean(),
+  /** Branch name; empty string when isRepo is false. */
+  branch: z.string(),
   dirty: z.boolean(),
-  headSha: z.string().regex(/^[0-9a-f]{40}$/, 'headSha must be a 40-char SHA-1'),
+  /** HEAD commit SHA-1 (40 hex chars); empty string when isRepo is false. */
+  headSha: z.string().regex(/^([0-9a-f]{40})?$/, 'headSha must be a 40-char SHA-1 or empty'),
 });
 
 export const RepositoryScanSchema = z.object({

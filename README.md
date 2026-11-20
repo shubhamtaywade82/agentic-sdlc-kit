@@ -97,10 +97,20 @@ Executes a strict vertical-slice engineering workflow with an **evidence-gated T
 4. **Verify**: Audits the persisted evidence chain, then runs deterministic test/lint/typecheck verification.
 5. **Report**: Generates an execution report with per-task TDD evidence.
 
+The spec and plan are authored by your agent following
+`docs/workflows/WORKFLOWS.md` (step 4: requirements-engineering, step 7:
+implementation-planning). The loaders expect:
+
+- `docs/specifications/features/<ID>/SPEC.md` starting with `# <ID>: Title`
+  (missing or malformed title lines are rejected, not defaulted)
+- `docs/plans/<ID>/plan.json` (or `PLAN.md` with an embedded JSON block)
+  matching the Task/ImplementationPlan contracts in `docs/contracts/CONTRACTS.md`.
+  The plan's `featureId` must match the requested feature id.
+
 ```bash
 # Validate feature spec and implementation DAG
 kit validate-spec docs/specifications/features/FEATURE-001/SPEC.md
-kit validate-plan docs/plans/FEATURE-001/PLAN.md
+kit validate-plan docs/plans/FEATURE-001/plan.json
 
 # Drive the TDD phases (the agent implements between calls)
 kit feature FEATURE-001 start
@@ -109,6 +119,9 @@ kit feature FEATURE-001 red TASK-001      # verification MUST fail
 kit feature FEATURE-001 green TASK-001    # verification MUST pass
 kit feature FEATURE-001 refactor TASK-001 # verification MUST pass again
 kit feature FEATURE-001 verify            # audits evidence + final verification
+
+# Preview the plan without executing anything:
+kit feature FEATURE-001 verify --dry-run
 ```
 
 Completion is blocked until every task has a persisted, complete
@@ -171,7 +184,10 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 | **`model-router`** | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
 | **`run-observer`** | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
 
-Install plugins into your runtime environment:
+Install plugins into your runtime environment (the kit repository must be
+built first — `pnpm install && pnpm run build` — so each plugin has a
+self-contained `dist/hooks/register.js`; the installer validates the hooks
+module paths before linking and reports per-plugin results):
 
 ```bash
 kit install --profile full-sdlc --stack node-typescript

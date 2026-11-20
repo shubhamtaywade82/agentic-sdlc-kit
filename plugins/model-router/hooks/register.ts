@@ -10,7 +10,7 @@
 // recommendation but does not override the model unless suggestOnly is
 // false in the policy.
 
-import type { RegisterFn, TurnStepEvent, AgentSpawnEvent } from '@agentic-sdlc-kit/mod-sdk';
+import type { On, TurnStepEvent, AgentSpawnEvent } from '@agentic-sdlc-kit/mod-sdk';
 import type { RoutingPolicy, RoutingContext } from '@agentic-sdlc-kit/contracts';
 import { route } from '../policies/router.js';
 
@@ -65,8 +65,10 @@ const DEFAULT_POLICY: RoutingPolicy = {
   suggestOnly: true,
 };
 
-function getPolicy($: { state: { get: <T>(k: string) => T | undefined } }): RoutingPolicy {
-  return $.state.get<RoutingPolicy>('model-router.policy') ?? DEFAULT_POLICY;
+function getPolicy($: {
+  state: { get: <T>(ref: { plugin: string; key: string }) => T | undefined };
+}): RoutingPolicy {
+  return $.state.get<RoutingPolicy>({ plugin: 'model-router', key: 'policy' }) ?? DEFAULT_POLICY;
 }
 
 function buildContextFromTurn(scope: 'main-turn' | 'subagent'): RoutingContext {
@@ -83,9 +85,18 @@ function buildContextFromTurn(scope: 'main-turn' | 'subagent'): RoutingContext {
   };
 }
 
-export const register: RegisterFn = (on) => {
-  // turn.step: main-turn model + effort routing.
-  on('turn.step', async ($, e: TurnStepEvent, next) => {
+export function register(on: On): void {
+  // turn.step: main-turn model + effort routing. turn.step is a streaming
+  // event, so its hook takes the generator form — async function* — which
+  // yields the chunks and returns the result. The router only decides the
+  // model before the turn runs; it has no chunks of its own, so it returns
+  // the delegated result directly.
+  //
+  // A pre-stream routing decision produces no chunks of its own; the
+  // generator form is the host's required shape for streaming events, and
+  // the result is the delegated next(...) return value.
+  // eslint-disable-next-line require-yield
+  on('turn.step', async function* ($, e: TurnStepEvent, next) {
     const policy = getPolicy($);
     const ctx = buildContextFromTurn('main-turn');
     const decision = route(ctx, policy);
@@ -115,4 +126,4 @@ export const register: RegisterFn = (on) => {
     }
     return next({ ...e, model: decision.model });
   });
-};
+}

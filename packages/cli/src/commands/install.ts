@@ -9,6 +9,12 @@ import path from 'node:path';
 import { resolveStackPack } from '@agentic-sdlc-kit/core';
 import type { Command, CommandContext, CommandResult } from './types.js';
 import type { OwnershipEntry } from '@agentic-sdlc-kit/contracts';
+import { linkRuntimePlugins, type PluginLinkResult } from './plugin-linker.js';
+
+// Profiles that also link the four runtime guard plugins into the
+// project's `.claude/plugins/` directory (as documented in
+// docs/HOST_INTEGRATIONS.md). `minimal` is plugin-free.
+const PROFILES_WITH_PLUGINS: ReadonlySet<string> = new Set(['full-sdlc', 'runtime']);
 
 interface InstallOperation {
   path: string;
@@ -137,12 +143,16 @@ export const installCommand: Command = {
       stackInfo = pack ? pack.name : stackName;
     }
 
+    // Plugin-enabled profiles also link the runtime guard plugins.
+    const withPlugins = PROFILES_WITH_PLUGINS.has(installProfile);
+
     // In dry-run mode, print the plan and exit without writing.
     if (isDryRun) {
       const plan = {
         profile: installProfile,
         stack: stackInfo,
         dryRun: true,
+        plugins: withPlugins ? ['sdlc-guard', 'secret-guard', 'model-router', 'run-observer'] : [],
         operations: operations.map((op) => ({
           path: op.path,
           kind: op.kind,
@@ -184,6 +194,39 @@ export const installCommand: Command = {
       });
     }
 
+    // Link the runtime guard plugins for plugin-enabled profiles. This is
+    // what HOST_INTEGRATIONS.md documents: the plugins land in
+    // `<project>/.claude/plugins/` with validated hooks module paths.
+    let pluginResults: PluginLinkResult[] = [];
+    if (withPlugins) {
+      pluginResults = await linkRuntimePlugins(ctx.cwd);
+      for (const pr of pluginResults) {
+        if (pr.status === 'linked' || pr.status === 'already-linked') {
+          // Ownership hash for a plugin link: the content hash of the
+          // linked plugin's identity file (what the symlink resolves to),
+          // NOT the hash of the path string.
+          let pluginHash = '';
+          try {
+            const pluginJson = await fs.readFile(
+              path.join(pr.linkPath, '.claude-plugin', 'plugin.json'),
+              'utf8',
+            );
+            pluginHash = await sha256(pluginJson);
+          } catch {
+            pluginHash = await sha256(`${pr.name}:${pr.status}`);
+          }
+          ownershipEntries.push({
+            packageId: 'agentic-sdlc-kit',
+            packageVersion: '0.8.0',
+            path: path.relative(ctx.cwd, pr.linkPath),
+            sha256: pluginHash,
+            installedAt: now,
+            preserved: pr.status === 'already-linked',
+          });
+        }
+      }
+    }
+
     // Write ownership manifest so kit uninstall knows what we own.
     const manifestPath = path.join(ctx.cwd, '.ai-kit', 'ownership-manifest.json');
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
@@ -201,6 +244,7 @@ export const installCommand: Command = {
       stack: stackInfo,
       writtenFiles,
       skippedFiles,
+      plugins: pluginResults,
       ownershipManifest: '.ai-kit/ownership-manifest.json',
     };
 
@@ -218,6 +262,7 @@ interface DryRunPlan {
   profile: string;
   stack: string;
   dryRun: boolean;
+  plugins: string[];
   operations: Array<{ path: string; kind: string; sha256: string }>;
 }
 
@@ -232,6 +277,9 @@ function formatDryRun(plan: DryRunPlan): string {
   for (const op of plan.operations) {
     lines.push(`  ${op.kind.padEnd(20)} ${op.path}`);
   }
+  if (plan.plugins.length > 0) {
+    lines.push(`  link${' '.repeat(17)}.claude/plugins/ (${plan.plugins.join(', ')})`);
+  }
   lines.push('');
   lines.push(`${plan.operations.length} operation(s) planned. Run without --dry-run to execute.`);
   lines.push('');
@@ -244,6 +292,7 @@ interface InstallResult {
   stack: string;
   writtenFiles: string[];
   skippedFiles: string[];
+  plugins: PluginLinkResult[];
   ownershipManifest: string;
 }
 
@@ -263,6 +312,20 @@ function formatResult(r: InstallResult): string {
       lines.push(`    ~ ${f}`);
     }
   }
+  if (r.plugins.length > 0) {
+    lines.push(`  Plugins:      ${r.plugins.length} runtime plugin(s)`);
+    for (const p of r.plugins) {
+      if (p.status === 'linked') {
+        lines.push(`    + ${p.name} -> ${p.linkPath}`);
+      } else if (p.status === 'already-linked') {
+        lines.push(`    ~ ${p.name} (already linked)`);
+      } else {
+        // not-built / not-found: a plugin the profile promised but could
+        // not deliver. Report loudly; never claim it is installed.
+        lines.push(`    ! ${p.name}: ${p.status} — ${p.detail ?? ''}`);
+      }
+    }
+  }
   lines.push(`  Ownership:    ${r.ownershipManifest}`);
   lines.push('');
   return lines.join('\n');
@@ -275,9 +338,14 @@ function formatHelp(): string {
     'Install and configure kit environment, instructions, commands, and stack packs.',
     '',
     'Profiles:',
-    '  minimal      Core instructions and essential skills only',
-    '  full-sdlc    Complete workflows, agents, templates, and planning engines (default)',
-    '  runtime      Runtime governance, secret protection, and model routing mods',
+    '  minimal      Core instructions and essential skills only (no plugins)',
+    '  full-sdlc    Complete workflows, templates, and the runtime guard plugins (default)',
+    '  runtime      Runtime governance, secret protection, and model routing plugins',
+    '',
+    'The full-sdlc and runtime profiles link the four guard plugins',
+    '(sdlc-guard, secret-guard, model-router, run-observer) into',
+    '.claude/plugins/. The kit repository must be built first (pnpm install &&',
+    'pnpm run build) so each plugin has a bundled dist/hooks/register.js.',
     '',
     'Options:',
     '  --stack <id> Stack pack to activate (e.g. node-typescript, ruby-rails)',

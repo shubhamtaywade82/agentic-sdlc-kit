@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   loadSpecification,
   parseBddScenarios,
+  parseSpecificationMarkdown,
   scaffoldSpecification,
   validateSpecification,
 } from './index.js';
@@ -107,5 +108,18 @@ describe('scaffolder and parser', () => {
     expect(scenarios).toHaveLength(1);
     expect(scenarios[0]?.scenario).toBe('Login success');
     expect(scenarios[0]?.given).toEqual(['valid credentials']);
+  });
+
+  it('rejects a spec without a well-formed "# ID: Title" heading (no silent FEATURE-001)', () => {
+    const noHeading = '## Overview\nSome content without a title line.\n';
+    const res1 = parseSpecificationMarkdown(noHeading);
+    expect(res1.ok).toBe(false);
+    if (!res1.ok) {
+      expect(res1.error.message).toContain('# FEATURE-NNN: Title');
+    }
+
+    const malformedHeading = '# Untitled spec with no id\n## Overview\nx\n';
+    const res2 = parseSpecificationMarkdown(malformedHeading);
+    expect(res2.ok).toBe(false);
   });
 });

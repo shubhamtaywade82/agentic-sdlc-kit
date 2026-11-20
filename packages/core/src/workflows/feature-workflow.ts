@@ -84,9 +84,7 @@ async function loadProfile(root: string): Promise<Result<ProjectProfile>> {
   }
 }
 
-async function loadFeatureContext(
-  opts: FeatureWorkflowOptions,
-): Promise<Result<FeatureContext>> {
+async function loadFeatureContext(opts: FeatureWorkflowOptions): Promise<Result<FeatureContext>> {
   const scanner = new FileSystemRepositoryScanner();
   const scanRes = await scanner.scan(opts.projectRoot);
   if (!scanRes.ok) return scanRes;
@@ -98,20 +96,39 @@ async function loadFeatureContext(
   const specRes = await loadSpecification(specDir);
   if (!specRes.ok) return specRes;
 
+  // The spec's id must match the requested feature — a mismatch means the
+  // directory contents belong to a different feature. Silent substitution
+  // hides the problem (the 0.7.3 verification finding).
+  if (specRes.value.id !== opts.featureId) {
+    return {
+      ok: false,
+      error: Errors.specInvalid(
+        `Specification id '${specRes.value.id}' does not match requested feature '${opts.featureId}' ` +
+          `(loaded from ${specDir}).`,
+      ),
+    };
+  }
+
   const planDir = path.join(opts.projectRoot, 'docs', 'plans', opts.featureId);
   const planRes = await loadPlan(planDir);
   if (!planRes.ok) return planRes;
 
   const { plan, analysis } = planRes.value;
-  const dangling = analysis.executionOrder.filter(
-    (id) => !plan.tasks.some((t) => t.id === id),
-  );
-  if (dangling.length > 0) {
+  if (plan.featureId !== opts.featureId) {
     return {
       ok: false,
       error: Errors.planInvalid(
-        `Execution order references unknown tasks: ${dangling.join(', ')}`,
+        `Plan featureId '${plan.featureId}' does not match requested feature '${opts.featureId}' ` +
+          `(loaded from ${planDir}).`,
       ),
+    };
+  }
+
+  const dangling = analysis.executionOrder.filter((id) => !plan.tasks.some((t) => t.id === id));
+  if (dangling.length > 0) {
+    return {
+      ok: false,
+      error: Errors.planInvalid(`Execution order references unknown tasks: ${dangling.join(', ')}`),
     };
   }
 
@@ -213,9 +230,7 @@ export async function getFeatureRunState(
   return loadFeatureRunState(projectRoot, featureId);
 }
 
-export async function runTddPhase(
-  opts: TddPhaseRequest,
-): Promise<Result<FeatureRunState>> {
+export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<FeatureRunState>> {
   const stateRes = await loadFeatureRunState(opts.projectRoot, opts.featureId);
   if (!stateRes.ok) return stateRes;
   const state = stateRes.value;
@@ -309,9 +324,7 @@ export async function finalizeFeatureRun(
   });
   if (!verifyRes.ok) return verifyRes;
 
-  const tddEvidence = executionOrder.map(
-    (id) => stateRes.value.tasks[id],
-  ) as TaskRunState[];
+  const tddEvidence = executionOrder.map((id) => stateRes.value.tasks[id]) as TaskRunState[];
 
   return {
     ok: true,

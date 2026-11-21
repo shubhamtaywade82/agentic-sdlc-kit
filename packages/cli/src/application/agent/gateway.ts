@@ -478,7 +478,13 @@ export class AgentGateway {
     const final: StoredAgentExecution = {
       ...current,
       status: outcome.status,
-      ...(outcome.result !== undefined ? { result: outcome.result } : {}),
+      // RESUME TOKENS ARE CREDENTIALS (ADR-0020 §6.8): the gateway may hold
+      // them in memory (this.resumeTokens) but must NEVER write them to
+      // the execution record. The session id is not secret and stays;
+      // the token is scrubbed from the persisted copy of the result. PR4
+      // hardening: the first real provider to issue session tokens exposed
+      // that the original persist path wrote the result verbatim.
+      ...(outcome.result !== undefined ? { result: scrubResultForDisk(outcome.result) } : {}),
       ...(outcome.providerReportedStatus !== undefined
         ? { providerReportedStatus: outcome.providerReportedStatus }
         : {}),
@@ -636,6 +642,18 @@ function isTerminal(status: StoredAgentExecution['status']): boolean {
 
 function formatIssues(issues: ReadonlyArray<{ path: (string | number | symbol)[]; message: string }>): string {
   return issues.map((i) => `${i.path.map(String).join('.')}: ${i.message}`).join('; ');
+}
+
+/**
+ * Scrub the resume credential from a result before it reaches disk. The
+ * token lives in memory only (this.resumeTokens); the persisted execution
+ * record keeps the session id — which is not a credential — but never the
+ * token. First exercised for real by the PR4 claude-code provider, whose
+ * results carry session tokens by contract.
+ */
+function scrubResultForDisk(result: AgentExecutionResult): AgentExecutionResult {
+  if (!result.session?.resumeToken) return result;
+  return { ...result, session: { sessionId: result.session.sessionId } };
 }
 
 /** The request's policy fields must be exactly the frozen snapshot's. */

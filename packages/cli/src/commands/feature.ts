@@ -10,9 +10,11 @@
 // `kit feature <id> run` is Mode 1 (kit-orchestrated, ADR-0019): the kit
 // drives the SAME TDD state machine through a configured agent provider
 // in an isolated git worktree. Providers are injected at construction
-// (createFeatureCommand({ agentProviders })); the default command ships
-// with NONE registered, so `run` fails with AGENT_PROVIDER_NOT_CONFIGURED
-// (exit 3) until a provider is configured (PR4 adds claude-code).
+// (createFeatureCommand({ agentProviders })); since PR4 the shipped CLI
+// registers claude-code by DEFAULT — and gates on its healthCheck: when
+// the claude CLI is missing or misconfigured, `run` fails blocked
+// (exit 3) with an honest message, never a silent manual-workflow
+// fallback (ADR-0019 §1, ADR-0020 §4).
 
 import path from 'node:path';
 import {
@@ -25,6 +27,7 @@ import {
 import type { AgentProvider } from '@agentic-sdlc-kit/contracts';
 import {
   AgentGateway,
+  ClaudeCodeProvider,
   runFeatureOrchestration,
   type OrchestrationReport,
 } from '../application/agent/index.js';
@@ -50,8 +53,8 @@ function blocked(ctx: CommandContext, message: string): CommandResult {
 export interface FeatureCommandOptions {
   /**
    * Agent providers injectable for Mode 1 (`run`) — used by embedding
-   * code and tests. The shipped CLI registers none: with no provider,
-   * `run` fails with AGENT_PROVIDER_NOT_CONFIGURED (ADR-0019 §1).
+   * code and tests. When omitted, the shipped CLI registers the secure
+   * claude-code provider (PR4) against the resolved project root.
    */
   readonly agentProviders?: ReadonlyArray<AgentProvider>;
 }
@@ -221,9 +224,10 @@ async function runVerify(
 
 /**
  * Mode 1 (ADR-0019): orchestrate the whole feature through a configured
- * agent provider. Providers come from the command's construction options
- * — the shipped CLI registers none, and `run` then fails blocked (exit 3)
- * rather than pretending a manual workflow completed.
+ * agent provider. Providers come from the command's construction options;
+ * since PR4 the shipped CLI registers claude-code by default and gates on
+ * its healthCheck — an unavailable runtime is a blocked run (exit 3) with
+ * an honest message, never a silent manual-workflow fallback.
  */
 async function runOrchestrated(
   ctx: CommandContext,
@@ -232,23 +236,36 @@ async function runOrchestrated(
   isJson: boolean,
   opts: FeatureCommandOptions,
 ): Promise<CommandResult> {
-  const providerFlag = parseFlagValue(ctx.argv, '--provider');
+  const providerFlag = parseFlagValue(ctx.argv, '--provider') ?? 'claude-code';
   const maxDurationMs = parseFlagValue(ctx.argv, '--max-duration-ms');
 
-  if (!providerFlag) {
-    return blocked(
-      ctx,
-      'AGENT_PROVIDER_NOT_CONFIGURED: no agent provider selected. Pass --provider <id> ' +
-        'with a configured provider (none are configured in this build; PR4 adds ' +
-        'claude-code). Mode 1 execution will not fall back to pretending a manual ' +
-        'workflow completed — use red/green/refactor to drive the phases yourself.',
-    );
-  }
+  // PR4: the shipped CLI registers claude-code against the resolved root
+  // (the provider roots its encrypted resume store there). Explicitly
+  // injected providers override the default entirely.
+  const providers: ReadonlyArray<AgentProvider> =
+    opts.agentProviders ?? [new ClaudeCodeProvider({ projectRoot: root })];
 
   const gateway = new AgentGateway({
-    providers: opts.agentProviders ?? [],
+    providers,
     projectRoot: root,
   });
+
+  // Health gate: a REGISTERED provider whose runtime is unavailable is a
+  // blocked run (exit 3) with an honest message — never a spawn that
+  // would flake into a silent manual-workflow fallback (ADR-0020 §4).
+  if (gateway.hasProvider(providerFlag)) {
+    const provider = providers.find((p) => p.id === providerFlag);
+    const health = await provider?.healthCheck();
+    if (provider && health && !health.available) {
+      return blocked(
+        ctx,
+        `AGENT_PROVIDER_UNAVAILABLE: provider '${providerFlag}' is registered but its ` +
+          `runtime is unavailable: ${health.message ?? 'no detail'}. Mode 1 execution will ` +
+          `not fall back to pretending a manual workflow completed — install the ` +
+          `provider runtime or drive the phases yourself with red/green/refactor.`,
+      );
+    }
+  }
 
   const controller = new AbortController();
   const onSigint = (): void => controller.abort();
@@ -352,7 +369,7 @@ function formatHelp(): string {
     '',
     'Options:',
     '  --dry-run            (verify only) simulate the final verification',
-    '  --provider <id>      (run only) agent provider to orchestrate through',
+    '  --provider <id>      (run only) agent provider to orchestrate through (default: claude-code)',
     '  --max-duration-ms N  (run only) per-execution duration budget',
     '  --json               output machine-readable run state or report',
     '  --help               Show this message',

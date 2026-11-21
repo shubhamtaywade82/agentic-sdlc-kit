@@ -213,12 +213,22 @@ test in `orchestrator.test.ts`, the `AGENT_PROVIDER_NOT_CONFIGURED`
 first-class error, the canonical policy snapshot contract
 (`contracts/src/agent/policy.ts`, ADR-0020 §1), and the
 `test-*.ts`/`*.test.ts` architecture-gate exception for
-`@agentic-sdlc-kit/testing`. PR3 deliberately ships the CLI with NO
-provider registered — provider injection is the seam PR4 fills with
-claude-code. Cross-process provider-session resume is deferred to PR4
-(resume tokens are credentials and must not be persisted unencrypted;
-PR3 resumability is workflow-level: persistent worktree + run state +
-persisted original requests).
+`@agentic-sdlc-kit/testing`. PR4 landed the secure Claude Code provider
+in `packages/cli/src/application/agent/providers/claude-code/` — headless
+`claude -p --output-format stream-json` with an argv array (`shell:false`),
+the policy-derived permission configuration (`permission-config.ts`, the
+generated representation of ADR-0020 §2), runtime Mods linked into the
+worktree for parity (`mod-parity.ts`), the AES-256-GCM encrypted
+resume-session store (`resume-store.ts`) that closes PR3's deferred
+cross-process resume item, live event streaming so the gateway's tool-call
+counters fire mid-run, honest best-effort token/cost reporting (rev C),
+and a real-provider smoke test that skips VISIBLY when the claude CLI is
+absent. The shipped CLI registers claude-code by default and gates on its
+healthCheck (`AGENT_PROVIDER_UNAVAILABLE`, exit 3) — autonomous, but
+never silent, and never `bypassPermissions`. PR4 also hardened the PR3
+gateway: a result's `session.resumeToken` is now scrubbed before the
+execution record reaches disk (the first provider to actually issue
+session tokens exposed that the record wrote results verbatim).
 
 ### 6. Non-negotiable rules
 

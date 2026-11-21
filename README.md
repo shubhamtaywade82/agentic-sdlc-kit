@@ -179,16 +179,17 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 
 | Plugin             | Capability                | Function                                                                                               |
 | :----------------- | :------------------------ | :----------------------------------------------------------------------------------------------------- |
-| **`sdlc-guard`**   | `tool.call`, `tool.check` | Enforces fail-closed safety policy on destructive actions (`rm -rf`, `git push --force`, table drops). |
-| **`secret-guard`** | `tool.call`               | Redacts API keys (Stripe, GitHub, AWS, etc.) before writing or executing tools.                        |
-| **`model-router`** | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
-| **`run-observer`** | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
+| **`sdlc-guard`**   | PreToolUse (Bash)         | Token-level classifier: asks before destructive commands (`rm -r`, force-push, `reset --hard`, DB drops, deploys, `curl \| sh`); denies when non-interactive. |
+| **`secret-guard`** | PreToolUse (Write/Edit/Bash) | Refuses file writes and `git commit` whose added lines contain a known secret format. Reports kind and line, never the value. |
+| **`model-router`** (not converted) | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
+| **`run-observer`** (not converted) | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
 
-Install plugins into your runtime environment. Each plugin ships its hooks
-as TypeScript source (`hooks/register.ts`) that Claude Code loads directly —
-no build step is required, so linking works straight from a fresh clone.
-The installer validates each hooks module path before linking and reports
-per-plugin results:
+Install plugins into your runtime environment. `sdlc-guard` and `secret-guard`
+are Claude Code command hooks (`hooks/hooks.json`, PreToolUse). They run the
+built entries under `dist/`, so run `pnpm run build` first. The installer
+validates every built hook entry before linking and reports per-plugin results.
+`model-router` and `run-observer` still use the retired module contract; they
+are reported as `not-converted` and are not linked.
 
 ```bash
 kit install --profile full-sdlc --stack node-typescript

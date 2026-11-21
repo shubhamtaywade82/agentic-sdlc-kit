@@ -7,11 +7,13 @@
 // discovers them via `<plugin>/.claude-plugin/plugin.json` and loads their
 // hook modules from the paths declared in `hooks/hooks.json`.
 //
-// IMPORTANT (official docs, verified November 2026): module paths in
-// hooks/hooks.json resolve relative to the hooks/ DIRECTORY (where the
-// manifest lives), and Claude Code loads `.ts` hooks modules DIRECTLY —
-// no build step. The shipped manifests therefore declare `./register.ts`
-// (source committed in the repository), so a fresh clone validates as-is.
+// Hook contract (Claude Code plugin hooks, code.claude.com/docs/en/hooks):
+// hooks/hooks.json uses the official `hooks` object with command handlers that
+// run `node "${CLAUDE_PLUGIN_ROOT}/dist/..."`. Those dist files are produced by
+// `pnpm run build`, so a plugin is linked only when its built hook entry exists.
+// Plugins still on the retired `modules`/register() contract are reported as
+// `not-converted` and are NOT linked: a link to a plugin Claude Code cannot load
+// would show an installed guard that does nothing.
 //
 // This module:
 //   1. Locates the kit's `plugins/` directory relative to the CLI's own
@@ -40,7 +42,7 @@ export interface PluginLinkResult {
   name: string;
   /** Where the symlink was created (or already existed) inside the project. */
   linkPath: string;
-  status: 'linked' | 'already-linked' | 'incomplete' | 'not-found';
+  status: 'linked' | 'already-linked' | 'incomplete' | 'not-found' | 'not-converted';
   detail?: string;
 }
 
@@ -64,38 +66,58 @@ export function resolveKitPluginsDir(overrideRoot?: string): string | null {
   return existsSync(pluginsDir) ? pluginsDir : null;
 }
 
+export type HooksFormat = 'command-hooks' | 'legacy-modules' | 'unreadable';
+
+export interface HooksValidation {
+  format: HooksFormat;
+  ok: boolean;
+  /** Built hook entries (relative to the plugin root) that do not exist. */
+  missing: string[];
+}
+
+const PLUGIN_ROOT_PATH = /\$\{CLAUDE_PLUGIN_ROOT\}\/([^"'\s]+)/g;
+
+function commandStrings(hooks: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (const groups of Object.values(hooks)) {
+    if (!Array.isArray(groups)) continue;
+    for (const group of groups as Array<{ hooks?: unknown }>) {
+      if (!Array.isArray(group.hooks)) continue;
+      for (const handler of group.hooks as Array<{ type?: unknown; command?: unknown }>) {
+        if (handler.type === 'command' && typeof handler.command === 'string') out.push(handler.command);
+      }
+    }
+  }
+  return out;
+}
+
 /**
- * Validate that the hooks module paths declared by a plugin's
- * `hooks/hooks.json` resolve to real files. Paths resolve relative to the
- * hooks/ directory — the same base the Claude Code plugin validator uses
- * (an easy mistake: relative to the plugin root the same string would point
- * one directory too high).
+ * Validate a plugin's hooks/hooks.json. Every `${CLAUDE_PLUGIN_ROOT}/<path>`
+ * referenced by a command handler must exist under the plugin directory.
  */
-export async function validatePluginHooks(
-  pluginDir: string,
-): Promise<{ ok: boolean; missing: string[] }> {
-  const hooksDir = path.join(pluginDir, 'hooks');
-  const manifestPath = path.join(hooksDir, 'hooks.json');
-  let modules: string[] = [];
+export async function validatePluginHooks(pluginDir: string): Promise<HooksValidation> {
+  const manifestPath = path.join(pluginDir, 'hooks', 'hooks.json');
+  let parsed: { hooks?: unknown; modules?: unknown };
   try {
-    const raw = await fs.readFile(manifestPath, 'utf8');
-    const parsed = JSON.parse(raw) as { modules?: unknown };
-    if (Array.isArray(parsed.modules)) {
-      modules = parsed.modules.filter((m): m is string => typeof m === 'string');
-    }
+    parsed = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as typeof parsed;
   } catch {
-    return { ok: false, missing: [manifestPath] };
+    return { format: 'unreadable', ok: false, missing: [manifestPath] };
   }
-  const missing: string[] = [];
-  for (const mod of modules) {
-    const resolved = path.resolve(hooksDir, mod);
-    try {
-      await fs.access(resolved);
-    } catch {
-      missing.push(mod);
+  if (parsed.hooks === undefined || typeof parsed.hooks !== 'object' || parsed.hooks === null) {
+    return { format: 'legacy-modules', ok: false, missing: [] };
+  }
+  const missing = new Set<string>();
+  for (const command of commandStrings(parsed.hooks as Record<string, unknown>)) {
+    for (const match of command.matchAll(PLUGIN_ROOT_PATH)) {
+      const rel = match[1] as string;
+      try {
+        await fs.access(path.join(pluginDir, rel));
+      } catch {
+        missing.add(rel);
+      }
     }
   }
-  return { ok: missing.length === 0, missing };
+  return { format: 'command-hooks', ok: missing.size === 0, missing: [...missing] };
 }
 
 /**
@@ -139,25 +161,37 @@ export async function linkRuntimePlugins(
       continue;
     }
 
-    // Validate hooks modules BEFORE linking so we never install a plugin
-    // whose hook module path is broken (which is what the Claude Code
-    // plugin validator would reject). The shipped manifests point at
-    // TypeScript source inside the repository, so a missing module means
-    // an incomplete plugin directory (bad clone, partial copy) — not a
-    // missing build.
-    //
-    // Note: validatePluginHooks resolves module paths relative to the
-    // hooks/ directory — mirroring the real Claude Code validator — so a
-    // manifest that passes here also passes `claude plugin validate`.
+    // Validate BEFORE linking so a plugin Claude Code cannot load is never
+    // reported as installed.
     const hooks = await validatePluginHooks(pluginDir);
+    if (hooks.format === 'legacy-modules') {
+      results.push({
+        name,
+        linkPath,
+        status: 'not-converted',
+        detail:
+          'hooks use the retired register() module contract, which Claude Code does not load. ' +
+          'Not linked until converted to command hooks (see docs/HOST_INTEGRATIONS.md).',
+      });
+      continue;
+    }
+    if (hooks.format === 'unreadable') {
+      results.push({
+        name,
+        linkPath,
+        status: 'incomplete',
+        detail: `hooks/hooks.json is missing or unreadable under ${pluginDir}; repair the kit repository.`,
+      });
+      continue;
+    }
     if (!hooks.ok) {
       results.push({
         name,
         linkPath,
         status: 'incomplete',
         detail:
-          `hooks module(s) ${hooks.missing.join(', ')} not found under ${pluginDir}. ` +
-          'The plugin directory is incomplete — reinstall or repair the kit repository, then re-run `kit install`.',
+          `built hook entr${hooks.missing.length === 1 ? 'y' : 'ies'} ${hooks.missing.join(', ')} missing under ${pluginDir}. ` +
+          'Run `pnpm run build` in the kit repository, then re-run `kit install`.',
       });
       continue;
     }

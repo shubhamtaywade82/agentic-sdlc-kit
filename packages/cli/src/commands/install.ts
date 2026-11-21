@@ -110,6 +110,22 @@ export const installCommand: Command = {
     const profileIdx = ctx.argv.indexOf('--profile');
     const installProfile = profileIdx !== -1 ? ctx.argv[profileIdx + 1] : 'full-sdlc';
 
+    // --dir selects the project to install into. Every write, plugin link and
+    // the ownership manifest resolve under this root; without it they used to
+    // land in the process cwd regardless of what the user asked for.
+    const dirIdx = ctx.argv.indexOf('--dir');
+    const dirArg = dirIdx !== -1 ? ctx.argv[dirIdx + 1] : undefined;
+    if (dirIdx !== -1 && (!dirArg || dirArg.startsWith('-'))) {
+      ctx.stderr('kit install: --dir requires a directory path\n');
+      return { exitCode: 1, message: 'missing --dir value' };
+    }
+    const targetRoot = path.resolve(ctx.cwd, dirArg ?? '.');
+    const targetStat = await fs.stat(targetRoot).catch(() => null);
+    if (!targetStat?.isDirectory()) {
+      ctx.stderr(`kit install: target directory does not exist: ${targetRoot}\n`);
+      return { exitCode: 1, message: `target directory not found: ${targetRoot}` };
+    }
+
     if (!installProfile || !FILES_BY_PROFILE[installProfile]) {
       ctx.stderr(`kit install: unknown profile '${installProfile ?? '(missing)'}'\n`);
       return { exitCode: 1, message: `unknown profile: ${installProfile ?? '(missing)'}` };
@@ -120,7 +136,7 @@ export const installCommand: Command = {
     const operations: InstallOperation[] = [];
 
     for (const file of filesToWrite) {
-      const targetPath = path.join(ctx.cwd, file.path);
+      const targetPath = path.join(targetRoot, file.path);
       const exists = await fileExists(targetPath);
       let kind: InstallOperation['kind'] = 'create';
       if (exists) {
@@ -152,7 +168,7 @@ export const installCommand: Command = {
         profile: installProfile,
         stack: stackInfo,
         dryRun: true,
-        plugins: withPlugins ? ['sdlc-guard', 'secret-guard', 'model-router', 'run-observer'] : [],
+        plugins: withPlugins ? ['sdlc-guard', 'secret-guard'] : [],
         operations: operations.map((op) => ({
           path: op.path,
           kind: op.kind,
@@ -178,7 +194,7 @@ export const installCommand: Command = {
         skippedFiles.push(op.path);
         continue;
       }
-      const targetPath = path.join(ctx.cwd, op.path);
+      const targetPath = path.join(targetRoot, op.path);
       await fs.mkdir(path.dirname(targetPath), { recursive: true });
       await fs.writeFile(targetPath, op.content, 'utf8');
       writtenFiles.push(op.path);
@@ -199,7 +215,7 @@ export const installCommand: Command = {
     // `<project>/.claude/plugins/` with validated hooks module paths.
     let pluginResults: PluginLinkResult[] = [];
     if (withPlugins) {
-      pluginResults = await linkRuntimePlugins(ctx.cwd);
+      pluginResults = await linkRuntimePlugins(targetRoot);
       for (const pr of pluginResults) {
         if (pr.status === 'linked' || pr.status === 'already-linked') {
           // Ownership hash for a plugin link: the content hash of the
@@ -218,7 +234,7 @@ export const installCommand: Command = {
           ownershipEntries.push({
             packageId: 'agentic-sdlc-kit',
             packageVersion: '0.8.0',
-            path: path.relative(ctx.cwd, pr.linkPath),
+            path: path.relative(targetRoot, pr.linkPath),
             sha256: pluginHash,
             installedAt: now,
             preserved: pr.status === 'already-linked',
@@ -228,11 +244,11 @@ export const installCommand: Command = {
     }
 
     // Write ownership manifest so kit uninstall knows what we own.
-    const manifestPath = path.join(ctx.cwd, '.ai-kit', 'ownership-manifest.json');
+    const manifestPath = path.join(targetRoot, '.ai-kit', 'ownership-manifest.json');
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
     const manifest = {
       schemaVersion: 1,
-      root: ctx.cwd,
+      root: targetRoot,
       scope: 'project',
       entries: ownershipEntries,
     };
@@ -342,14 +358,15 @@ function formatHelp(): string {
     '  full-sdlc    Complete workflows, templates, and the runtime guard plugins (default)',
     '  runtime      Runtime governance, secret protection, and model routing plugins',
     '',
-    'The full-sdlc and runtime profiles link the four guard plugins',
-    '(sdlc-guard, secret-guard, model-router, run-observer) into',
-    '.claude/plugins/. Claude Code loads each plugin\'s TypeScript hooks',
-    'module (hooks/register.ts) directly, so the plugins work from a fresh',
-    'clone of the kit repository with no build step.',
+    'The full-sdlc and runtime profiles link sdlc-guard and secret-guard',
+    '(PreToolUse command hooks) into .claude/plugins/. They run the built',
+    'dist/ entries, so run `pnpm run build` in the kit repository first.',
+    'model-router and run-observer are not yet converted to the command-hook',
+    'format and are reported as not-converted, not linked.',
     '',
     'Options:',
     '  --stack <id> Stack pack to activate (e.g. node-typescript, ruby-rails)',
+    '  --dir <path> Project directory to install into (default: current directory)',
     '  --dry-run    Preview planned operations without writing files',
     '  --json       Output machine-readable installation status',
     '  --help       Show this message',

@@ -1,10 +1,7 @@
 {
   "name": "sdlc-guard",
   "version": "0.8.0",
-  "types": "./contract.d.ts",
-  "description": "Runtime governance Mod: destructive-operation protection, approval gates, migration and deployment controls. Uses the M10 policy evaluator and action classification.",
-  "author": {
-    "name": "Agentic SDLC Kit"
-  },
+  "description": "Gates destructive Bash commands (force-push, rm -rf, DB drops, deploys, remote-shell pipes) with approval or refusal before they run.",
+  "author": { "name": "Agentic SDLC Kit" },
   "license": "MIT"
 }

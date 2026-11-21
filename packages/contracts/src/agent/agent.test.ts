@@ -1,15 +1,16 @@
 // packages/contracts/src/agent/agent.test.ts
 //
-// Contract tests for the M36 agent execution surface. These verify the
-// Zod schemas parse valid payloads, reject invalid ones, and survive a
-// JSON round trip (no functions, no undefined-dependent shapes). See
-// TESTING.md §4.4 and CONTRACTS.md §10.
+// Contract tests for the M36 agent execution surface (v2 revisions A–D).
+// These verify the Zod schemas parse valid payloads, reject invalid ones,
+// and survive a JSON round trip (no functions, no undefined-dependent
+// shapes). See TESTING.md §4.4 and CONTRACTS.md §10.
 
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_CAPABILITIES,
   AGENT_EVENT_SCHEMA_VERSION,
   AGENT_EXECUTION_SCHEMA_VERSION,
+  BudgetEnforcementLevelSchema,
   AgentCapabilitySchema,
   AgentErrorCodeSchema,
   AgentExecutionErrorSchema,
@@ -17,6 +18,8 @@ import {
   AgentExecutionRequestSchema,
   AgentExecutionResultSchema,
   AgentExecutionStatusSchema,
+  ExecutionBudgetSchema,
+  ExecutionWorkspaceSchema,
   NON_SUCCESS_ERROR_CODES,
   RETRYABLE_ERROR_CODES,
 } from './index.js';
@@ -28,9 +31,17 @@ const validRequest = {
   taskId: 'TASK-001',
   providerId: 'claude-code',
   taskKind: 'implementation',
+  policyHash: 'sha256:9f2c1ab4',
+  workspace: {
+    id: 'ws-001',
+    kind: 'git-worktree',
+    rootPath: '/repo/worktrees/run-001',
+    branch: 'kit/run-001',
+    baseCommitSha: 'a1b2c3d4e5f6',
+    createdAt: '2026-11-20T12:00:00.000Z',
+  },
   instructions: 'Implement user registration with email verification.',
   context: {
-    projectRoot: '/repo/worktree/run-001',
     specificationRef: 'docs/specifications/features/FEATURE-001/spec.md',
     planRef: 'docs/plans/FEATURE-001/plan.md',
     relevantFiles: ['src/auth/registration.ts'],
@@ -38,11 +49,14 @@ const validRequest = {
   },
   permissions: {
     capabilities: ['repository.read', 'repository.write', 'process.test'],
-    writablePaths: ['/repo/worktree/run-001/src'],
+    writablePaths: ['/repo/worktrees/run-001/src'],
     networkAllowed: false,
-    maxToolCalls: 50,
+  },
+  budget: {
     maxDurationMs: 600_000,
-    maxTokens: 200_000,
+    maxToolCalls: 50,
+    maxInputTokens: 150_000,
+    maxOutputTokens: 50_000,
   },
   approvalPolicy: {
     requireApprovalFor: ['external.approval'],
@@ -70,14 +84,16 @@ const validResult = {
 function event(over: Record<string, unknown>): unknown {
   return {
     schemaVersion: AGENT_EVENT_SCHEMA_VERSION,
+    eventId: 'evt-001',
     executionId: 'exec-001',
-    seq: 1,
-    at: '2026-11-20T12:00:00.000Z',
+    sequence: 1,
+    policyHash: validRequest.policyHash,
+    occurredAt: '2026-11-20T12:00:00.000Z',
     ...over,
   };
 }
 
-describe('AgentExecutionRequestSchema', () => {
+describe('AgentExecutionRequestSchema (v2)', () => {
   it('parses a valid, fully-populated request', () => {
     const r = AgentExecutionRequestSchema.safeParse(validRequest);
     expect(r.success).toBe(true);
@@ -99,11 +115,40 @@ describe('AgentExecutionRequestSchema', () => {
     expect(r.success).toBe(false);
   });
 
-  it('rejects a non-positive maxToolCalls', () => {
+  it('rejects a missing workspace (revision B: no cwd assumption)', () => {
+    const { workspace, ...withoutWorkspace } = validRequest;
+    expect(workspace).toBeDefined();
+    const r = AgentExecutionRequestSchema.safeParse(withoutWorkspace);
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects a git-worktree workspace without branch/baseCommitSha', () => {
     const r = AgentExecutionRequestSchema.safeParse({
       ...validRequest,
-      permissions: { ...validRequest.permissions, maxToolCalls: 0 },
+      workspace: { ...validRequest.workspace, branch: undefined, baseCommitSha: undefined },
     });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects a workspace with an unknown kind', () => {
+    const r = AgentExecutionRequestSchema.safeParse({
+      ...validRequest,
+      workspace: { ...validRequest.workspace, kind: 'vm' },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects a missing budget (revision C)', () => {
+    const { budget, ...withoutBudget } = validRequest;
+    expect(budget).toBeDefined();
+    const r = AgentExecutionRequestSchema.safeParse(withoutBudget);
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects a missing policyHash (revision D: policy traceability)', () => {
+    const { policyHash, ...withoutHash } = validRequest;
+    expect(policyHash).toBeDefined();
+    const r = AgentExecutionRequestSchema.safeParse(withoutHash);
     expect(r.success).toBe(false);
   });
 
@@ -115,8 +160,75 @@ describe('AgentExecutionRequestSchema', () => {
     expect(r.success).toBe(false);
   });
 
-  it('rejects a wrong schemaVersion', () => {
-    const r = AgentExecutionRequestSchema.safeParse({ ...validRequest, schemaVersion: 2 });
+  it('rejects a v1 schemaVersion', () => {
+    const r = AgentExecutionRequestSchema.safeParse({ ...validRequest, schemaVersion: 1 });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('ExecutionWorkspaceSchema', () => {
+  it('accepts a container workspace without git fields', () => {
+    const r = ExecutionWorkspaceSchema.safeParse({
+      id: 'ws-c',
+      kind: 'container',
+      rootPath: '/var/containers/exec-1',
+      createdAt: '2026-11-20T12:00:00.000Z',
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects an empty rootPath', () => {
+    const r = ExecutionWorkspaceSchema.safeParse({
+      id: 'ws-c',
+      kind: 'directory',
+      rootPath: '',
+      createdAt: '2026-11-20T12:00:00.000Z',
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('ExecutionBudgetSchema', () => {
+  it('requires duration and tool calls (gateway-enforceable)', () => {
+    const r = ExecutionBudgetSchema.safeParse({ maxDurationMs: 1000, maxToolCalls: 10 });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects a non-positive duration', () => {
+    const r = ExecutionBudgetSchema.safeParse({ maxDurationMs: 0, maxToolCalls: 10 });
+    expect(r.success).toBe(false);
+  });
+
+  it('accepts an estimated cost with currency', () => {
+    const r = ExecutionBudgetSchema.safeParse({
+      maxDurationMs: 1000,
+      maxToolCalls: 10,
+      maxEstimatedCost: { amount: 2.5, currency: 'USD' },
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects an estimated cost without currency', () => {
+    const r = ExecutionBudgetSchema.safeParse({
+      maxDurationMs: 1000,
+      maxToolCalls: 10,
+      maxEstimatedCost: { amount: 2.5 },
+    });
+    expect(r.success).toBe(false);
+  });
+});
+
+describe('BudgetEnforcementLevelSchema (revision C honesty)', () => {
+  it('accepts exactly the three honest levels', () => {
+    expect(BudgetEnforcementLevelSchema.options).toEqual([
+      'provider-enforced',
+      'gateway-enforced',
+      'best-effort',
+    ]);
+  });
+
+  it('rejects a made-up level like "always-enforced"', () => {
+    const r = BudgetEnforcementLevelSchema.safeParse('always-enforced');
     expect(r.success).toBe(false);
   });
 });
@@ -131,7 +243,7 @@ describe('AgentExecutionResultSchema', () => {
     const r = AgentExecutionResultSchema.safeParse({
       ...validResult,
       status: 'timed_out',
-      summary: 'Agent exceeded maxDurationMs after partial implementation.',
+      summary: 'Agent exceeded budget maxDurationMs after partial implementation.',
       errors: [{ code: 'PROVIDER_TIMEOUT', message: 'exceeded 600000ms', retryable: false }],
     });
     expect(r.success).toBe(true);
@@ -156,7 +268,7 @@ describe('AgentExecutionResultSchema', () => {
   });
 });
 
-describe('AgentExecutionEventSchema', () => {
+describe('AgentExecutionEventSchema (v2 envelope, revision D)', () => {
   it('parses each event variant', () => {
     const cases: Array<{ type: string; extra: Record<string, unknown> }> = [
       { type: 'execution.started', extra: {} },
@@ -170,15 +282,31 @@ describe('AgentExecutionEventSchema', () => {
       { type: 'execution.progress', extra: { taskId: 'TASK-001', progress: 0.5 } },
       { type: 'execution.completed', extra: { status: 'completed' } },
     ];
-    for (const c of cases) {
-      const r = AgentExecutionEventSchema.safeParse(event({ type: c.type, ...c.extra }));
+    for (const [i, c] of cases.entries()) {
+      const r = AgentExecutionEventSchema.safeParse(
+        event({ type: c.type, sequence: i + 1, eventId: `evt-${i + 1}`, ...c.extra }),
+      );
       expect(r.success, `event type ${c.type}`).toBe(true);
     }
   });
 
-  it('rejects an event missing the monotonic seq field', () => {
+  it('rejects an event missing the monotonic sequence field', () => {
     const e = event({ type: 'execution.started' });
-    delete (e as { seq?: number }).seq;
+    delete (e as { sequence?: number }).sequence;
+    const r = AgentExecutionEventSchema.safeParse(e);
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects an event missing eventId (idempotent persistence key)', () => {
+    const e = event({ type: 'execution.started' });
+    delete (e as { eventId?: string }).eventId;
+    const r = AgentExecutionEventSchema.safeParse(e);
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects an event missing policyHash (policy traceability)', () => {
+    const e = event({ type: 'execution.started' });
+    delete (e as { policyHash?: string }).policyHash;
     const r = AgentExecutionEventSchema.safeParse(e);
     expect(r.success).toBe(false);
   });

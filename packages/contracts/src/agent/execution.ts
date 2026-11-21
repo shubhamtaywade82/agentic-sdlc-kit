@@ -1,12 +1,23 @@
 // packages/contracts/src/agent/execution.ts
 //
-// M36 agent execution request and result contracts (ADR-0019, ADR-0020).
+// M36 agent execution request and result contracts (ADR-0019 v2, ADR-0020).
 //
 // Design rules:
 //   - The request is provider-neutral and capability-scoped. It carries
 //     NO provider-specific fields (no model name, no prompt-template id).
 //     Provider selection is the gateway's job; the request describes the
 //     work and its bounds.
+//   - The request references an EXPLICIT ExecutionWorkspace (v2, revision
+//     B): an execution never assumes the current process directory is its
+//     environment. The workspace is created and owned by the gateway.
+//   - The request carries a policyHash (v2, revision D): the hash of the
+//     canonical, versioned ExecutionPolicy snapshot in force. Providers
+//     echo it in every event so each decision is traceable to the exact
+//     policy that authorized it; the gateway rejects mismatched echoes.
+//   - Bounds live in an explicit ExecutionBudget (v2, revision C) with
+//     per-limit enforcement levels declared by the provider's
+//     capabilities. Token or monetary cost enforcement is NEVER claimed
+//     where the provider does not expose reliable usage information.
 //   - The result's `proposedArtifacts` is INFORMATIONAL — it is what the
 //     agent claims it changed. Kit independently inspects git to establish
 //     truth. A `completed` result is never sufficient to mark a workflow
@@ -24,7 +35,7 @@ import { AgentResumeTokenSchema, AgentSessionIdSchema } from './session.js';
 // would collide at the contracts barrel.
 import { IdentifierSchema } from '../common/identifier.js';
 
-export const AGENT_EXECUTION_SCHEMA_VERSION = 1 as const;
+export const AGENT_EXECUTION_SCHEMA_VERSION = 2 as const;
 
 // Provider ids are kebab-case (e.g. "claude-code", "codex"). This keeps
 // them filename- and url-safe across config files and CLI flags.
@@ -80,6 +91,83 @@ export const AgentApprovalPolicySchema = z.object({
 });
 export type AgentApprovalPolicy = z.infer<typeof AgentApprovalPolicySchema>;
 
+/**
+ * How a workspace is isolated (ADR-0020 §7). A git worktree isolates
+ * repository changes; it is NOT an OS sandbox — provider processes must
+ * additionally run with restricted host permissions or in a container.
+ */
+export const ExecutionWorkspaceKindSchema = z.enum(['git-worktree', 'container', 'directory']);
+export type ExecutionWorkspaceKind = z.infer<typeof ExecutionWorkspaceKindSchema>;
+
+/**
+ * The explicit execution environment (ADR-0019 v2, revision B). A request
+ * NEVER assumes the current process directory: the gateway creates the
+ * workspace and the request references it. For `git-worktree` (and only
+ * that kind) `branch` and `baseCommitSha` are required — the orchestrator
+ * uses them to derive clean diffs for evidence.
+ */
+export const ExecutionWorkspaceSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: ExecutionWorkspaceKindSchema,
+    rootPath: z.string().min(1),
+    branch: z.string().min(1).optional(),
+    baseCommitSha: z.string().min(1).optional(),
+    createdAt: z.string().min(1),
+  })
+  .superRefine((ws, ctx) => {
+    if (ws.kind === 'git-worktree' && (!ws.branch || !ws.baseCommitSha)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['branch'],
+        message:
+          'a git-worktree workspace requires both branch and baseCommitSha',
+      });
+    }
+  });
+export type ExecutionWorkspace = z.infer<typeof ExecutionWorkspaceSchema>;
+
+/**
+ * How honestly a budget limit is enforced (ADR-0020 §8, revision C).
+ *
+ * - `provider-enforced` — the provider reliably enforces or reports it.
+ * - `gateway-enforced` — Kit enforces it itself (always true for duration
+ *   and process bounds: the gateway owns the process).
+ * - `best-effort` — reported as such; evidence must state the limit was
+ *   not hard-enforced.
+ *
+ * Token or monetary cost enforcement is NEVER declared `provider-enforced`
+ * where the provider does not expose reliable usage information.
+ */
+export const BudgetEnforcementLevelSchema = z.enum([
+  'provider-enforced',
+  'gateway-enforced',
+  'best-effort',
+]);
+export type BudgetEnforcementLevel = z.infer<typeof BudgetEnforcementLevelSchema>;
+
+/**
+ * Execution budget (ADR-0019 v2, revision C). Duration and tool calls are
+ * mandatory (the gateway can always enforce them); token and cost limits
+ * are optional and only meaningful when the provider declares an
+ * enforcement level for them. Exceeding an enforced limit is a
+ * BUDGET_EXCEEDED error, never silent continuation.
+ */
+export const ExecutionBudgetSchema = z.object({
+  maxDurationMs: z.number().int().positive(),
+  maxToolCalls: z.number().int().positive(),
+  maxInputTokens: z.number().int().positive().optional(),
+  maxOutputTokens: z.number().int().positive().optional(),
+  maxTotalTokens: z.number().int().positive().optional(),
+  maxEstimatedCost: z
+    .object({
+      amount: z.number().nonnegative(),
+      currency: z.string().min(1),
+    })
+    .optional(),
+});
+export type ExecutionBudget = z.infer<typeof ExecutionBudgetSchema>;
+
 export const AgentExecutionRequestSchema = z.object({
   schemaVersion: z.literal(AGENT_EXECUTION_SCHEMA_VERSION),
   executionId: z.string().min(1),
@@ -89,9 +177,17 @@ export const AgentExecutionRequestSchema = z.object({
   providerId: AgentProviderIdSchema,
   taskKind: AgentTaskKindSchema,
 
+  // Hash of the canonical, versioned ExecutionPolicy snapshot in force
+  // (ADR-0020). Providers echo it in every event; the gateway rejects
+  // events whose policyHash does not match the execution's policy.
+  policyHash: z.string().min(1),
+
+  // The explicit execution environment (revision B). The workspace is
+  // created by the gateway; a request never assumes the cwd.
+  workspace: ExecutionWorkspaceSchema,
+
   instructions: z.string().min(1),
   context: z.object({
-    projectRoot: z.string().min(1),
     specificationRef: z.string().optional(),
     planRef: z.string().optional(),
     relevantFiles: z.array(z.string()),
@@ -104,12 +200,11 @@ export const AgentExecutionRequestSchema = z.object({
     // workspace (worktree). The tool broker rejects writes outside.
     writablePaths: z.array(z.string().min(1)),
     networkAllowed: z.boolean(),
-    maxToolCalls: z.number().int().positive(),
-    maxDurationMs: z.number().int().positive(),
-    // Token budget; the provider reports usage against it. Exceeding the
-    // budget is a BUDGET_EXCEEDED error, not silent continuation.
-    maxTokens: z.number().int().positive().optional(),
   }),
+
+  // Execution bounds (revision C), separated from permissions: grants say
+  // WHAT the agent may do; the budget says HOW MUCH.
+  budget: ExecutionBudgetSchema,
 
   session: z
     .object({

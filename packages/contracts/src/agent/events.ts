@@ -1,10 +1,17 @@
 // packages/contracts/src/agent/events.ts
 //
-// M36 agent execution event contract (ADR-0019). Events are the normalized
-// lifecycle stream emitted by a provider during execute(); Kit records them
-// for audit and surfaces progress. Each event carries a monotonically
-// increasing sequence number per executionId; duplicate or out-of-order
-// events are the provider's bug, not Kit's.
+// M36 agent execution event contract (ADR-0019 v2, revision D). Events
+// are the normalized lifecycle stream emitted by a provider during an
+// execution; the GATEWAY persists them and replay is idempotent. Every
+// event carries:
+//   - `eventId`      — unique per event; makes persistence and replay
+//                      idempotent (the same event stored twice is
+//                      detectable, not duplicable)
+//   - `sequence`    — monotonically increasing per executionId; gaps and
+//                      duplicates are detectable in the audit log
+//   - `policyHash`  — echo of the request's policy snapshot hash; the
+//                      gateway rejects events whose hash does not match
+//                      the execution's policy (fail closed, ADR-0020 §4)
 //
 // Invariant: events are OBSERVABILITY, not control.
 //   - A `tool.requested` event does NOT authorize the tool — the tool
@@ -27,18 +34,24 @@ export const AgentExecutionEventKindSchema = z.enum([
 ]);
 export type AgentExecutionEventKind = z.infer<typeof AgentExecutionEventKindSchema>;
 
-export const AGENT_EVENT_SCHEMA_VERSION = 1 as const;
+export const AGENT_EVENT_SCHEMA_VERSION = 2 as const;
 
-// Fields common to every event variant.
+// Fields common to every event variant (the persistence envelope, kept
+// stable while per-kind payloads stay typed in the discriminated union).
 const AgentExecutionEventBaseSchema = z.object({
   schemaVersion: z.literal(AGENT_EVENT_SCHEMA_VERSION),
+  // Unique per event; gateway persistence is idempotent on it.
+  eventId: z.string().min(1),
   // Correlates to AgentExecutionRequest.executionId.
   executionId: z.string().min(1),
   // Monotonic per-execution sequence; the first event for an executionId
-  // is seq=1. Kit uses seq to detect gaps and duplicates in the audit log.
-  seq: z.number().int().positive(),
+  // is sequence=1. Kit uses it to detect gaps and duplicates in the audit log.
+  sequence: z.number().int().positive(),
+  // Echo of AgentExecutionRequest.policyHash — the policy snapshot in
+  // force when the event was produced. Mismatches fail closed.
+  policyHash: z.string().min(1),
   // ISO 8601 timestamp.
-  at: z.string(),
+  occurredAt: z.string(),
 });
 
 export const AgentExecutionEventSchema = z.discriminatedUnion('type', [
@@ -86,8 +99,9 @@ export const AgentExecutionEventSchema = z.discriminatedUnion('type', [
 export type AgentExecutionEvent = z.infer<typeof AgentExecutionEventSchema>;
 
 /**
- * Event sink passed to AgentProvider.execute/resume. Providers that emit
- * lifecycle events call this for each event; providers that do not stream
- * simply ignore it.
+ * Event sink subscribed via an AgentExecutionHandle. Providers that emit
+ * lifecycle events deliver them through the handle's `events()`
+ * subscription; providers that do not stream simply never deliver.
+ * The subscription returns an unsubscribe function.
  */
 export type AgentEventSink = (event: AgentExecutionEvent) => void;

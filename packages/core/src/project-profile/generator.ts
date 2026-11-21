@@ -10,6 +10,7 @@ import {
   type Result,
 } from '@agentic-sdlc-kit/contracts';
 import { validateProfile } from './validator.js';
+import { commandsForStack } from '../stacks/stack-commands.js';
 
 function deriveCommands(scan: RepositoryScan): ProjectProfile['commands'] {
   const commands: ProjectProfile['commands'] = {};
@@ -24,24 +25,14 @@ function deriveCommands(scan: RepositoryScan): ProjectProfile['commands'] {
     commands.test = [['node', '--test']];
     return commands;
   }
-  if (primary === 'node-typescript') {
-    commands.test = [[pm, 'test']];
-    commands.lint = [[pm, 'lint']];
-    commands.typecheck = [[pm, 'typecheck']];
-    commands.build = [[pm, 'build']];
-    return commands;
-  }
-  if (primary === 'react-typescript') {
-    commands.test = [[pm, 'test']];
-    commands.build = [[pm, 'build']];
-    return commands;
-  }
-  if (primary === 'ruby-rails') {
-    commands.test = [['bundle', 'exec', 'rspec']];
-    commands.lint = [['bundle', 'exec', 'rubocop']];
-    return commands;
-  }
-  return commands;
+  if (primary === undefined) return commands;
+  const fromPack = commandsForStack(primary, { packageManager: pm }) ?? {};
+  // The scan can confirm pytest but not ruff or mypy. Writing their commands
+  // for a project that does not use them would make every verify run fail, so
+  // only the test command is derived for Python. Add lint/typecheck by hand.
+  // Plain Ruby gets the same treatment: the scan confirms RSpec, not RuboCop.
+  if (primary === 'python' || primary === 'ruby') return fromPack.test ? { test: fromPack.test } : commands;
+  return fromPack;
 }
 
 export function generateProfile(scan: RepositoryScan): Result<ProjectProfile> {

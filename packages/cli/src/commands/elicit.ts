@@ -25,7 +25,7 @@ import {
 import type { Command, CommandContext, CommandResult } from './types.js';
 
 const FEATURE_ID = /^[A-Za-z][A-Za-z0-9-]{1,63}$/;
-const KNOWN_STACKS: ReadonlySet<string> = new Set(['ruby-rails', 'node-typescript', 'react-typescript', 'python', 'go']);
+const KNOWN_STACKS: ReadonlySet<string> = new Set(['ruby', 'ruby-rails', 'node-typescript', 'react-typescript', 'python', 'go']);
 
 const VALUE_FLAGS: ReadonlySet<string> = new Set(['--stack', '--answers']);
 

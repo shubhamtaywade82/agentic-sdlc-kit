@@ -5,7 +5,7 @@
 // recorded as an explicit assumption, so the record shows what was assumed.
 // Stack-scoped questions only apply when that stack is in the project.
 
-export type QuestionStack = 'ruby-rails' | 'node-typescript' | 'react-typescript' | 'python' | 'go';
+export type QuestionStack = 'ruby' | 'ruby-rails' | 'node-typescript' | 'react-typescript' | 'python' | 'go';
 
 export interface Question {
   id: string;

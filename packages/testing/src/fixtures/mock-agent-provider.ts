@@ -23,6 +23,7 @@ import {
   AGENT_EXECUTION_SCHEMA_VERSION,
   type AgentCapability,
   type AgentEventSink,
+  type AgentExecutionError,
   type AgentExecutionEvent,
   type AgentExecutionHandle,
   type AgentExecutionRequest,
@@ -47,6 +48,23 @@ export interface MockAgentProviderOptions {
   readonly delayMs?: number;
   /** Override healthCheck output; default `{ available: true }`. */
   readonly health?: AgentHealth;
+  /**
+   * Simulate the agent doing real work in the execution workspace: called
+   * on the completion path, after `execution.started` and before the final
+   * result. Orchestrator integration tests use this to make the task's
+   * verification command actually fail (Red) or pass (Green) inside the
+   * workspace — exactly what a real provider's edits would do. If it
+   * throws, the execution ends `failed` with the error message.
+   */
+  readonly performWork?: (request: AgentExecutionRequest) => Promise<void> | void;
+  /**
+   * Policy hash the mock echoes in events produced by resume(). The mock
+   * cannot know the original request's policy on resume (the gateway owns
+   * the request and does not re-submit it), so gateway tests that want a
+   * clean replay pass the real hash here. Default: the synthetic fixture
+   * hash used by the provider contract harness.
+   */
+  readonly resumePolicyHash?: string;
 }
 
 const DEFAULT_CAPABILITIES: readonly AgentCapability[] = [
@@ -121,6 +139,7 @@ export class MockAgentProvider implements AgentProvider {
       'executionId' | 'workflowRunId' | 'taskId' | 'instructions' | 'policyHash'
     >,
     status: AgentExecutionStatus,
+    extraErrors: readonly AgentExecutionError[] = [],
   ): AgentExecutionResult {
     return {
       schemaVersion: AGENT_EXECUTION_SCHEMA_VERSION,
@@ -138,8 +157,8 @@ export class MockAgentProvider implements AgentProvider {
       usage: { durationMs: this.opts.delayMs ?? 0 },
       errors:
         status === 'cancelled'
-          ? [{ code: 'CANCELLED', message: 'execution aborted', retryable: false }]
-          : [],
+          ? [{ code: 'CANCELLED', message: 'execution aborted', retryable: false }, ...extraErrors]
+          : [...extraErrors],
     };
   }
 
@@ -149,6 +168,7 @@ export class MockAgentProvider implements AgentProvider {
       'executionId' | 'workflowRunId' | 'taskId' | 'instructions' | 'policyHash'
     >,
     signal: AbortSignal,
+    fullRequest?: AgentExecutionRequest,
   ): AgentExecutionHandle {
     const listeners = new Set<AgentEventSink>();
     // Events emitted before the first subscription are buffered and
@@ -199,6 +219,25 @@ export class MockAgentProvider implements AgentProvider {
         }
       }
 
+      // Simulated agent work happens on the completion path only: a
+      // cancelled/timed-out execution performs no work. It receives the
+      // FULL request (workspace paths, task ids) and is only available on
+      // the start() path — resume() has no original request to simulate.
+      if (this.opts.performWork && fullRequest) {
+        try {
+          await this.opts.performWork(fullRequest);
+        } catch (e) {
+          nextEvent({ type: 'execution.completed', status: 'failed' });
+          return this.buildResult(request, 'failed', [
+            {
+              code: 'PROVIDER_INTERNAL',
+              message: `simulated work failed: ${String(e)}`,
+              retryable: true,
+            },
+          ] as const);
+        }
+      }
+
       const status = this.opts.status ?? 'completed';
       nextEvent({ type: 'execution.completed', status });
       return this.buildResult(request, status);
@@ -216,7 +255,7 @@ export class MockAgentProvider implements AgentProvider {
   }
 
   async start(request: AgentExecutionRequest, signal: AbortSignal): Promise<AgentExecutionHandle> {
-    return this.runExecution(request, signal);
+    return this.runExecution(request, signal, request);
   }
 
   async resume(executionId: string, resumeToken: string): Promise<AgentExecutionHandle> {
@@ -232,7 +271,7 @@ export class MockAgentProvider implements AgentProvider {
         workflowRunId: 'RUN-002',
         taskId: 'TASK-002',
         instructions: 'resume',
-        policyHash: 'sha256:mock-resume-policy',
+        policyHash: this.opts.resumePolicyHash ?? 'sha256:mock-resume-policy',
       },
       AbortSignal.timeout(60_000),
     );

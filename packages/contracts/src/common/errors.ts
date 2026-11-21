@@ -20,6 +20,7 @@ export type KitErrorCode =
   | 'ARTIFACT_READ_DENIED'
   | 'TIMEOUT'
   | 'NOT_IMPLEMENTED'
+  | 'AGENT_PROVIDER_NOT_CONFIGURED'
   | 'INTERNAL';
 
 export interface KitError {
@@ -97,6 +98,17 @@ export const Errors = {
     kitError('TIMEOUT', message, details, cause),
   notImplemented: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
     kitError('NOT_IMPLEMENTED', message, details, cause),
+  /**
+   * Mode 1 (kit-orchestrated) execution was requested but no agent
+   * provider is configured/registered (ADR-0019 §1). The CLI maps this to
+   * exit code 3 (blocked / prerequisite missing) and NEVER falls back to
+   * pretending a manual workflow completed.
+   */
+  agentProviderNotConfigured: (
+    message: string,
+    details?: Record<string, unknown>,
+    cause?: unknown,
+  ): KitError => kitError('AGENT_PROVIDER_NOT_CONFIGURED', message, details, cause),
   internal: (message: string, details?: Record<string, unknown>, cause?: unknown): KitError =>
     kitError('INTERNAL', message, details, cause),
 } as const;

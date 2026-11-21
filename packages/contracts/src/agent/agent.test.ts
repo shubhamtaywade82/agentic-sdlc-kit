@@ -10,7 +10,7 @@ import {
   AGENT_CAPABILITIES,
   AGENT_EVENT_SCHEMA_VERSION,
   AGENT_EXECUTION_SCHEMA_VERSION,
-  BudgetEnforcementLevelSchema,
+  AGENT_POLICY_SNAPSHOT_SCHEMA_VERSION,
   AgentCapabilitySchema,
   AgentErrorCodeSchema,
   AgentExecutionErrorSchema,
@@ -18,10 +18,13 @@ import {
   AgentExecutionRequestSchema,
   AgentExecutionResultSchema,
   AgentExecutionStatusSchema,
+  AgentPolicySnapshotSchema,
+  BudgetEnforcementLevelSchema,
   ExecutionBudgetSchema,
   ExecutionWorkspaceSchema,
   NON_SUCCESS_ERROR_CODES,
   RETRYABLE_ERROR_CODES,
+  computePolicyHash,
 } from './index.js';
 
 const validRequest = {
@@ -360,5 +363,89 @@ describe('status taxonomy', () => {
   it('does not include a "success" alias — only "completed"', () => {
     expect(AgentExecutionStatusSchema.options).toContain('completed');
     expect(AgentExecutionStatusSchema.options).not.toContain('success');
+  });
+});
+
+describe('canonical policy snapshot (ADR-0020 §1)', () => {
+  const snapshot = {
+    schemaVersion: AGENT_POLICY_SNAPSHOT_SCHEMA_VERSION,
+    permissions: {
+      capabilities: ['repository.read', 'repository.write', 'process.test'] as const,
+      writablePaths: ['/repo/worktrees/run-001'],
+      networkAllowed: false,
+    },
+    budget: {
+      maxDurationMs: 600_000,
+      maxToolCalls: 200,
+    },
+    approvalPolicy: {
+      requireApprovalFor: ['external.approval'] as const,
+      allowAutonomousExecution: true,
+    },
+  };
+
+  it('parses a valid snapshot', () => {
+    const r = AgentPolicySnapshotSchema.safeParse(snapshot);
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects an empty capability grant (least privilege means explicit, not none)', () => {
+    const r = AgentPolicySnapshotSchema.safeParse({
+      ...snapshot,
+      permissions: { ...snapshot.permissions, capabilities: [] },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects a capability outside the allowlist', () => {
+    const r = AgentPolicySnapshotSchema.safeParse({
+      ...snapshot,
+      permissions: {
+        ...snapshot.permissions,
+        capabilities: ['repository.read', 'process.shell'],
+      },
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('rejects the wrong schemaVersion', () => {
+    const r = AgentPolicySnapshotSchema.safeParse({ ...snapshot, schemaVersion: 2 });
+    expect(r.success).toBe(false);
+  });
+
+  it('hashes to a stable sha256:<hex> value', () => {
+    const h = computePolicyHash(AgentPolicySnapshotSchema.parse(snapshot));
+    expect(h).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(computePolicyHash(AgentPolicySnapshotSchema.parse(snapshot))).toBe(h);
+  });
+
+  it('is independent of property insertion order (canonical JSON)', () => {
+    const reordered = {
+      approvalPolicy: snapshot.approvalPolicy,
+      budget: { maxToolCalls: 200, maxDurationMs: 600_000 },
+      permissions: {
+        networkAllowed: false,
+        writablePaths: ['/repo/worktrees/run-001'],
+        capabilities: ['repository.read', 'repository.write', 'process.test'],
+      },
+      schemaVersion: AGENT_POLICY_SNAPSHOT_SCHEMA_VERSION,
+    };
+    expect(computePolicyHash(AgentPolicySnapshotSchema.parse(reordered))).toBe(
+      computePolicyHash(AgentPolicySnapshotSchema.parse(snapshot)),
+    );
+  });
+
+  it('changes when the policy changes (a different grant is a different policy)', () => {
+    const changed = { ...snapshot, permissions: { ...snapshot.permissions, networkAllowed: true } };
+    expect(computePolicyHash(AgentPolicySnapshotSchema.parse(changed))).not.toBe(
+      computePolicyHash(AgentPolicySnapshotSchema.parse(snapshot)),
+    );
+  });
+
+  it('changes when the budget changes', () => {
+    const changed = { ...snapshot, budget: { maxDurationMs: 300_000, maxToolCalls: 200 } };
+    expect(computePolicyHash(AgentPolicySnapshotSchema.parse(changed))).not.toBe(
+      computePolicyHash(AgentPolicySnapshotSchema.parse(snapshot)),
+    );
   });
 });

@@ -249,6 +249,12 @@ surface so that later milestones do not have to refactor the core.
    through the source via the workspace package name.
 7. No timestamp or random ID is emitted into a build artifact.
 8. No destructive operation is performed without an explicit approval.
+9. `*.test.ts` files (and `test-*.ts` test-support files) may additionally
+   import `@agentic-sdlc-kit/testing` (PR3, ADR-0019 §4): the runtime
+   surface keeps its discipline; tests use the shared fixtures and the
+   canonical mock provider.
+10. `packages/core` never imports a provider SDK; agent execution lives
+    behind the `AgentProvider` interface (ADR-0019 §6).
 
 These invariants are enforced by:
 
@@ -257,3 +263,41 @@ These invariants are enforced by:
   invariant is violated.
 - Tests in `packages/testing` that import every public symbol and fail if
   the dependency graph has cycles.
+
+## 7. Agent execution modes (M36, ADR-0019)
+
+The kit has two interaction modes around ONE deterministic workflow
+engine — they never become two implementations:
+
+| | Mode 2 — agent-led (existing) | Mode 1 — kit-orchestrated (PR3+) |
+| --- | --- | --- |
+| Who drives | An external agent (or developer) between steps | Kit itself, end to end |
+| Entry | `kit feature <id> start\|red\|green\|refactor\|verify` | `kit feature <id> run --provider <id>` |
+| Engine | `packages/core` TDD state machine (authoritative) | The SAME state machine — the orchestrator only coordinates |
+| Evidence | Persisted per phase by `runTddPhase` | Identical store, written by the same functions inside an isolated git worktree |
+| Agent role | Writes tests/implementations between invocations | Executes bounded per-phase tasks through a provider |
+
+Mode 1 lives in `packages/cli/src/application/agent/` (ADR-0019 §4 — no
+new packages until proven responsibilities demand extraction):
+
+- `gateway.ts` — the `AgentGateway`: freezes the original request and the
+  canonical policy snapshot per execution (ADR-0020 §1), persists events
+  idempotently with fail-closed `policyHash` checks (rev D), enforces the
+  duration and tool-call budgets itself, validates result correlation,
+  and holds resume tokens in memory ONLY (they are credentials).
+- `workspace.ts` — git-worktree-per-run isolation (ADR-0020 §7). A
+  worktree isolates repository changes; it is NOT an OS sandbox.
+- `orchestrator.ts` — derives the next pending task/phase from the
+  feature run state (the authority), invokes the provider, and lets
+  `runTddPhase`/`finalizeFeatureRun` decide every transition. A provider
+  `completed` result is NEVER sufficient (ADR-0018).
+- `execution-store.ts` — durable execution records under
+  `.ai-kit/state/agent-executions/`; orchestration linkage under
+  `.ai-kit/state/orchestrations/`.
+
+Providers are INJECTED (`AgentGatewayOptions.providers`). The shipped CLI
+registers none, so `kit feature <id> run` fails with
+`AGENT_PROVIDER_NOT_CONFIGURED` (exit 3) and never pretends a manual
+workflow completed. PR4 adds the first real provider (claude-code). The
+integration direction table (host adapter vs provider adapter) is in
+ADR-0019 §2 — `claude-code-adapter` keeps its host-adapter role.

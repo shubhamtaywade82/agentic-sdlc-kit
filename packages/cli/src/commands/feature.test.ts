@@ -7,7 +7,9 @@ import {
   scaffoldSpecification,
   serializeProfileYaml,
 } from '@agentic-sdlc-kit/core';
-import { featureCommand } from './feature.js';
+import { MockAgentProvider } from '@agentic-sdlc-kit/testing';
+import { buildOrchestrationFixture } from '../application/agent/test-fixture.js';
+import { createFeatureCommand, featureCommand } from './feature.js';
 import type { CommandContext } from './types.js';
 
 const makeCtx = (
@@ -166,6 +168,108 @@ describe('featureCommand', () => {
       expect(ctx.err[0]).toContain('Phase mismatch');
     } finally {
       await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('featureCommand run (Mode 1, PR3)', () => {
+  it('is blocked (exit 3) with no --provider: AGENT_PROVIDER_NOT_CONFIGURED, never a silent fallback', async () => {
+    const project = await setupProject();
+    try {
+      const ctx = makeCtx(['FEATURE-001', 'run'], project.root);
+      const r = await featureCommand.run(ctx);
+      expect(r.exitCode).toBe(3);
+      expect(ctx.err[0]).toContain('AGENT_PROVIDER_NOT_CONFIGURED');
+      expect(ctx.err[0]).toContain('will not fall back');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('is blocked (exit 3) when --provider names an unregistered provider', async () => {
+    const project = await setupProject();
+    try {
+      const ctx = makeCtx(['FEATURE-001', 'run', '--provider', 'claude-code'], project.root);
+      const r = await featureCommand.run(ctx);
+      expect(r.exitCode).toBe(3);
+      expect(ctx.err[0]).toContain('No agent provider');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('orchestrates the full lifecycle through an injected mock provider and exits 0', async () => {
+    const fixture = await buildOrchestrationFixture();
+    try {
+      const command = createFeatureCommand({
+        agentProviders: [
+          new MockAgentProvider({
+            performWork: async (request) => {
+              if (request.instructions.includes('Phase: green')) {
+                await fs.writeFile(
+                  path.join(request.workspace.rootPath, `.done-${request.taskId}`),
+                  'implemented\n',
+                );
+              }
+            },
+          }),
+        ],
+      });
+      const ctx = makeCtx(['FEATURE-001', 'run', '--provider', 'mock'], fixture.root);
+      const r = await command.run(ctx);
+      expect(r.exitCode).toBe(0);
+      const joined = ctx.out.join('\n');
+      expect(joined).toContain('Mode 1 run RUN-001');
+      expect(joined).toContain('TASK-001 red: evidence accepted');
+      expect(joined).toContain('Feature Orchestration: FEATURE-001');
+      expect(joined).toContain('COMPLETED');
+    } finally {
+      await fs.rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a lying agent with exit 1 (the evidence gate rejects)', async () => {
+    const fixture = await buildOrchestrationFixture();
+    try {
+      const command = createFeatureCommand({
+        agentProviders: [new MockAgentProvider()],
+      });
+      const ctx = makeCtx(['FEATURE-001', 'run', '--provider', 'mock'], fixture.root);
+      const r = await command.run(ctx);
+      expect(r.exitCode).toBe(1);
+      expect(ctx.out.join('\n')).toContain('PHASE_GATE_REJECTED');
+    } finally {
+      await fs.rm(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  it('emits machine-readable report JSON with --json', async () => {
+    const fixture = await buildOrchestrationFixture();
+    try {
+      const command = createFeatureCommand({
+        agentProviders: [
+          new MockAgentProvider({
+            performWork: async (request) => {
+              if (request.instructions.includes('Phase: green')) {
+                await fs.writeFile(
+                  path.join(request.workspace.rootPath, `.done-${request.taskId}`),
+                  'implemented\n',
+                );
+              }
+            },
+          }),
+        ],
+      });
+      const ctx = makeCtx(['FEATURE-001', 'run', '--provider', 'mock', '--json'], fixture.root);
+      const r = await command.run(ctx);
+      expect(r.exitCode).toBe(0);
+      const report = JSON.parse(ctx.out[ctx.out.length - 1]);
+      expect(report.status).toBe('completed');
+      expect(report.runId).toBe('RUN-001');
+      expect(report.executions).toHaveLength(6);
+      expect(report.workspace.branch).toBe('kit/RUN-001');
+    } finally {
+      await fs.rm(fixture.root, { recursive: true, force: true });
     }
   });
 });

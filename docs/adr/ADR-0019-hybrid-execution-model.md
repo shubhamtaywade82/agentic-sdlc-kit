@@ -206,6 +206,20 @@ PR 1 and PR 2 are independently reviewable and may proceed in either
 order; they touch disjoint files. (PR 2 corresponds to the contracts
 merged in PR #8, revised to v2 per this ADR.)
 
+Status: PR 1 landed as PR #9; PR 2 (v2 revisions) landed as PR #10; PR 3
+landed as the gateway/orchestrator modules in
+`packages/cli/src/application/agent/` with the acceptance integration
+test in `orchestrator.test.ts`, the `AGENT_PROVIDER_NOT_CONFIGURED`
+first-class error, the canonical policy snapshot contract
+(`contracts/src/agent/policy.ts`, ADR-0020 §1), and the
+`test-*.ts`/`*.test.ts` architecture-gate exception for
+`@agentic-sdlc-kit/testing`. PR3 deliberately ships the CLI with NO
+provider registered — provider injection is the seam PR4 fills with
+claude-code. Cross-process provider-session resume is deferred to PR4
+(resume tokens are credentials and must not be persisted unencrypted;
+PR3 resumability is workflow-level: persistent worktree + run state +
+persisted original requests).
+
 ### 6. Non-negotiable rules
 
 1. `packages/core` never imports a provider SDK; agent-specific behavior

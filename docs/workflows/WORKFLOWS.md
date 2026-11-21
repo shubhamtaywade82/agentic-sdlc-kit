@@ -211,3 +211,69 @@ independent analysis. Scripts handle deterministic checks.
 The kit MUST NOT use an LLM to validate facts a deterministic program can
 verify more reliably. This is an architectural invariant
 (`ARCHITECTURE.md` §6, enforced by `core.policy.evaluator` in M10).
+
+## 5. Two ways to drive the feature workflow (M36, ADR-0019)
+
+The feature lifecycle has ONE engine — the TDD state machine in
+`packages/core` (ADR-0018) — and two ways to drive it. The modes produce
+equivalent evidence; they never become two implementations.
+
+### Mode 2 — agent-led (existing)
+
+An external agent or developer executes each step and invokes the phase
+gates between steps:
+
+```
+kit feature FEATURE-001 start          # validate spec/plan, init run state
+kit feature FEATURE-001 red TASK-001   # task's verification MUST fail (assertion)
+#   ... agent implements ...
+kit feature FEATURE-001 green TASK-001 # task's verification MUST pass
+kit feature FEATURE-001 refactor TASK-001
+kit feature FEATURE-001 verify         # audit chain + whole-profile verification
+```
+
+### Mode 1 — kit-orchestrated (PR3, M36)
+
+```
+kit feature FEATURE-001 run --provider <id>
+```
+
+The orchestrator, for every pending task phase (red, then green, then
+refactor, in the plan's execution order):
+
+1. builds one bounded `AgentExecutionRequest` (phase-specific
+   instructions, the task's own verification command, the frozen policy
+   snapshot and its hash, and the run's isolated git worktree as the
+   explicit workspace);
+2. executes it through the configured provider via the agent gateway;
+3. if the provider reports anything other than `completed`, STOPS — the
+   status is persisted and reported honestly;
+4. if it reports `completed`, runs the SAME `runTddPhase` gate Mode 2
+   uses. The gate decides: an assertion-classified failure advances Red,
+   a pass advances Green/Refactor, and a lying agent is rejected
+   (`phase_gate_rejected`).
+
+When every task has a complete chain, the orchestrator runs the SAME
+`finalizeFeatureRun` whole-profile verification, in the worktree.
+
+**Evidence stores:** the TDD run state lives in the worktree at
+`.ai-kit/state/feature-runs/<featureId>.json` (written by core, identical
+to Mode 2). The orchestration linkage (run id, workspace identity,
+execution ids) lives in the main repository at
+`.ai-kit/state/orchestrations/<featureId>.json`, and the durable
+execution records (frozen requests, policy snapshots, event streams,
+audit trails) live at `.ai-kit/state/agent-executions/`.
+
+**Resumability:** the worktree and its run state persist. Re-running
+`kit feature <id> run` after a cancellation or crash resumes from the
+first incomplete task/phase — derived from the run state, which is the
+authority. A completed orchestration refuses to re-run.
+
+**Cancellation:** SIGINT aborts the in-flight execution through the
+gateway; the execution is recorded `cancelled` and the next invocation
+resumes.
+
+**Provider configuration is a prerequisite:** with no provider
+registered, `run` fails with `AGENT_PROVIDER_NOT_CONFIGURED` (exit 3)
+and never falls back to pretending a manual workflow completed. PR4
+adds the first real provider (claude-code, headless).

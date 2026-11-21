@@ -6,6 +6,13 @@
 // tests and implementations between invocations; the kit verifies,
 // records evidence, and blocks completion without a complete
 // Red -> Green -> Refactor chain per task.
+//
+// `kit feature <id> run` is Mode 1 (kit-orchestrated, ADR-0019): the kit
+// drives the SAME TDD state machine through a configured agent provider
+// in an isolated git worktree. Providers are injected at construction
+// (createFeatureCommand({ agentProviders })); the default command ships
+// with NONE registered, so `run` fails with AGENT_PROVIDER_NOT_CONFIGURED
+// (exit 3) until a provider is configured (PR4 adds claude-code).
 
 import path from 'node:path';
 import {
@@ -15,6 +22,12 @@ import {
   startFeatureRun,
   type FeatureRunReport,
 } from '@agentic-sdlc-kit/core';
+import type { AgentProvider } from '@agentic-sdlc-kit/contracts';
+import {
+  AgentGateway,
+  runFeatureOrchestration,
+  type OrchestrationReport,
+} from '../application/agent/index.js';
 import type { Command, CommandContext, CommandResult } from './types.js';
 
 const PHASES = ['red', 'green', 'refactor'] as const;
@@ -29,47 +42,70 @@ function fail(ctx: CommandContext, message: string): CommandResult {
   return { exitCode: 1, message };
 }
 
-export const featureCommand: Command = {
-  name: 'feature',
-  summary:
-    'Drive the phase-based TDD feature workflow (spec -> plan -> red/green/refactor -> verify).',
-  async run(ctx: CommandContext): Promise<CommandResult> {
-    if (ctx.argv.includes('--help') || ctx.argv.includes('-h')) {
-      ctx.stdout(formatHelp());
-      return { exitCode: 0 };
-    }
+function blocked(ctx: CommandContext, message: string): CommandResult {
+  ctx.stderr(`kit feature: ${message}\n`);
+  return { exitCode: 3, message };
+}
 
-    const positional = ctx.argv.filter((a) => !a.startsWith('-'));
-    const featureId = positional[0];
-    if (!featureId) {
-      return fail(ctx, 'missing required feature identifier (e.g. FEATURE-001)');
-    }
+export interface FeatureCommandOptions {
+  /**
+   * Agent providers injectable for Mode 1 (`run`) — used by embedding
+   * code and tests. The shipped CLI registers none: with no provider,
+   * `run` fails with AGENT_PROVIDER_NOT_CONFIGURED (ADR-0019 §1).
+   */
+  readonly agentProviders?: ReadonlyArray<AgentProvider>;
+}
 
-    const isJson = ctx.argv.includes('--json');
-    const action = positional[1] ?? 'auto';
-    const root = path.resolve(ctx.cwd, '.');
-
-    if (isPhase(action)) {
-      return runPhase(ctx, root, featureId, action, positional[2], isJson);
-    }
-    switch (action) {
-      case 'start':
-        return runStart(ctx, root, featureId, isJson);
-      case 'status':
-        return runStatus(ctx, root, featureId, isJson);
-      case 'verify':
-        return runVerify(ctx, root, featureId, isJson, ctx.argv.includes('--dry-run'));
-      case 'auto': {
-        const state = await getFeatureRunState(root, featureId);
-        return state.ok
-          ? runStatus(ctx, root, featureId, isJson)
-          : runStart(ctx, root, featureId, isJson);
+export function createFeatureCommand(opts: FeatureCommandOptions = {}): Command {
+  return {
+    name: 'feature',
+    summary:
+      'Drive the TDD feature workflow (spec -> plan -> red/green/refactor -> verify) or orchestrate it through an agent provider (run).',
+    async run(ctx: CommandContext): Promise<CommandResult> {
+      if (ctx.argv.includes('--help') || ctx.argv.includes('-h')) {
+        ctx.stdout(formatHelp());
+        return { exitCode: 0 };
       }
-      default:
-        return fail(ctx, `unknown action '${action}' (expected start|red|green|refactor|status|verify)`);
-    }
-  },
-};
+
+      const positional = ctx.argv.filter((a) => !a.startsWith('-'));
+      const featureId = positional[0];
+      if (!featureId) {
+        return fail(ctx, 'missing required feature identifier (e.g. FEATURE-001)');
+      }
+
+      const isJson = ctx.argv.includes('--json');
+      const action = positional[1] ?? 'auto';
+      const root = path.resolve(ctx.cwd, '.');
+
+      if (isPhase(action)) {
+        return runPhase(ctx, root, featureId, action, positional[2], isJson);
+      }
+      switch (action) {
+        case 'start':
+          return runStart(ctx, root, featureId, isJson);
+        case 'status':
+          return runStatus(ctx, root, featureId, isJson);
+        case 'verify':
+          return runVerify(ctx, root, featureId, isJson, ctx.argv.includes('--dry-run'));
+        case 'run':
+          return runOrchestrated(ctx, root, featureId, isJson, opts);
+        case 'auto': {
+          const state = await getFeatureRunState(root, featureId);
+          return state.ok
+            ? runStatus(ctx, root, featureId, isJson)
+            : runStart(ctx, root, featureId, isJson);
+        }
+        default:
+          return fail(
+            ctx,
+            `unknown action '${action}' (expected start|red|green|refactor|status|verify|run)`,
+          );
+      }
+    },
+  };
+}
+
+export const featureCommand: Command = createFeatureCommand();
 
 async function runStart(
   ctx: CommandContext,
@@ -183,6 +219,102 @@ async function runVerify(
   return { exitCode: res.value.status === 'passed' ? 0 : 1 };
 }
 
+/**
+ * Mode 1 (ADR-0019): orchestrate the whole feature through a configured
+ * agent provider. Providers come from the command's construction options
+ * — the shipped CLI registers none, and `run` then fails blocked (exit 3)
+ * rather than pretending a manual workflow completed.
+ */
+async function runOrchestrated(
+  ctx: CommandContext,
+  root: string,
+  featureId: string,
+  isJson: boolean,
+  opts: FeatureCommandOptions,
+): Promise<CommandResult> {
+  const providerFlag = parseFlagValue(ctx.argv, '--provider');
+  const maxDurationMs = parseFlagValue(ctx.argv, '--max-duration-ms');
+
+  if (!providerFlag) {
+    return blocked(
+      ctx,
+      'AGENT_PROVIDER_NOT_CONFIGURED: no agent provider selected. Pass --provider <id> ' +
+        'with a configured provider (none are configured in this build; PR4 adds ' +
+        'claude-code). Mode 1 execution will not fall back to pretending a manual ' +
+        'workflow completed — use red/green/refactor to drive the phases yourself.',
+    );
+  }
+
+  const gateway = new AgentGateway({
+    providers: opts.agentProviders ?? [],
+    projectRoot: root,
+  });
+
+  const controller = new AbortController();
+  const onSigint = (): void => controller.abort();
+  process.once('SIGINT', onSigint);
+  try {
+    const res = await runFeatureOrchestration({
+      projectRoot: root,
+      featureId,
+      gateway,
+      providerId: providerFlag,
+      ...(maxDurationMs !== undefined && Number.isFinite(Number(maxDurationMs))
+        ? { maxDurationMs: Math.max(1, Math.floor(Number(maxDurationMs))) }
+        : {}),
+      signal: controller.signal,
+      ...(isJson ? {} : { onProgress: (line: string) => ctx.stdout(line) }),
+    });
+    if (!res.ok) {
+      if (res.error.code === 'AGENT_PROVIDER_NOT_CONFIGURED') return blocked(ctx, res.error.message);
+      return fail(ctx, res.error.message);
+    }
+    const report = res.value;
+    if (isJson) {
+      ctx.stdout(JSON.stringify(report, null, 2) + '\n');
+    } else {
+      ctx.stdout(formatOrchestrationReport(report));
+    }
+    if (report.status === 'completed') return { exitCode: 0 };
+    if (report.status === 'needs_approval') return blocked(ctx, report.message);
+    return { exitCode: 1, message: report.message };
+  } finally {
+    process.removeListener('SIGINT', onSigint);
+  }
+}
+
+function parseFlagValue(argv: ReadonlyArray<string>, flag: string): string | undefined {
+  const i = argv.indexOf(flag);
+  if (i === -1) return undefined;
+  const value = argv[i + 1];
+  if (!value || value.startsWith('-')) return undefined;
+  return value;
+}
+
+function formatOrchestrationReport(report: OrchestrationReport): string {
+  const lines: string[] = [
+    `Feature Orchestration: ${report.featureId} (run ${report.runId}, provider ${report.providerId})`,
+    `Status:               ${report.status.toUpperCase()}`,
+    `Workspace:            ${report.worktreePath} (branch ${report.workspace.branch ?? 'n/a'})`,
+  ];
+  for (const t of report.tasks) {
+    lines.push(
+      `  ${t.taskId}: ${t.completed ? 'completed' : `stopped at ${t.phase}`} (${t.records} evidence record(s))`,
+    );
+  }
+  lines.push(`Executions: ${report.executions.length} agent execution(s)`);
+  for (const e of report.executions) {
+    lines.push(`  ${e.executionId}: ${e.outcome}`);
+  }
+  if (report.verification) {
+    lines.push(
+      `Final verification:   ${report.verification.status.toUpperCase()} (${report.verification.checks.length} checks)`,
+    );
+  }
+  lines.push(report.message);
+  return lines.join('\n') + '\n';
+}
+
 function formatSummary(report: FeatureRunReport): string {
   const evidence = report.tddEvidence
     .map((t) => `${t.taskId} [${t.records.map((r) => `${r.phase}:${r.status}`).join(' ')}]`)
@@ -201,11 +333,11 @@ function formatSummary(report: FeatureRunReport): string {
 function formatHelp(): string {
   return [
     'Usage: kit feature <feature-id> [action] [task-id] [--dry-run] [--json]',
+    '       kit feature <feature-id> run [--provider <id>] [--max-duration-ms <n>] [--json]',
     '',
-    'Drive the TDD feature workflow phase by phase. The agent writes tests and',
-    'implementations between invocations; the kit verifies, records evidence,',
-    'and blocks completion until every task has a complete',
-    'Red -> Green -> Refactor evidence chain.',
+    'Drive the TDD feature workflow phase by phase, or orchestrate it end-to-end',
+    'through an agent provider. The kit verifies, records evidence, and blocks',
+    'completion until every task has a complete Red -> Green -> Refactor evidence chain.',
     '',
     'Actions:',
     '  start                validate spec/plan and initialize the run state',
@@ -214,12 +346,22 @@ function formatHelp(): string {
     '  refactor <task-id>   run verification: it MUST pass (behavior preserved)',
     '  status               show run state and the next action',
     '  verify               audit the evidence chain and run final verification',
+    '  run                  Mode 1: orchestrate all phases through an agent provider',
+    '                       in an isolated git worktree (ADR-0019)',
     '  (none)               start if no run exists, otherwise show status',
     '',
     'Options:',
-    '  --dry-run   (verify only) simulate the final verification',
-    '  --json      output machine-readable run state or report',
-    '  --help      Show this message',
+    '  --dry-run            (verify only) simulate the final verification',
+    '  --provider <id>      (run only) agent provider to orchestrate through',
+    '  --max-duration-ms N  (run only) per-execution duration budget',
+    '  --json               output machine-readable run state or report',
+    '  --help               Show this message',
+    '',
+    'Exit codes:',
+    '  0  action succeeded / feature completed',
+    '  1  verification or orchestration failed',
+    '  3  blocked: no agent provider configured (AGENT_PROVIDER_NOT_CONFIGURED)',
+    '     or the run is waiting for a required approval',
     '',
   ].join('\n');
 }

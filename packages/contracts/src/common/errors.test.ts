@@ -20,6 +20,7 @@ describe('Errors factory', () => {
     { code: 'ARTIFACT_READ_DENIED', factory: (m) => Errors.artifactReadDenied(m) },
     { code: 'TIMEOUT', factory: (m) => Errors.timeout(m) },
     { code: 'NOT_IMPLEMENTED', factory: (m) => Errors.notImplemented(m) },
+    { code: 'AGENT_PROVIDER_NOT_CONFIGURED', factory: (m) => Errors.agentProviderNotConfigured(m) },
     { code: 'INTERNAL', factory: (m) => Errors.internal(m) },
   ];
 

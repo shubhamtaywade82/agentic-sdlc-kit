@@ -11,6 +11,13 @@
 //   5. claude-code-adapter imports only from contracts.
 //   6. No package imports from a sibling's dist/.
 //
+// EXCEPTION (PR3, ADR-0019 §4): `*.test.ts` files may additionally import
+// `@agentic-sdlc-kit/testing`. The runtime surface of every package keeps
+// its discipline; tests may use the shared fixtures/validators — the
+// canonical MockAgentProvider lives in testing and the CLI's orchestration
+// integration tests (ADR-0019 §5, PR3 acceptance) drive the real command
+// through it. Non-test files remain fully restricted.
+//
 // We enforce this by scanning each package's src/**/*.ts files for import
 // statements and checking them against the per-package allow-list.
 
@@ -112,6 +119,12 @@ interface Violation {
   reason: string;
 }
 
+/** Test-only files (PR3 exception): may import @agentic-sdlc-kit/testing. */
+function isTestFile(file: string): boolean {
+  const base = path.basename(file);
+  return base.endsWith('.test.ts') || /^test-[a-z0-9-]*\.ts$/.test(base);
+}
+
 async function checkPackage(pkg: Pkg): Promise<Violation[]> {
   // Plugins use hooks/ and policies/ instead of src/. Scan whichever exists.
   const candidateDirs = ['src', 'hooks', 'policies'].map((d) => path.join(pkg.dir, d));
@@ -165,13 +178,15 @@ async function checkPackage(pkg: Pkg): Promise<Violation[]> {
       // Extract the package name: @agentic-sdlc-kit/<name>[/...]
       const sibling = specifier.slice(SIBLING_PREFIX.length).split('/')[0];
       if (sibling === undefined) continue;
-      if (!pkg.allowedImports.includes(SIBLING_PREFIX + sibling)) {
+      const allowed = [...pkg.allowedImports];
+      if (isTestFile(file)) allowed.push(`${SIBLING_PREFIX}testing`);
+      if (!allowed.includes(SIBLING_PREFIX + sibling)) {
         violations.push({
           pkg: pkg.name,
           file: path.relative(ROOT, file),
           importStatement: specifier,
           reason: `package ${sibling} not in allow-list for ${pkg.name} (allowed: ${
-            pkg.allowedImports.map((s) => s.slice(SIBLING_PREFIX.length)).join(', ') || 'none'
+            allowed.map((s) => s.slice(SIBLING_PREFIX.length)).join(', ') || 'none'
           })`,
         });
       }

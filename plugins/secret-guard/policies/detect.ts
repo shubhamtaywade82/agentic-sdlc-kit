@@ -28,6 +28,10 @@ export type SecretKind =
   | 'slack-token'
   | 'private-key-pem'
   | 'generic-api-key'
+  | 'openai-key'
+  | 'anthropic-key'
+  | 'db-url-credentials'
+  | 'password-assignment'
   | 'unknown';
 
 export type SecretSource =
@@ -109,6 +113,42 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     kind: 'private-key-pem',
     pattern: '-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----',
     severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'anthropic-key',
+    kind: 'anthropic-key',
+    pattern: '(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_-]{32,}',
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'openai-key',
+    kind: 'openai-key',
+    // Covers sk-..., sk-proj-..., sk-svcacct-..., sk-admin-...; the lookahead
+    // keeps Anthropic keys (sk-ant-) out of this rule. The digit lookahead
+    // rejects English identifiers such as sk-learning-about-sorting.
+    pattern: '(?<![A-Za-z0-9])sk-(?!ant-)(?:proj-|svcacct-|admin-)?(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}',
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'db-url-credentials',
+    kind: 'db-url-credentials',
+    // scheme://user:PASSWORD@host — the captured group is the password. A
+    // placeholder such as ${DB_PASSWORD} or <password> is not a secret.
+    pattern: '[a-zA-Z][a-zA-Z0-9+.-]*://[^\\s:/@\'"]+:(?![$<{])([^\\s@\'"/]{4,})@[^\\s\'"]+',
+    severity: 'high',
+    enabled: true,
+  },
+  {
+    id: 'password-assignment',
+    kind: 'password-assignment',
+    // Case-insensitive by explicit classes (no (?i) in ECMAScript). Medium
+    // severity: a quoted literal of 8+ chars assigned to a password name.
+    pattern:
+      '(?:[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])\\s*[:=]\\s*["\']([^"\'\\s$<{]{8,})["\']',
+    severity: 'medium',
     enabled: true,
   },
   {

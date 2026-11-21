@@ -181,15 +181,14 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 | :----------------- | :------------------------ | :----------------------------------------------------------------------------------------------------- |
 | **`sdlc-guard`**   | PreToolUse (Bash)         | Token-level classifier: asks before destructive commands (`rm -r`, force-push, `reset --hard`, DB drops, deploys, `curl \| sh`); denies when non-interactive. |
 | **`secret-guard`** | PreToolUse (Write/Edit/Bash) | Refuses file writes and `git commit` whose added lines contain a known secret format. Reports kind and line, never the value. |
-| **`model-router`** (not converted) | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
-| **`run-observer`** (not converted) | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
+| **`model-router`** | UserPromptSubmit (advisory) | Adds routing context when a prompt is high-risk or high-complexity. Advisory only: hooks cannot switch the model. |
+| **`run-observer`** | PostToolUse | Appends one metadata line per tool call (time, session, tool name) to `.ai-kit/state/`, size-capped. Never records tool input or output. |
 
-Install plugins into your runtime environment. `sdlc-guard` and `secret-guard`
-are Claude Code command hooks (`hooks/hooks.json`, PreToolUse). They run the
-built entries under `dist/`, so run `pnpm run build` first. The installer
-validates every built hook entry before linking and reports per-plugin results.
-`model-router` and `run-observer` still use the retired module contract; they
-are reported as `not-converted` and are not linked.
+Install plugins into your runtime environment. All four plugins are Claude Code
+command hooks (`hooks/hooks.json`). They run the built entries under `dist/`,
+so run `pnpm run build` first. The installer validates every built hook entry
+before linking and reports per-plugin results. Hooks that cannot be verified
+are reported and not linked.
 
 ```bash
 kit install --profile full-sdlc --stack node-typescript

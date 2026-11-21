@@ -10,18 +10,14 @@
     "forceConsistentCasingInFileNames": true,
     "target": "ES2022",
     "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": [],
-    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "dist",
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": [
-    "hooks/**/*.ts",
-    "policies/**/*.ts",
-    "contract.d.ts",
-    ".claude-plugin/types/**/*.d.ts"
-  ],
+  "include": ["hooks/**/*.ts", "policies/**/*.ts"],
   "exclude": ["tests/**/*.ts", "node_modules", "dist"]
 }

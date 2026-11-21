@@ -1,13 +1,8 @@
 {
   "id": "model-router",
   "version": "0.8.0",
-  "hooks": ["turn.step", "agent.spawn"],
-  "apiAccess": ["ui.log", "state.get"],
-  "filesystemAccess": [],
+  "hooks": ["UserPromptSubmit"],
   "networkAccess": false,
   "processExecution": false,
-  "modifiesPrompts": false,
-  "modifiesToolCalls": false,
-  "modifiesModels": true,
-  "learningAutonomyLevel": "L0"
+  "modifiesToolCalls": false
 }

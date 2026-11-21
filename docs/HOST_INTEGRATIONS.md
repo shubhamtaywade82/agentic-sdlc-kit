@@ -55,7 +55,8 @@ documented protocol:
 Any other non-zero exit is a non-blocking error in Claude Code and would fail
 open, so the hooks exit 2 on every internal failure. `onFailure: "block"` on
 each handler covers timeouts and crashes (Claude Code >= 2.1.295).
-`model-router` and `run-observer` have not been converted and are not linked.
+`model-router` (UserPromptSubmit, advisory) and `run-observer` (PostToolUse,
+metadata only) use the same command-hook protocol. Neither blocks.
 
 Or manually link the plugins in your project's `.claude/` directory:
 

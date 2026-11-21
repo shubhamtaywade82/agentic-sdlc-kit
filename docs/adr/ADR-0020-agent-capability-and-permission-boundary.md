@@ -65,6 +65,18 @@ operations. A capability denied by the Kit evaluator must be denied by the
 runtime representation, and vice versa. Parity failures are release
 blockers.
 
+Landed (PR4): for Claude Code the generated representation is
+`packages/cli/src/application/agent/providers/claude-code/permission-config.ts`
+(allow/deny tool rules, path-scoped writes, permission mode, turn bound —
+derived from the frozen snapshot only), and the parity tests live in
+`permission-config.test.ts`: every capability the snapshot did not grant
+produces no allowing rule (with an explicit deny for network tools and
+the `Task` subagent), and every generated Bash rule infers back to exactly
+the capability that produced it — one mapping table drives both directions.
+PR4 additionally hardened the enforcement boundary itself: the gateway now
+scrubs a result's `session.resumeToken` before the execution record
+reaches disk (§6.8 — tokens are credentials; memory only).
+
 ### 4. Fail-closed on policy problems
 
 Missing, malformed, or mismatched (wrong `policyHash`, stale snapshot)

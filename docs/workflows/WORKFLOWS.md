@@ -235,7 +235,7 @@ kit feature FEATURE-001 verify         # audit chain + whole-profile verificatio
 ### Mode 1 — kit-orchestrated (PR3, M36)
 
 ```
-kit feature FEATURE-001 run --provider <id>
+kit feature FEATURE-001 run [--provider <id>]   # default provider: claude-code (PR4)
 ```
 
 The orchestrator, for every pending task phase (red, then green, then

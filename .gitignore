@@ -30,5 +30,9 @@ pnpm-debug.log*
 .ai-kit/state/
 .ai-kit/reports/
 
+# Claude Code runtime links (kit install / PR4 mod-parity create these in
+# worktrees and projects at run time; they are machinery, not content)
+.claude/
+
 # OS
 Thumbs.db

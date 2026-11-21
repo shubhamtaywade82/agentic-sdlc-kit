@@ -8,6 +8,7 @@ import {
   serializeProfileYaml,
 } from '@agentic-sdlc-kit/core';
 import { MockAgentProvider } from '@agentic-sdlc-kit/testing';
+import type { AgentProvider } from '@agentic-sdlc-kit/contracts';
 import { buildOrchestrationFixture } from '../application/agent/test-fixture.js';
 import { createFeatureCommand, featureCommand } from './feature.js';
 import type { CommandContext } from './types.js';
@@ -172,14 +173,46 @@ describe('featureCommand', () => {
   });
 });
 
-describe('featureCommand run (Mode 1, PR3)', () => {
-  it('is blocked (exit 3) with no --provider: AGENT_PROVIDER_NOT_CONFIGURED, never a silent fallback', async () => {
+describe('featureCommand run (Mode 1, PR3+PR4)', () => {
+  // A deterministic stand-in for a registered-but-unavailable provider: PR4
+  // gates `run` on the provider's healthCheck (exit 3, honest message,
+  // never a silent fallback) before anything durable happens.
+  const unavailableClaudeCode = (): AgentProvider => ({
+    id: 'claude-code',
+    async capabilities() {
+      return {
+        capabilities: ['repository.read', 'repository.write', 'process.test'],
+        budgetEnforcement: {
+          maxDurationMs: 'gateway-enforced',
+          maxToolCalls: 'gateway-enforced',
+          maxInputTokens: 'best-effort',
+          maxOutputTokens: 'best-effort',
+          maxTotalTokens: 'best-effort',
+          maxEstimatedCost: 'best-effort',
+        },
+      };
+    },
+    async healthCheck() {
+      return { available: false, message: 'stub: claude CLI not installed on this machine' };
+    },
+    async start() {
+      throw new Error('unavailable provider must never be started');
+    },
+    async resume() {
+      throw new Error('unavailable provider must never be resumed');
+    },
+    async cancel() {},
+  });
+
+  it('is blocked (exit 3) when the default claude-code provider is unavailable — AGENT_PROVIDER_UNAVAILABLE, never a silent fallback', async () => {
     const project = await setupProject();
     try {
+      const command = createFeatureCommand({ agentProviders: [unavailableClaudeCode()] });
       const ctx = makeCtx(['FEATURE-001', 'run'], project.root);
-      const r = await featureCommand.run(ctx);
+      const r = await command.run(ctx);
       expect(r.exitCode).toBe(3);
-      expect(ctx.err[0]).toContain('AGENT_PROVIDER_NOT_CONFIGURED');
+      expect(ctx.err[0]).toContain('AGENT_PROVIDER_UNAVAILABLE');
+      expect(ctx.err[0]).toContain('claude-code');
       expect(ctx.err[0]).toContain('will not fall back');
     } finally {
       await fs.rm(project.root, { recursive: true, force: true });
@@ -189,10 +222,25 @@ describe('featureCommand run (Mode 1, PR3)', () => {
   it('is blocked (exit 3) when --provider names an unregistered provider', async () => {
     const project = await setupProject();
     try {
-      const ctx = makeCtx(['FEATURE-001', 'run', '--provider', 'claude-code'], project.root);
+      // The shipped default registers claude-code (PR4); 'codex' is not it.
+      const ctx = makeCtx(['FEATURE-001', 'run', '--provider', 'codex'], project.root);
       const r = await featureCommand.run(ctx);
       expect(r.exitCode).toBe(3);
       expect(ctx.err[0]).toContain('No agent provider');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('is blocked (exit 3) for `run` in a build that registers NO providers (PR3 contract preserved)', async () => {
+    const project = await setupProject();
+    try {
+      const command = createFeatureCommand({ agentProviders: [] });
+      const ctx = makeCtx(['FEATURE-001', 'run'], project.root);
+      const r = await command.run(ctx);
+      expect(r.exitCode).toBe(3);
+      expect(ctx.err[0]).toContain("No agent provider 'claude-code' is configured");
+      expect(ctx.err[0]).toContain('will not fall back');
     } finally {
       await fs.rm(project.root, { recursive: true, force: true });
     }

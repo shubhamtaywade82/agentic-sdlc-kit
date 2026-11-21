@@ -295,9 +295,15 @@ new packages until proven responsibilities demand extraction):
   `.ai-kit/state/agent-executions/`; orchestration linkage under
   `.ai-kit/state/orchestrations/`.
 
-Providers are INJECTED (`AgentGatewayOptions.providers`). The shipped CLI
-registers none, so `kit feature <id> run` fails with
-`AGENT_PROVIDER_NOT_CONFIGURED` (exit 3) and never pretends a manual
-workflow completed. PR4 adds the first real provider (claude-code). The
+Providers are INJECTED (`AgentGatewayOptions.providers`). Since PR4 the
+shipped CLI registers the first real provider — claude-code
+(`packages/cli/src/application/agent/providers/claude-code/`) — and gates
+`run` on its healthCheck: an unavailable runtime fails with
+`AGENT_PROVIDER_UNAVAILABLE` (exit 3), never a silent fallback and never
+`bypassPermissions` (ADR-0019 §6.5). The provider derives the session's
+permission configuration from the canonical snapshot (ADR-0020 §2),
+links the runtime Mods into the worktree (parity, ADR-0020 §2/§3),
+streams events live so the gateway's counters fire mid-run, and keeps
+resume tokens only in the AES-256-GCM store (ADR-0020 §6.8). The
 integration direction table (host adapter vs provider adapter) is in
 ADR-0019 §2 — `claude-code-adapter` keeps its host-adapter role.

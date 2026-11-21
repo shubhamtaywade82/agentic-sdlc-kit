@@ -75,7 +75,7 @@ pnpm --filter @agentic-sdlc-kit/cli link --global
 
 ## Core Workflows
 
-The kit provides 15 commands covering the complete SDLC:
+The kit provides 16 commands covering the complete SDLC:
 
 ### 1. Repository Discovery & Initialization
 
@@ -87,7 +87,20 @@ kit inspect .
 kit init .
 ```
 
-### 2. Incremental Feature Workflow (`kit feature`)
+### 2. Requirements Elicitation (`kit elicit`)
+
+```bash
+# Ask the blocking questions for a feature, saving after each answer
+kit elicit FEATURE-001
+# Non-interactive (agents, CI): all-or-nothing
+kit elicit FEATURE-001 --answers answers.json
+# Gate check only: exit 1 while a blocking question has no user answer
+kit elicit FEATURE-001 --check
+```
+
+Blocking questions must be answered by a person; only non-blocking ones may be recorded as assumptions.
+
+### 3. Incremental Feature Workflow (`kit feature`)
 
 Executes a strict vertical-slice engineering workflow with an **evidence-gated TDD loop** (ADR-0018):
 

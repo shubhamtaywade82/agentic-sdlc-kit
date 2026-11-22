@@ -3,9 +3,9 @@
 // Pure decision for one Bash command: the strictest verdict across every
 // destructive action the classifier finds. deny beats ask beats allow.
 
-import { classifyCommand } from './classify.js';
-import { evaluateAction } from './evaluator.js';
-import type { PolicyContext } from './types.js';
+import { classifyCommand } from './classify';
+import { evaluateAction } from './evaluator';
+import type { PolicyContext } from './types';
 
 export type HookDecision =
   | { kind: 'allow' }

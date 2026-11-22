@@ -1,16 +1,4 @@
 {
-  "description": "model-router: advisory routing context on each prompt (UserPromptSubmit). Advisory only; never blocks.",
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/advise.js\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
+  "description": "model-router hooks: turn.step (streaming generator, yield* delegation) and agent.spawn routing. Suggest-only by default; skips resumed runs and preserves explicit models.",
+  "modules": ["./register.ts"]
 }

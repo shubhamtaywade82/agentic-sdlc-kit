@@ -1,0 +1,156 @@
+// plugins/secret-guard/tests/register.test.ts
+//
+// Behavioral tests against the MockRuntime, which mirrors the REAL host
+// contract: tool.call carries the arguments as fields of e (e.command for
+// Bash, e.file_path + e.content for Write, e.new_string for Edit);
+// $.process.run resolves queued results; a hook error runs the chained
+// .catch (fail closed).
+import { describe, expect, it } from 'vitest';
+import { MockRuntime } from '@agentic-sdlc-kit/mod-sdk';
+import { register } from '../hooks/register';
+
+// Real-shaped (but fake) samples for detection. None of these are valid
+// credentials.
+const AWS_KEY_SAMPLE = 'AKIAIOSFODNNN7EXAMPLE';
+const GITHUB_TOKEN_SAMPLE = 'ghp_' + 'a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8';
+const SLACK_TOKEN_SAMPLE = 'xoxb-1234567890abcdefghijklmnop';
+
+describe('secret-guard register', () => {
+  it('registers three gated tool.call handlers plus the result redactor', () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    expect(runtime.registrationCount('tool.call')).toBe(4);
+  });
+
+  it('denies a Write of a file containing an AWS access key', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    const result = await runtime.fire('tool.call', {
+      tool: 'Write',
+      file_path: 'config.env',
+      content: `AWS_KEY=${AWS_KEY_SAMPLE}\n`,
+    });
+    expect(result.answered).toBe(true);
+    const value = result.value as { deny?: string };
+    expect(value.deny).toMatch(/secret-guard/);
+    expect(value.deny).toMatch(/aws-access-key/);
+  });
+
+  it('denies an Edit whose new_string adds a GitHub token', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    const result = await runtime.fire('tool.call', {
+      tool: 'Edit',
+      file_path: 'scripts/deploy.sh',
+      old_string: 'TOKEN=',
+      new_string: `TOKEN=${GITHUB_TOKEN_SAMPLE}`,
+    });
+    expect(result.answered).toBe(true);
+    const value = result.value as { deny?: string };
+    expect(value.deny).toMatch(/github-token/);
+  });
+
+  it('forwards a Write of clean content', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    const result = await runtime.fire('tool.call', {
+      tool: 'Write',
+      file_path: 'README.md',
+      content: '# Hello world\nThis is a normal file.\n',
+    });
+    expect(result.forwarded).toBe(true);
+    expect(result.answered).toBe(false);
+  });
+
+  it('scans the staged diff before a git commit and denies a secret in it', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.queueProcessResults({
+      stdout: `+password = "${AWS_KEY_SAMPLE}"\n`,
+      exitCode: 0,
+    });
+    const result = await runtime.fire('tool.call', {
+      tool: 'Bash',
+      command: "git commit -m 'release v1.0.0'",
+    });
+    expect(result.answered).toBe(true);
+    const value = result.value as { deny?: string };
+    expect(value.deny).toMatch(/staged changes contain/);
+    expect(runtime.getProcessCalls()).toEqual([['git', 'diff', '--cached']]);
+  });
+
+  it('forwards a git commit whose staged diff is clean', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.queueProcessResults({ stdout: '+const x = 1;\n', exitCode: 0 });
+    const result = await runtime.fire('tool.call', {
+      tool: 'Bash',
+      command: "git commit -m 'add x'",
+    });
+    expect(result.forwarded).toBe(true);
+    expect(result.answered).toBe(false);
+  });
+
+  it('fails closed when the staged diff cannot be read', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
+    const result = await runtime.fire('tool.call', {
+      tool: 'Bash',
+      command: 'git push origin main',
+    });
+    expect(result.answered).toBe(true);
+    expect((result.value as { deny?: string }).deny).toMatch(/could not read the staged changes/);
+  });
+
+  it('does not run git for a non-git Bash command', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    const result = await runtime.fire('tool.call', {
+      tool: 'Bash',
+      command: 'ls -la',
+    });
+    expect(result.forwarded).toBe(true);
+    expect(runtime.getProcessCalls()).toEqual([]);
+  });
+
+  it('redacts secrets from a tool result the model would read', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.setHostResult({
+      text: `config: ${SLACK_TOKEN_SAMPLE} and ${AWS_KEY_SAMPLE}`,
+      isError: false,
+    });
+    const result = await runtime.fire('tool.call', {
+      tool: 'Bash',
+      command: 'cat config.env',
+    });
+    const value = result.value as { text?: string };
+    expect(value.text).not.toContain(SLACK_TOKEN_SAMPLE);
+    expect(value.text).not.toContain(AWS_KEY_SAMPLE);
+    expect(value.text).toContain('[REDACTED:');
+    expect(runtime.getLogs().some((l) => l.includes('redacted 2 secret(s)'))).toBe(true);
+  });
+
+  it('leaves a denied tool result untouched (no double handling)', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.setHostResult({ deny: 'refused by a later hook' });
+    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'cat .env' });
+    expect(result.value).toEqual({ deny: 'refused by a later hook' });
+  });
+
+  it('fails CLOSED via .catch when a gated hook errors', async () => {
+    const runtime = new MockRuntime();
+    // Poison the policy key: getPolicy throws inside the Write hook.
+    runtime.poisonState('secret-guard', 'policy');
+    runtime.load(register);
+    const result = await runtime.fire('tool.call', {
+      tool: 'Write',
+      file_path: 'x.txt',
+      content: 'hello',
+    });
+    expect(result.answered).toBe(true);
+    expect((result.value as { deny?: string }).deny).toMatch(/fail closed/);
+  });
+});

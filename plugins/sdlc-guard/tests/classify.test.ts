@@ -2,7 +2,7 @@
 // previous substring regexes missed (split flags, +refspec, find -delete,
 // curl|sh, wrapper programs) or a benign look-alike that must stay allowed.
 import { describe, expect, it } from 'vitest';
-import { decideBash } from '../policies/decision.js';
+import { decideBash } from '../policies/decision';
 
 const ASK = ['rm -rf /', 'rm -fr build', 'rm -r -f dist', 'rm --recursive --force x', 'rm -r x',
   'git push -f origin main', 'git push origin +main', 'git push origin :feature', 'git push --force-with-lease origin feat',

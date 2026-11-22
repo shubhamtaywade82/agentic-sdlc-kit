@@ -1,8 +1,8 @@
 // plugins/sdlc-guard/policies/types.ts
 //
-// Local type surface for the sdlc-guard hook. Self-contained on purpose: the
-// hook runs as a standalone Node process out of the plugin's dist/ and must
-// not import workspace packages.
+// Local type surface for the sdlc-guard Mod. Self-contained on purpose: a
+// Claude Code hooks module imports only its own files by relative path and
+// 'claude-code', so it cannot import @agentic-sdlc-kit/contracts.
 
 export type ActionCategory =
   // File operations:
@@ -34,6 +34,8 @@ export interface ClassifiedAction {
 
 export interface PolicyContext {
   interactive: boolean;
+  scopeFileCount?: number;
+  isProduction?: boolean;
 }
 
 export type PolicyVerdict = 'allow' | 'deny' | 'require-approval';

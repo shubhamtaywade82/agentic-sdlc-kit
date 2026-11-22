@@ -1,18 +1,4 @@
 {
-  "description": "secret-guard: refuses file writes and git commits that add secrets (PreToolUse). Requires Claude Code >= 2.1.295 for onFailure.",
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/guard.js\"",
-            "timeout": 15,
-            "onFailure": "block"
-          }
-        ]
-      }
-    ]
-  }
+  "description": "secret-guard hooks: scans Write/Edit/NotebookEdit content, the staged diff before git commit/push, and tool results — refusing or redacting secrets. Fail closed via .catch.",
+  "modules": ["./register.ts"]
 }

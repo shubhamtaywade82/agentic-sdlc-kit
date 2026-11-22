@@ -46,7 +46,7 @@ Enforced by `scripts/check-architecture.ts` in CI:
 ### 1. Requirements & Installation
 
 - **Node.js**: `>= 20.11.0`
-- **pnpm**: `9.12.0` (pinned via `packageManager` in `package.json`)
+- **pnpm**: `>= 12.0.0` (pinned via `packageManager` in `package.json`)
 
 ```bash
 # Install dependencies
@@ -68,7 +68,7 @@ node packages/cli/dist/index.js doctor
 _(Optional)_ Link `kit` globally to run directly from your PATH:
 
 ```bash
-pnpm --filter @agentic-sdlc-kit/cli link --global
+pnpm add -g ./packages/cli
 ```
 
 ---

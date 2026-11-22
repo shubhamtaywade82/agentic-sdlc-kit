@@ -14,12 +14,12 @@ contract changes, which require an ADR.
 ```bash
 git clone <this repo>
 cd agentic-sdlc-kit
-corepack enable          # picks up pnpm@9.12.0 from package.json
+corepack enable          # picks up pnpm from package.json
 pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-Requirements: Node 20+ and pnpm 9.12.0.
+Requirements: Node 20+ and pnpm 12.21.0.
 
 ## The verify pipeline
 

@@ -9,7 +9,7 @@ This guide walks you through setting up and using the **Agentic SDLC Kit** for d
 ### Prerequisites
 
 - **Node.js**: `>= 20.11.0`
-- **pnpm**: `9.12.0` (managed via Corepack or installed globally)
+- **pnpm**: `>= 12.0.0` (managed via Corepack or installed globally)
 
 ### Build and Test
 
@@ -31,7 +31,7 @@ pnpm run verify
 node packages/cli/dist/index.js doctor
 
 # (Optional) Link the CLI globally so you can run `kit` anywhere
-pnpm --filter @agentic-sdlc-kit/cli link --global
+pnpm add -g ./packages/cli
 ```
 
 ---

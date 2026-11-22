@@ -5,6 +5,6 @@ source of truth for how to work in this repository.
 
 Project specifics:
 
-- Modular pnpm-workspace monorepo (Node >= 20.11, pnpm 9.12.0).
+- Modular pnpm-workspace monorepo (Node >= 20.11, pnpm 12.21.0).
 - Run `pnpm run verify` before claiming done.
 - Safety boundaries in Section 4 of `AGENTS.md` require human approval.

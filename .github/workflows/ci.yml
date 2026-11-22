@@ -44,7 +44,7 @@ jobs:
         # Pin: pnpm/action-setup@v4 → SHA at tag v4.0.0.
         uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
-          version: 9.12.0
+          version: 12.21.0
 
       - name: Setup Node ${{ matrix.node }}
         # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
@@ -138,7 +138,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
-          version: 9.12.0
+          version: 12.21.0
 
       - name: Setup Node 22
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
@@ -171,7 +171,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
-          version: 9.12.0
+          version: 12.21.0
 
       - name: Setup Node 22
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
@@ -214,7 +214,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
-          version: 9.12.0
+          version: 12.21.0
 
       - name: Setup Node 22
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
@@ -268,7 +268,7 @@ jobs:
         if: steps.gate.outputs.enabled == 'true'
         uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
         with:
-          version: 9.12.0
+          version: 12.21.0
 
       - name: Setup Node 22
         if: steps.gate.outputs.enabled == 'true'

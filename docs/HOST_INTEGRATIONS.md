@@ -12,7 +12,7 @@ Before integrating with any host tool, install dependencies, build the packages,
 # In the agentic-sdlc-kit directory:
 pnpm install --frozen-lockfile
 pnpm run build
-pnpm --filter @agentic-sdlc-kit/cli link --global
+pnpm add -g ./packages/cli
 
 # Verify installation
 kit --version
@@ -194,7 +194,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 9.12.0
+          version: 12.21.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22

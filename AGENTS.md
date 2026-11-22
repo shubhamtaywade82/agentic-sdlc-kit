@@ -5,7 +5,7 @@
 ## 1. Project Context
 
 - **Product:** Agentic SDLC Kit — runtime-independent SDLC system for AI coding assistants.
-- **Stack:** Node.js >= 20.11.0 / TypeScript ~5.9 / pnpm 9.12.0 monorepo / Vitest 2.1.
+- **Stack:** Node.js >= 20.11.0 / TypeScript ~5.9 / pnpm 12.21.0 monorepo / Vitest 2.1.
 - **Architecture:** Modular monorepo under `packages/` and `plugins/`:
   - `packages/contracts`: shared types and zod schemas (depends on nothing).
   - `packages/core`: runtime-independent workflow engine, planning DAG, TDD machine, CLSE engine.

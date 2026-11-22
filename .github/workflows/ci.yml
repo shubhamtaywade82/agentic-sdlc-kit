@@ -11,7 +11,7 @@
 #
 # Pipeline:
 #   install (frozen-lockfile) → architecture check → typecheck → lint →
-#   test → build → CLI smoke → fixture smoke (kit verify) → live agent (main, keyed)
+#   test → build → CLI smoke → mods (claude plugin validate) → fixture smoke (kit verify) → live agent (main, keyed)
 
 name: CI
 
@@ -94,6 +94,37 @@ jobs:
           else
             echo "No shell scripts to check."
           fi
+
+  mods:
+    # The Mods' own static check (code.claude.com/docs/en/plugins/mods).
+    # Mods need Claude Code 2.1.287 or newer. 2.1.319 was the newest release
+    # at least two weeks old when pinned. Bump on purpose. No API key needed.
+    # `claude plugin test` is not run here: these Mods' tests use Vitest and
+    # the kit's MockRuntime, and already run in the verify job.
+    name: mods (claude plugin validate)
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE_VERSION: 2.1.319
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Node 22
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+
+      - name: Install the pinned Claude Code CLI
+        run: npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && claude --version
+
+      - name: Validate each Mod
+        run: |
+          set -e
+          for dir in plugins/*/; do
+            echo "::group::claude plugin validate ${dir}"
+            claude plugin validate "${dir}"
+            echo "::endgroup::"
+          done
 
   fixture-smoke:
     name: fixture smoke (kit verify on the committed Node fixture)

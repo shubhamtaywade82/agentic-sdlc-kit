@@ -1,0 +1,8 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Plain-Ruby fixture for the Agentic SDLC Kit. RSpec only — no Rails, no
+# web framework — so the kit's evidence gate can be exercised against a
+# real `bundle exec rspec` run with minimal boot risk and no database.
+gem "rspec", "~> 3.13"

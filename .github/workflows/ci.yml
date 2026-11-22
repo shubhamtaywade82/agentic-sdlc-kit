@@ -11,7 +11,8 @@
 #
 # Pipeline:
 #   install (frozen-lockfile) → architecture check → typecheck → lint →
-#   test → build → CLI smoke → mods (claude plugin validate) → fixture smoke (kit verify) → live agent (main, keyed)
+#   test → build → CLI smoke → mods (claude plugin validate) →
+#   fixture smoke (Node kit verify) → fixture ruby (Ruby kit verify) → live agent (main, keyed)
 
 name: CI
 
@@ -153,6 +154,47 @@ jobs:
         run: cp -R fixtures/fixture-node-fullstack "$RUNNER_TEMP/fixture"
 
       - name: kit verify on the copied fixture
+        run: node packages/cli/dist/index.js verify "$RUNNER_TEMP/fixture"
+
+  fixture-ruby:
+    # Exercises the `ruby` stack pack end to end against a real `bundle exec
+    # rspec` run, proving the verification classifier recognizes RSpec output
+    # (ADR-0018 P1). Mirrors `fixture-smoke` but swaps the Node toolchain for
+    # Ruby + bundler. Actions are pinned to full SHAs (SECURITY.md §6).
+    name: fixture ruby (kit verify on the committed Ruby fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 9.12.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install and build the kit
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Copy fixture out of the repository
+        run: cp -R fixtures/fixture-ruby-rspec "$RUNNER_TEMP/fixture"
+
+      - name: Setup Ruby and install gems
+        # Pin: ruby/setup-ruby@v1 → SHA at tag v1.222.0.
+        uses: ruby/setup-ruby@277ba2a127aba66d45bad0fa2dc56f80dbfedffa
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ${{ runner.temp }}/fixture
+
+      - name: kit verify on the copied Ruby fixture
         run: node packages/cli/dist/index.js verify "$RUNNER_TEMP/fixture"
 
   live-agent:

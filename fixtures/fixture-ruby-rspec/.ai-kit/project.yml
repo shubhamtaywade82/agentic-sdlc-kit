@@ -1,0 +1,7 @@
+schemaVersion: 1
+name: fixture-ruby-rspec
+stack:
+  - ruby
+commands:
+  test:
+    - ['bundle', 'exec', 'rspec']

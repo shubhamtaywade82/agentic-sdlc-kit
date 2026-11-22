@@ -5,6 +5,8 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+docs/.vitepress/dist/
+docs/.vitepress/cache/
 
 # Coverage
 coverage/

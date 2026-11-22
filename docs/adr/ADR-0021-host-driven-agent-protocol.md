@@ -85,8 +85,8 @@ Every feature-workflow transition appends an event to
 `.ai-kit/journal/feature-runs/<featureId>.jsonl`:
 `workflow.started`, `phase.recorded`, `phase.rejected`, `phase.failed`,
 `workflow.finalized`. Each event carries `seq`, `prevHash`, and `hash`
-(SHA-256 over the canonical serialization without `hash`); `kit journal
-<id> --verify` recomputes the chain and reports the first violation.
+(SHA-256 over the canonical serialization without `hash`); `kit journal <id> --verify`
+recomputes the chain and reports the first violation.
 
 Invariants:
 

@@ -31,7 +31,7 @@ The two command surfaces are **distinct** and are not interchangeable.
 - **CLI commands** live under `packages/cli/src/commands/`. They are
   TypeScript modules that implement the `Command` interface and execute
   deterministic operations. They never initiate an AI-guided workflow; if a
-  workflow is needed, they print "run /kit:<name> from your AI assistant"
+  workflow is needed, they print "run `/kit:<name>` from your AI assistant"
   and exit.
 
 The naming convention keeps them visually distinct:

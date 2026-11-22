@@ -26,6 +26,9 @@
     "milestones:write": "tsx scripts/milestone-status.ts --write",
     "verify": "pnpm run check:architecture && pnpm run milestones:check && pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run test",
     "clean": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" exec -- rm -rf dist *.tsbuildinfo",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "kit": "pnpm --filter @agentic-sdlc-kit/cli start"
   },
   "devDependencies": {
@@ -39,6 +42,7 @@
     "tsx": "^4.7.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",
+    "vitepress": "^1.6.4",
     "vitest": "^2.0.0"
   }
 }

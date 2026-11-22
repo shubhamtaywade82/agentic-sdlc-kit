@@ -45,13 +45,11 @@ owns a separate implementation of workflow logic.
 ### 1. Product direction: C — Hybrid, precisely defined
 
 - **Mode 2 (existing, preserved):** the CLI-driven phase workflow. An
-  external agent (or a developer) drives `kit feature <id>
-  start|red|green|refactor|status|verify`. Kit verifies evidence and gates
-  transitions. This surface does not change semantics.
-- **Mode 1 (new, additive):** provider-backed agent execution. `kit feature
-  <id> run` loads the spec and plan, creates a persisted run and an
-  isolated workspace, invokes a configured agent through a provider
-  adapter, and validates each phase against the **same** TDD state machine.
+  external agent (or a developer) drives `kit feature <id> start|red|green|refactor|status|verify`.
+  Kit verifies evidence and gates transitions. This surface does not change semantics.
+- **Mode 1 (new, additive):** provider-backed agent execution. `kit feature <id> run`
+  loads the spec and plan, creates a persisted run and an isolated workspace, invokes a configured
+  agent through a provider adapter, and validates each phase against the **same** TDD state machine.
 - The deterministic core stays authoritative. Mode 1 is an orchestration
   layer over existing core workflow APIs — not a parallel engine.
 - One workflow engine, one contract set, one policy model, one evidence

@@ -322,8 +322,7 @@ and outcomes, model/effort selection, duration, token usage, verification
 results, escalations and retries, failures and blocked actions, cost where
 reliable.
 
-**Output:** `.ai-kit/reports/runs/<RUN-NNN>/{summary.json,events.jsonl,
-verification.json,review.md}`.
+**Output:** `.ai-kit/reports/runs/<RUN-NNN>/{summary.json,events.jsonl,verification.json,review.md}`.
 
 **Interface:** CLI first (`kit runs`, `kit runs show RUN-001`, `kit runs
 report RUN-001`); a dashboard is later, not a prerequisite.

@@ -1,0 +1,18 @@
+# SQLite database configuration. The sqlite3 gem stores database files under
+# storage/ (Rails 8 convention). The directory is tracked via storage/.gitkeep.
+default: &default
+  adapter: sqlite3
+  pool: 5
+  timeout: 5000
+
+development:
+  <<: *default
+  database: storage/development.sqlite3
+
+test:
+  <<: *default
+  database: storage/test.sqlite3
+
+production:
+  <<: *default
+  database: storage/production.sqlite3

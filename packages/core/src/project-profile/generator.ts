@@ -30,8 +30,11 @@ function deriveCommands(scan: RepositoryScan): ProjectProfile['commands'] {
   // The scan can confirm pytest but not ruff or mypy. Writing their commands
   // for a project that does not use them would make every verify run fail, so
   // only the test command is derived for Python. Add lint/typecheck by hand.
-  // Plain Ruby gets the same treatment: the scan confirms RSpec, not RuboCop.
-  if (primary === 'python' || primary === 'ruby') return fromPack.test ? { test: fromPack.test } : commands;
+  // Plain Ruby and Rails get the same treatment: the scan confirms RSpec,
+  // not RuboCop (many Rails apps use standardrb or no linter at all), so
+  // deriving `bundle exec rubocop` would fail every verify run.
+  if (primary === 'python' || primary === 'ruby' || primary === 'ruby-rails')
+    return fromPack.test ? { test: fromPack.test } : commands;
   return fromPack;
 }
 

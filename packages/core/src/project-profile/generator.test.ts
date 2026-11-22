@@ -55,6 +55,39 @@ describe('generateProfile', () => {
     if (r.ok) expect(r.value.commands).toEqual({});
   });
 
+  it('derives only the test command for a plain ruby scan (rubocop not confirmed)', () => {
+    const r = generateProfile(
+      baseScan({
+        root: '/repo/fixture-ruby-rspec',
+        detectedStacks: ['ruby'],
+        packageManagers: ['bundler'],
+        testFrameworks: ['rspec'],
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.commands.test).toEqual([['bundle', 'exec', 'rspec']]);
+      expect(r.value.commands.lint).toBeUndefined();
+    }
+  });
+
+  it('derives only the test command for a ruby-rails scan (rubocop not confirmed)', () => {
+    const r = generateProfile(
+      baseScan({
+        root: '/repo/fixture-rails-api',
+        detectedStacks: ['ruby-rails'],
+        packageManagers: ['bundler'],
+        testFrameworks: ['rspec'],
+        hasMigrations: true,
+      }),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.value.commands.test).toEqual([['bundle', 'exec', 'rspec']]);
+      expect(r.value.commands.lint).toBeUndefined();
+    }
+  });
+
   it('never throws on malformed input shape (scan is well-formed but weird)', () => {
     const weird = baseScan({ root: '/' });
     const r = generateProfile(weird);

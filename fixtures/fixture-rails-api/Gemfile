@@ -1,0 +1,19 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Rails 8 API fixture for the Agentic SDLC Kit. Minimal: Rails + sqlite3 +
+# rspec-rails only. No active_storage/action_cable/action_mailer/action_text
+# railties are loaded (see config/application.rb), so no storage.yml or
+# action-cable config is required and the app boots with a single sqlite DB.
+#
+# No `ruby` directive: bundler parses `ruby "3.3"` as an exact `= 3.3.0`
+# requirement and rejects the latest 3.3.x patch. The Ruby version is pinned
+# via .ruby-version (3.3) for local devs and via the CI action's
+# ruby-version: '3.3', which resolve to the latest 3.3.x.
+gem "rails", "~> 8.0"
+gem "sqlite3", "~> 2.1"
+
+group :development, :test do
+  gem "rspec-rails", "~> 8.0"
+end

@@ -12,7 +12,8 @@
 # Pipeline:
 #   install (frozen-lockfile) → architecture check → typecheck → lint →
 #   test → build → CLI smoke → mods (claude plugin validate) →
-#   fixture smoke (Node kit verify) → fixture ruby (Ruby kit verify) → live agent (main, keyed)
+#   fixture smoke (Node kit verify) → fixture ruby (Ruby kit verify) →
+#   fixture rails (Rails kit verify) → live agent (main, keyed)
 
 name: CI
 
@@ -195,6 +196,55 @@ jobs:
           working-directory: ${{ runner.temp }}/fixture
 
       - name: kit verify on the copied Ruby fixture
+        run: node packages/cli/dist/index.js verify "$RUNNER_TEMP/fixture"
+
+  fixture-rails:
+    # Exercises the `ruby-rails` stack pack end to end: a real Rails 8 API
+    # app boots, `db:prepare` loads the schema, and `bundle exec rspec` runs
+    # inside the booted Rails environment (rspec-rails). Proves the evidence
+    # gate and the RSpec classifier against Rails-shaped output. Mirrors
+    # `fixture-ruby` with an added schema-load step. Actions pinned to full
+    # SHAs (SECURITY.md §6).
+    name: fixture rails (kit verify on the committed Rails fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 9.12.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install and build the kit
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Copy fixture out of the repository
+        run: cp -R fixtures/fixture-rails-api "$RUNNER_TEMP/fixture"
+
+      - name: Setup Ruby and install gems
+        # Pin: ruby/setup-ruby@v1 → SHA at tag v1.222.0.
+        uses: ruby/setup-ruby@277ba2a127aba66d45bad0fa2dc56f80dbfedffa
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: ${{ runner.temp }}/fixture
+
+      - name: Prepare the test database
+        # Loads db/schema.rb into storage/test.sqlite3 so maintain_test_schema!
+        # in rails_helper.rb passes and the model spec's table exists.
+        working-directory: ${{ runner.temp }}/fixture
+        run: bundle exec rails db:prepare RAILS_ENV=test
+
+      - name: kit verify on the copied Rails fixture
         run: node packages/cli/dist/index.js verify "$RUNNER_TEMP/fixture"
 
   live-agent:

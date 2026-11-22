@@ -1,0 +1,10 @@
+/storage/*
+!/storage/.gitkeep
+/log/*
+/tmp/*
+/.bundle/
+/coverage/
+/config/master.key
+/config/credentials/*.key
+*.rbc
+.rspec_status

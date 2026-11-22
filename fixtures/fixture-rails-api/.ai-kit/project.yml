@@ -1,0 +1,7 @@
+schemaVersion: 1
+name: fixture-rails-api
+stack:
+  - ruby-rails
+commands:
+  test:
+    - ['bundle', 'exec', 'rspec']

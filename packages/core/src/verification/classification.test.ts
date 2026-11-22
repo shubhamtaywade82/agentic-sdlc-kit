@@ -97,6 +97,103 @@ describe('classifyFailure', () => {
     expect(res.classification).toBe('assertion');
   });
 
+  // --- Ruby / RSpec / Minitest (ADR-0018 P1: the Ruby stack packs ship
+  // `bundle exec rspec`; the gate must recognize a real RSpec/Minitest
+  // failure as Red, and must NOT recognize a green or errored run as Red). ---
+
+  it('classifies RSpec Failure/Error blocks as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        'Failures:',
+        '',
+        '  1) Widget validates presence of name',
+        '     Failure/Error: expect(widget.name).to be_present',
+        "       expected `nil` to be present",
+        '     # ./spec/models/widget_spec.rb:5',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('classifies the RSpec summary line as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: 'Finished in 0.5 seconds\n52 examples, 1 failure',
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('classifies the Minitest summary line as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: '2 runs, 2 assertions, 1 failures, 0 errors, 0 skips',
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('does NOT classify a green RSpec summary (0 failures) as assertion', () => {
+    // A passing run exits 0 and is never classified, but defensively the
+    // pattern requires failures >= 1 so `0 failures` cannot leak through.
+    const res = classifyFailure({ ...base, output: '52 examples, 0 failures' });
+    expect(res.classification).not.toBe('assertion');
+  });
+
+  it('does NOT classify a Minitest error-only run (0 failures) as assertion', () => {
+    // An errored test raised before reaching an assertion; that is not a
+    // Red established by an assertion failure — fail closed.
+    const res = classifyFailure({
+      ...base,
+      output: [
+        '  1) Error:',
+        'WidgetTest#test_name_presence:',
+        "NameError: undefined local variable 'foo'",
+        '2 runs, 1 assertions, 0 failures, 1 errors, 0 skips',
+      ].join('\n'),
+    });
+    expect(res.classification).not.toBe('assertion');
+  });
+
+  it('classifies a bundler missing-spec error as dependency', () => {
+    const res = classifyFailure({
+      ...base,
+      output: "Could not find 'rspec' (>= 0) among 43 total gem(s) (Gem::MissingSpecError)",
+    });
+    expect(res.classification).toBe('dependency');
+  });
+
+  it('classifies Bundler::GemNotFound as dependency', () => {
+    const res = classifyFailure({
+      ...base,
+      output: "Bundler::GemNotFound: Could not find gem 'rspec-rails' in locally installed gems.",
+    });
+    expect(res.classification).toBe('dependency');
+  });
+
+  it('classifies a ruby LoadError as dependency', () => {
+    const res = classifyFailure({
+      ...base,
+      output: "LoadError: cannot load such file -- widget",
+    });
+    expect(res.classification).toBe('dependency');
+  });
+
+  it('prefers assertion over compilation when an RSpec failure and a syntax error both appear', () => {
+    // A run where one spec file failed at an assertion and another file
+    // had a syntax error: the test that ran and failed wins (assertion).
+    const res = classifyFailure({
+      ...base,
+      output: [
+        'SyntaxError: spec/broken_spec.rb:3: syntax error, unexpected keyword_end',
+        'Failures:',
+        '  1) Widget validates presence of name',
+        '     Failure/Error: expect(widget.name).to be_present',
+        'Finished in 0.5 seconds\n52 examples, 1 failure',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
   it('classifies tsc diagnostics as compilation', () => {
     const res = classifyFailure({
       ...base,

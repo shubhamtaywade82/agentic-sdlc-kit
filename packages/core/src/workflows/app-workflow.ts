@@ -9,6 +9,8 @@ import { type ProjectProfile, type Result } from '@agentic-sdlc-kit/contracts';
 import { serializeProfileYaml } from '../project-profile/serializer.js';
 import { createAdr } from '../planning/adr.js';
 import { scaffoldSpecification } from '../specification/scaffolder.js';
+import { canonicalStackId, commandsForStack } from '../stacks/stack-commands.js';
+import { Errors } from '@agentic-sdlc-kit/contracts';
 
 export interface GreenfieldAppOptions {
   readonly name: string;
@@ -27,6 +29,12 @@ export interface GreenfieldAppResult {
 export async function scaffoldGreenfieldApp(
   opts: GreenfieldAppOptions,
 ): Promise<Result<GreenfieldAppResult>> {
+  const requested = opts.stack ?? 'node-typescript';
+  const stack = canonicalStackId(requested);
+  const commands = stack === undefined ? undefined : commandsForStack(stack, { packageManager: 'npm' });
+  if (stack === undefined || commands === undefined) {
+    return { ok: false, error: Errors.profileInvalid(`unknown stack '${requested}'`, { stack: requested }) };
+  }
   const appDir = path.resolve(opts.targetDir, opts.name);
   await fs.mkdir(appDir, { recursive: true });
 
@@ -41,12 +49,8 @@ export async function scaffoldGreenfieldApp(
   const profile: ProjectProfile = {
     schemaVersion: 1,
     name: opts.name,
-    stack: [opts.stack ?? 'node-typescript'],
-    commands: {
-      test: [['npm', 'test']],
-      lint: [['npm', 'run', 'lint']],
-      build: [['npm', 'run', 'build']],
-    },
+    stack: [stack],
+    commands,
   };
   const profilePath = path.join(aiKitDir, 'project.yml');
   await fs.writeFile(profilePath, serializeProfileYaml(profile), 'utf8');
@@ -57,7 +61,7 @@ export async function scaffoldGreenfieldApp(
     number: 1,
     title: 'System Architecture Baseline',
     context: `Greenfield initialization for ${opts.name}`,
-    decision: `Adopt modular layered architecture using stack: ${opts.stack ?? 'node-typescript'}`,
+    decision: `Adopt modular layered architecture using stack: ${stack}`,
     consequences: ['Explicit module boundaries', 'Automated verification from day zero'],
     status: 'accepted',
   });

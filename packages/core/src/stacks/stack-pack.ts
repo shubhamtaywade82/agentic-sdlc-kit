@@ -69,12 +69,27 @@ export const RUBY_RAILS_PACK: StackPackManifest = {
   },
 };
 
+export const RUBY_PACK: StackPackManifest = {
+  id: 'ruby',
+  name: 'Ruby',
+  description: 'Plain Ruby project (no Rails) tested with RSpec and linted with RuboCop',
+  defaultCommands: {
+    test: [['bundle', 'exec', 'rspec']],
+    lint: [['bundle', 'exec', 'rubocop']],
+  },
+  conventions: {
+    entryPoints: ['lib', 'main.rb'],
+    testFrameworks: ['rspec', 'minitest'],
+    instructionFiles: ['AGENTS.md'],
+  },
+};
+
 export const PYTHON_PACK: StackPackManifest = {
   id: 'python',
   name: 'Python / FastAPI',
   description: 'Python stack with typing, ruff, mypy, and pytest testing',
   defaultCommands: {
-    test: [['pytest']],
+    test: [['python3', '-m', 'pytest']],
     lint: [['ruff', 'check', '.']],
     typecheck: [['mypy', '.']],
   },
@@ -105,6 +120,7 @@ const STACK_PACKS: ReadonlyMap<string, StackPackManifest> = new Map([
   [NODE_TYPESCRIPT_PACK.id, NODE_TYPESCRIPT_PACK],
   [REACT_TYPESCRIPT_PACK.id, REACT_TYPESCRIPT_PACK],
   [RUBY_RAILS_PACK.id, RUBY_RAILS_PACK],
+  [RUBY_PACK.id, RUBY_PACK],
   [PYTHON_PACK.id, PYTHON_PACK],
   [GO_PACK.id, GO_PACK],
 ]);

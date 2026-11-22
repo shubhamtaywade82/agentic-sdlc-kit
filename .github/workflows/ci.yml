@@ -11,7 +11,7 @@
 #
 # Pipeline:
 #   install (frozen-lockfile) → architecture check → typecheck → lint →
-#   test → build → CLI smoke → smoke install against fixture
+#   test → build → CLI smoke → fixture smoke (kit verify) → live agent (main, keyed)
 
 name: CI
 
@@ -94,3 +94,75 @@ jobs:
           else
             echo "No shell scripts to check."
           fi
+
+  fixture-smoke:
+    name: fixture smoke (kit verify on the committed Node fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 9.12.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install and build
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Copy fixture out of the repository
+        run: cp -R fixtures/fixture-node-fullstack "$RUNNER_TEMP/fixture"
+
+      - name: kit verify on the copied fixture
+        run: node packages/cli/dist/index.js verify "$RUNNER_TEMP/fixture"
+
+  live-agent:
+    # Runs only on main pushes, and only when the secret exists. Forks and
+    # pull requests never receive the key, so this job is skipped there.
+    name: live agent (real claude provider smoke test)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Check whether the key is configured
+        id: gate
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "enabled=false" >> "$GITHUB_OUTPUT"; echo "ANTHROPIC_API_KEY not set; live lane skipped"; fi
+
+      - name: Setup pnpm
+        if: steps.gate.outputs.enabled == 'true'
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 9.12.0
+
+      - name: Setup Node 22
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install the pinned Claude Code CLI
+        if: steps.gate.outputs.enabled == 'true'
+        # 2.1.319: newest release at least two weeks old when this was pinned.
+        run: npm install -g @anthropic-ai/claude-code@2.1.319 && claude --version
+
+      - name: Install dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the real-provider smoke test
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm --filter @agentic-sdlc-kit/cli exec vitest run src/application/agent/providers/claude-code/claude-code-smoke.test.ts

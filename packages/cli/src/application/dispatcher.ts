@@ -9,6 +9,7 @@ import { doctorCommand } from '../commands/doctor.js';
 import { inspectCommand } from '../commands/inspect.js';
 import { initCommand } from '../commands/init.js';
 import { validateSpecCommand } from '../commands/validate-spec.js';
+import { elicitCommand } from '../commands/elicit.js';
 import { validatePlanCommand } from '../commands/validate-plan.js';
 import { verifyCommand } from '../commands/verify.js';
 import { featureCommand } from '../commands/feature.js';
@@ -42,6 +43,7 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   if (!registry.get('inspect')) registry.register(inspectCommand);
   if (!registry.get('init')) registry.register(initCommand);
   if (!registry.get('validate-spec')) registry.register(validateSpecCommand);
+  if (!registry.get('elicit')) registry.register(elicitCommand);
   if (!registry.get('validate-plan')) registry.register(validatePlanCommand);
   if (!registry.get('verify')) registry.register(verifyCommand);
   if (!registry.get('feature')) registry.register(featureCommand);

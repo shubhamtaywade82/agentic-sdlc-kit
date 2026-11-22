@@ -23,3 +23,4 @@ export * from './learning/index.js';
 export * from './verification/index.js';
 export * from './scaffolding/index.js';
 export * from './secret-guard/index.js';
+export * from './elicitation/index.js';

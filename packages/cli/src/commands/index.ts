@@ -16,3 +16,4 @@ export * from './memory.js';
 export * from './evolve.js';
 export * from './refactor.js';
 export * from './optimize.js';
+export * from './elicit.js';

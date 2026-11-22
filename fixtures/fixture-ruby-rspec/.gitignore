@@ -1,0 +1,12 @@
+# Coverage, bundler, and Ruby VM artifacts. Gemfile.lock is intentionally
+# not committed: the CI lane regenerates it from the pinned `rspec ~> 3.13`
+# constraint and caches it via bundler's cache action.
+/.bundle/
+/coverage/
+/doc/
+/Gemfile.lock
+/spec/reports/
+/tmp/
+*.gem
+*.rbc
+.rspec_status

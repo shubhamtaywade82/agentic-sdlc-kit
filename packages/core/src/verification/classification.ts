@@ -84,6 +84,13 @@ const DEPENDENCY_PATTERNS: readonly RegExp[] = [
   /Module not found:\s*Error:/, // webpack-style
   /ERR_MODULE_NOT_FOUND/,
   /ERR_PACKAGE_PATH_NOT_EXPORTED/,
+  // Ruby / Bundler: a declared gem could not be resolved or loaded. The
+  // exception class names are unambiguous (Bundler and rubygems print them
+  // verbatim); LoadError covers a `require` of a missing local file.
+  /Gem::MissingSpecError/, // bundler: gem not installed / not in lockfile
+  /Bundler::GemNotFound/, // bundler: version resolution failure
+  /Bundler::VersionConflict/, // bundler: incompatible version constraints
+  /LoadError:\s+cannot load such file/, // ruby require of a missing file
 ];
 
 const DISCOVERY_PATTERNS: readonly RegExp[] = [
@@ -113,6 +120,13 @@ const ASSERTION_PATTERNS: readonly RegExp[] = [
   /Test Files\s+[^\n]*\bfailed\b/, // vitest summary line
   /Tests:?\s+[^\n]*\bfailed\b/, // jest/vitest summary line (colon optional)
   /tests?\s+\d+\s+failed/i, // generic runner summary
+  // RSpec / Minitest: the targeted Ruby test ran and failed at an
+  // expectation. `Failure/Error:` is RSpec's per-failure block header
+  // (RSpec-only); the summary lines require the failing count to be >= 1
+  // so a green run's `0 failures` never counts as Red.
+  /Failure\/Error:/, // RSpec per-failure block header
+  /[1-9]\d*\s+examples?,\s+[1-9]\d*\s+failures?/, // RSpec summary
+  /[1-9]\d*\s+runs?,\s+\d+\s+assertions?,\s+[1-9]\d*\s+failures?/, // Minitest summary
 ];
 
 /**

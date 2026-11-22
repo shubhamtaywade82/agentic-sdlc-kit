@@ -128,6 +128,81 @@ export type WorkflowTransition = 'start' | 'block' | 'resume' | 'complete' | 'fa
 The transition table is enforced by `core.workflows.engine` and is the only
 allowed way to mutate `WorkflowState.status`.
 
+### 3.1 NextAction — the host-driven agent protocol (ADR-0021)
+
+```ts
+// packages/contracts/src/workflow/next-action.ts
+export type NextRequiredAction =
+  | 'feature.start'    // no run state for this feature
+  | 'task.red'         // write the failing test, then run red
+  | 'task.green'       // implement, then run green
+  | 'task.refactor'    // refactor (behavior preserved), then run refactor
+  | 'feature.verify'   // all tasks completed — audit + final verification
+  | 'run.completed';   // passed final verification; nothing further required
+
+export interface LessonRef {
+  lessonId: string;
+  summary: string;
+  advisory: true; // a literal: a lesson is advice, NEVER authority
+}
+
+export interface NextAction {
+  schemaVersion: 1;
+  featureId: string;
+  status: WorkflowStatus;
+  taskId?: string;              // present iff task-scoped
+  phase?: 'red' | 'green' | 'refactor';
+  requiredAction: NextRequiredAction;
+  verificationCommand: string[]; // the task's own command from the plan (ADR-0018 P1)
+  nextInvocation: string;        // the literal CLI invocation
+  blockingQuestions: string[];   // honest: empty = not waiting on a human
+  advisoryLessons: LessonRef[];  // advisory only — never satisfies an invariant
+  constraints: { timeoutMs: number; maxOutputBytes: number };
+}
+```
+
+`kit next [feature-id] --json` emits this payload. Derivation fails
+closed: corrupt state and diverged plans are errors, never guesses;
+`run.completed` requires a journaled passed finalization.
+
+### 3.2 JournalEvent — the hash-chained execution record (ADR-0021)
+
+```ts
+// packages/contracts/src/observer/journal.ts
+export type JournalEventKind =
+  | 'workflow.started'
+  | 'phase.recorded'   // attempt satisfied its invariant and advanced
+  | 'phase.rejected'   // recorded but did NOT advance (non-assertion Red)
+  | 'phase.failed'     // attempt ran and violated its invariant
+  | 'workflow.finalized';
+
+export interface JournalActor {
+  kind: 'agent' | 'human' | 'kit'; // declared via --host / KIT_HOST, never inferred
+  host?: string;                   // 'claude-code' | 'cursor' | 'agy' | 'ci' | ...
+}
+
+export interface JournalEvent {
+  schemaVersion: 1;
+  seq: number;          // 0-based, strictly increasing, no gaps
+  ts: string;
+  featureId: string;    // run id == feature id (one run per feature)
+  taskId?: string;
+  kind: JournalEventKind;
+  actor: JournalActor;
+  payload: Record<string, unknown>; // redacted, bounded detail
+  prevHash: string;     // previous event's hash; 'GENESIS' for seq 0
+  hash: string;         // SHA-256 over the canonical serialization without `hash`
+}
+```
+
+Persisted at `.ai-kit/journal/feature-runs/<featureId>.jsonl`
+(append-only; runtime data, gitignored like `.ai-kit/state/`). The
+journal is observability, never authority: events never authorize and
+never substitute for evidence records, and journal write failures never
+block the workflow. Modification, insertion, and reordering are
+detectable via `kit journal <id> --verify`; tail truncation is not
+detectable from the journal alone (ADR-0021 §3.4).
+
 ## 4. Specification (M3)
 
 ```ts

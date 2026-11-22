@@ -42,7 +42,7 @@ validator resolves it. The installer validates that path before linking, so a
 plugin is never installed in a broken state (an incomplete plugin directory
 produces an explicit warning and links nothing).
 
-The plugins are Claude Code Mods (Claude Code v2.1.287 or later; see https://code.claude.com/docs/en/plugins/mods). Each follows the Mods contract that `claude plugin validate` checks. That command has not yet been run against them in this repository's CI:
+The plugins are Claude Code Mods (Claude Code v2.1.287 or later; see https://code.claude.com/docs/en/plugins/mods). Each follows the Mods contract that `claude plugin validate` checks — and CI runs that validation on every push (`mods (claude plugin validate)` job in `.github/workflows/ci.yml`):
 
 - Claude Code loads `.ts` hooks modules directly — no build step — so the
   linked plugins work straight from a fresh clone of the kit repository;
@@ -117,13 +117,25 @@ Always follow disciplined SDLC practices using `kit`:
 
 ### Step 2: Running Inside Cursor Composer / Agent
 
-In Cursor's Agent or Composer prompt:
+Cursor drives the kit through the **host-driven agent protocol**
+(ADR-0021): one bounded, machine-readable entry point instead of prose
+phase instructions. In Cursor's Agent or Composer prompt:
 
 ```
-@SPEC.md @PLAN.md Follow the implementation plan using TDD. Run `kit verify` to check all gates before finishing.
+@SPEC.md @PLAN.md Drive this feature with the kit's agent protocol:
+loop `kit next --json` until requiredAction is run.completed —
+write the failing test / implement / refactor between phases,
+then run the nextInvocation it reports. Declare yourself with
+KIT_HOST=cursor (or --host cursor) so the execution journal
+attributes your actions honestly.
 ```
 
-Cursor will execute `kit verify` in its terminal to ensure tests, lints, and builds pass.
+The loop is deterministic and bounded — `kit next` reports the next
+action, the task's own verification command, and the constraints; the
+evidence gate (not the prompt) decides what advances. Finish with
+`kit journal <feature-id> --verify` to check the tamper-evident
+executed record, and `kit verify` for whole-profile verification
+(tests, lints, builds — Cursor runs it in its terminal).
 
 ---
 
@@ -146,9 +158,14 @@ description: Use the Agentic SDLC Kit to inspect projects, run TDD feature workf
 When working on features, bug fixes, or quality verification:
 
 1. Initialize/inspect projects: `kit inspect .` / `kit init .`
-2. For new features: `kit validate-spec <path>` then drive the TDD phases with `kit feature <id> start|red|green|refactor|verify`
+2. For new features: `kit validate-spec <path>` then loop the host-driven
+   agent protocol (ADR-0021): `kit next --json` → act (write test /
+   implement / refactor) → run its `nextInvocation`, until
+   `requiredAction` is `run.completed`. Set KIT_HOST=agy so the journal
+   attributes actions honestly.
 3. For bug fixes: `kit fix <issue-id>`
 4. Before completing any turn with code changes, run: `kit verify`
+5. After a run: `kit journal <feature-id> --verify` (tamper-evident record)
 ```
 
 ### Step 2: Autonomous Agent Workflows
@@ -198,3 +215,17 @@ jobs:
 | **Cursor / Cursor CLI** | `.cursor/rules/`, `AGENTS.md` | Terminal execution via Agent / Composer | Pre-commit / Terminal verification                           |
 | **Antigravity (AGY)**   | `~/.gemini/skills/`           | Agent `run_command` tool calls          | Deterministic `kit verify` gating                            |
 | **GitHub Actions**      | `.github/workflows/`          | Subprocess CI gate on PRs               | Blocks non-compliant PR merges                               |
+
+Every host — regardless of tier — drives the same protocol:
+
+```bash
+kit next --json                     # the next action, bounded and machine-readable
+kit journal <feature-id> --verify   # the tamper-evident executed record
+```
+
+Hosts without hook surfaces (Cursor, AGY, CI) are Tier C
+(ADR-0021): the kit cannot intercept their tool calls, but the
+evidence gate still refuses completion without a valid
+Red → Green → Refactor chain. Parity is a tested claim — the Tier C
+conformance suite (`packages/testing/src/conformance/tier-c.ts`)
+defines the golden trace every host must reproduce.

@@ -116,23 +116,33 @@ kit validate-plan docs/plans/FEATURE-001/PLAN.md
 
 ### Step 3: Run the Feature Workflow
 
-Execute the workflow engine:
+The workflow is **phase-driven** (ADR-0018): your agent writes the tests
+and implementations between invocations; the kit verifies, records
+evidence, and refuses to advance when a phase invariant is broken.
 
 ```bash
-# Dry run to preview execution steps:
-kit feature FEATURE-001 --dry-run
+# Initialize the run state from the validated spec and plan:
+kit feature FEATURE-001 start
 
-# Run full feature implementation:
-kit feature FEATURE-001
+# Drive the TDD phases per task (the agent implements between calls):
+kit feature FEATURE-001 red TASK-001      # verification MUST fail (assertion)
+kit feature FEATURE-001 green TASK-001    # verification MUST pass
+kit feature FEATURE-001 refactor TASK-001 # verification MUST pass again
+kit feature FEATURE-001 verify            # audits evidence + final verification
 ```
 
-The engine will:
+Agents driving this from any host (Cursor, AGY, CI) do not need to
+remember the phase order — the host-driven agent protocol (ADR-0021)
+tells them the next action:
 
-1. Scan the repository and load `.ai-kit/project.yml`.
-2. Parse and validate the feature specification and DAG plan.
-3. Advance through Red-Green-Refactor TDD phases for each task.
-4. Run deterministic process verification (`kit verify`).
-5. Output execution evidence and report summary.
+```bash
+kit next --json   # { requiredAction, taskId, verificationCommand, nextInvocation }
+```
+
+Alternatively, `kit feature FEATURE-001 run` orchestrates every phase
+through a configured agent provider (Mode 1, ADR-0019) in an isolated
+git worktree, and `kit feature FEATURE-001 verify --dry-run` previews
+the audit without executing anything.
 
 ---
 
@@ -195,6 +205,8 @@ Runtime mods provide active governance during interactive coding sessions:
 kit install --profile full-sdlc --stack node-typescript
 ```
 
-Each plugin contains a `.claude-plugin/plugin.json` and `hooks/hooks.json` specifying hook triggers (`tool.call`, `tool.check`, `session.start`).
+Each plugin contains a `.claude-plugin/plugin.json` and a `hooks/hooks.json`
+that declares its hooks module (`./register.ts`, TypeScript source loaded
+directly by Claude Code — no build step).
 
 For setup guides covering **Claude Code**, **Cursor**, **Antigravity (AGY)**, and **CI/CD**, see [`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md).

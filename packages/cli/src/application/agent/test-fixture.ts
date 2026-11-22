@@ -50,9 +50,11 @@ export async function buildOrchestrationFixture(): Promise<OrchestrationFixture>
   // Only the RUNTIME directories are ignored; the project profile under
   // .ai-kit/ is project configuration and must be COMMITTED so every
   // worktree checkout has it (the same convention the kit documents).
+  // The journal (.ai-kit/journal/) is runtime data like state/ — it is
+  // kit bookkeeping, never part of the reviewable agent footprint.
   await fs.writeFile(
     path.join(root, '.gitignore'),
-    ['.ai-kit/state/', '.ai-kit/worktrees/', 'node_modules/', ''].join('\n'),
+    ['.ai-kit/state/', '.ai-kit/journal/', '.ai-kit/worktrees/', 'node_modules/', ''].join('\n'),
   );
 
   await fs.writeFile(

@@ -22,6 +22,7 @@ import {
   Errors,
   type FeatureSpecification,
   type ImplementationPlan,
+  type JournalActor,
   type ProjectProfile,
   type Result,
   type VerificationReport,
@@ -41,11 +42,18 @@ import {
   type FeatureRunState,
   type TaskRunState,
 } from './tdd-run-store.js';
+import { appendJournalEvent, type JournalAppendInput } from './journal.js';
 
 export interface FeatureWorkflowOptions {
   readonly featureId: string;
   readonly projectRoot: string;
   readonly dryRun?: boolean;
+  /**
+   * Who invoked the kit, recorded in the execution journal (ADR-0021
+   * §3). The kit cannot infer agent vs. human at the CLI boundary; the
+   * host declares itself. Default: an undeclared human.
+   */
+  readonly actor?: JournalActor;
 }
 
 export interface TddPhaseRequest {
@@ -59,6 +67,8 @@ export interface TddPhaseRequest {
    * which never satisfies a phase invariant.
    */
   readonly timeoutMs?: number;
+  /** Journal actor (see FeatureWorkflowOptions.actor). */
+  readonly actor?: JournalActor;
 }
 
 export interface FeatureRunReport {
@@ -78,6 +88,22 @@ interface FeatureContext {
   readonly spec: FeatureSpecification;
   readonly plan: ImplementationPlan;
   readonly executionOrder: readonly string[];
+}
+
+/**
+ * Append a journal event WITHOUT blocking the workflow: the journal is
+ * observability, never authority, and telemetry must not block the
+ * evidence chain (the run-observer invariant). Events are awaited in
+ * order so the chain sequence matches the executed sequence; only the
+ * FAILURE is swallowed.
+ */
+async function journal(projectRoot: string, input: JournalAppendInput): Promise<void> {
+  const res = await appendJournalEvent(projectRoot, input);
+  // Observability only: a journal failure is deliberately not propagated —
+  // the phase evidence in the run state is the authority, and telemetry
+  // must not block the evidence chain (the run-observer invariant). A
+  // missing event is visible via `kit journal <featureId> --verify`.
+  void res;
 }
 
 async function loadProfile(root: string): Promise<Result<ProjectProfile>> {
@@ -237,6 +263,15 @@ export async function startFeatureRun(
     state.tasks[taskId] = { taskId, phase: 'red', records: [] };
   }
   await saveFeatureRunState(opts.projectRoot, state);
+  await journal(opts.projectRoot, {
+    featureId: opts.featureId,
+    kind: 'workflow.started',
+    actor: opts.actor ?? { kind: 'human' },
+    payload: {
+      taskCount: ctxRes.value.executionOrder.length,
+      executionOrder: [...ctxRes.value.executionOrder],
+    },
+  });
   return { ok: true, value: state };
 }
 
@@ -330,6 +365,18 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
     task.records = [...session.getHistory()];
     state.updatedAt = new Date().toISOString();
     await saveFeatureRunState(opts.projectRoot, state);
+    await journal(opts.projectRoot, {
+      featureId: opts.featureId,
+      taskId: opts.taskId,
+      kind: 'phase.rejected',
+      actor: opts.actor ?? { kind: 'human' },
+      payload: {
+        phase: 'red',
+        classification: result.classification,
+        reason: result.reason,
+        evidence,
+      },
+    });
     return {
       ok: false,
       error: Errors.verificationFailed(
@@ -350,6 +397,20 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
   task.records = [...session.getHistory()];
   state.updatedAt = new Date().toISOString();
   await saveFeatureRunState(opts.projectRoot, state);
+
+  await journal(opts.projectRoot, {
+    featureId: opts.featureId,
+    taskId: opts.taskId,
+    kind: advanceRes.ok ? 'phase.recorded' : 'phase.failed',
+    actor: opts.actor ?? { kind: 'human' },
+    payload: {
+      phase: opts.phase,
+      status,
+      classification: result.classification,
+      advancedTo: advanceRes.ok ? session.getCurrentPhase() : null,
+      evidence,
+    },
+  });
 
   if (!advanceRes.ok) return { ok: false, error: advanceRes.error };
   return { ok: true, value: state };
@@ -384,11 +445,23 @@ export async function finalizeFeatureRun(
 
   const tddEvidence = executionOrder.map((id) => stateRes.value.tasks[id]) as TaskRunState[];
 
+  const finalStatus = verifyRes.value.status === 'passed' ? 'passed' : 'failed';
+  await journal(opts.projectRoot, {
+    featureId: opts.featureId,
+    kind: 'workflow.finalized',
+    actor: opts.actor ?? { kind: 'human' },
+    payload: {
+      status: finalStatus,
+      checkCount: verifyRes.value.checks.length,
+      dryRun: opts.dryRun ?? false,
+    },
+  });
+
   return {
     ok: true,
     value: {
       featureId: opts.featureId,
-      status: verifyRes.value.status === 'passed' ? 'passed' : 'failed',
+      status: finalStatus,
       spec,
       plan,
       tasksExecuted: [...executionOrder],

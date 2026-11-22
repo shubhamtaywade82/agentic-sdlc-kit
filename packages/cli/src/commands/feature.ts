@@ -24,7 +24,7 @@ import {
   startFeatureRun,
   type FeatureRunReport,
 } from '@agentic-sdlc-kit/core';
-import type { AgentProvider } from '@agentic-sdlc-kit/contracts';
+import type { AgentProvider, JournalActor } from '@agentic-sdlc-kit/contracts';
 import {
   AgentGateway,
   ClaudeCodeProvider,
@@ -48,6 +48,21 @@ function fail(ctx: CommandContext, message: string): CommandResult {
 function blocked(ctx: CommandContext, message: string): CommandResult {
   ctx.stderr(`kit feature: ${message}\n`);
   return { exitCode: 3, message };
+}
+
+/**
+ * Resolve the journal actor (ADR-0021 §3). The kit cannot infer agent
+ * vs. human at the CLI boundary — a host DECLARES itself via `--host
+ * <id>` or the KIT_HOST environment variable, and the journal records
+ * the declaration. Undeclared invocations are recorded honestly as
+ * humans, not guessed to be agents.
+ */
+function resolveActor(argv: ReadonlyArray<string>): JournalActor {
+  const fromFlag = parseFlagValue(argv, '--host');
+  const host = fromFlag ?? (process.env['KIT_HOST'] && process.env['KIT_HOST'].length > 0
+    ? process.env['KIT_HOST']
+    : undefined);
+  return host !== undefined ? { kind: 'agent', host } : { kind: 'human' };
 }
 
 export interface FeatureCommandOptions {
@@ -79,24 +94,25 @@ export function createFeatureCommand(opts: FeatureCommandOptions = {}): Command 
       const isJson = ctx.argv.includes('--json');
       const action = positional[1] ?? 'auto';
       const root = path.resolve(ctx.cwd, '.');
+      const actor = resolveActor(ctx.argv);
 
       if (isPhase(action)) {
-        return runPhase(ctx, root, featureId, action, positional[2], isJson);
+        return runPhase(ctx, root, featureId, action, positional[2], isJson, actor);
       }
       switch (action) {
         case 'start':
-          return runStart(ctx, root, featureId, isJson);
+          return runStart(ctx, root, featureId, isJson, actor);
         case 'status':
           return runStatus(ctx, root, featureId, isJson);
         case 'verify':
-          return runVerify(ctx, root, featureId, isJson, ctx.argv.includes('--dry-run'));
+          return runVerify(ctx, root, featureId, isJson, ctx.argv.includes('--dry-run'), actor);
         case 'run':
           return runOrchestrated(ctx, root, featureId, isJson, opts);
         case 'auto': {
           const state = await getFeatureRunState(root, featureId);
           return state.ok
             ? runStatus(ctx, root, featureId, isJson)
-            : runStart(ctx, root, featureId, isJson);
+            : runStart(ctx, root, featureId, isJson, actor);
         }
         default:
           return fail(
@@ -115,8 +131,9 @@ async function runStart(
   root: string,
   featureId: string,
   isJson: boolean,
+  actor: JournalActor,
 ): Promise<CommandResult> {
-  const res = await startFeatureRun({ featureId, projectRoot: root });
+  const res = await startFeatureRun({ featureId, projectRoot: root, actor });
   if (!res.ok) return fail(ctx, res.error.message);
   if (isJson) {
     ctx.stdout(JSON.stringify(res.value, null, 2) + '\n');
@@ -142,9 +159,10 @@ async function runPhase(
   phase: Phase,
   taskId: string | undefined,
   isJson: boolean,
+  actor: JournalActor,
 ): Promise<CommandResult> {
   if (!taskId) return fail(ctx, `phase '${phase}' requires a task id (see \`kit feature ${featureId} status\`)`);
-  const res = await runTddPhase({ featureId, projectRoot: root, taskId, phase });
+  const res = await runTddPhase({ featureId, projectRoot: root, taskId, phase, actor });
   if (!res.ok) return fail(ctx, res.error.message);
   if (isJson) {
     ctx.stdout(JSON.stringify(res.value, null, 2) + '\n');
@@ -211,8 +229,9 @@ async function runVerify(
   featureId: string,
   isJson: boolean,
   dryRun: boolean,
+  actor: JournalActor,
 ): Promise<CommandResult> {
-  const res = await finalizeFeatureRun({ featureId, projectRoot: root, dryRun });
+  const res = await finalizeFeatureRun({ featureId, projectRoot: root, dryRun, actor });
   if (!res.ok) return fail(ctx, res.error.message);
   if (isJson) {
     ctx.stdout(JSON.stringify(res.value, null, 2) + '\n');
@@ -371,6 +390,8 @@ function formatHelp(): string {
     '  --dry-run            (verify only) simulate the final verification',
     '  --provider <id>      (run only) agent provider to orchestrate through (default: claude-code)',
     '  --max-duration-ms N  (run only) per-execution duration budget',
+    '  --host <id>          declare the invoking host for the execution journal',
+    '                       (ADR-0021; also read from KIT_HOST)',
     '  --json               output machine-readable run state or report',
     '  --help               Show this message',
     '',

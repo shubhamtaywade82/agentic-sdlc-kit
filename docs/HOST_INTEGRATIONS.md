@@ -42,21 +42,27 @@ validator resolves it. The installer validates that path before linking, so a
 plugin is never installed in a broken state (an incomplete plugin directory
 produces an explicit warning and links nothing).
 
-`sdlc-guard` and `secret-guard` are PreToolUse command hooks (`hooks/hooks.json`,
-`"hooks": {"PreToolUse": [...]}`). Each command runs
-`node "${CLAUDE_PLUGIN_ROOT}/dist/hooks/guard.js"` and communicates through the
-documented protocol:
+The plugins are Claude Code Mods (Claude Code v2.1.287 or later; see https://code.claude.com/docs/en/plugins/mods). Each follows the Mods contract that `claude plugin validate` checks. That command has not yet been run against them in this repository's CI:
 
-- stdin: the event JSON (`tool_name`, `tool_input`, `cwd`);
-- exit 0 with no output: allow;
-- exit 0 with `hookSpecificOutput.permissionDecision: "ask"`: the host prompts;
-- exit 2 with a reason on stderr: deny.
-
-Any other non-zero exit is a non-blocking error in Claude Code and would fail
-open, so the hooks exit 2 on every internal failure. `onFailure: "block"` on
-each handler covers timeouts and crashes (Claude Code >= 2.1.295).
-`model-router` (UserPromptSubmit, advisory) and `run-observer` (PostToolUse,
-metadata only) use the same command-hook protocol. Neither blocks.
+- Claude Code loads `.ts` hooks modules directly — no build step — so the
+  linked plugins work straight from a fresh clone of the kit repository;
+- the hooks module graph is self-contained: it imports its own files by
+  relative path plus the `claude-code` bare import for types — no workspace
+  packages, no `node:` builtins (the plugins vendor their policy types and
+  the secret detector locally);
+- `register` is exported as a top-level function declaration;
+- `turn.step` (a streaming event) uses the `async function*` generator form
+  delegating with `const result = yield* next(e)`;
+- the event shapes match the real host: `tool.call` carries tool arguments
+  as fields of the event, `tool.check` answers `{ decision, reason }`, and
+  every gating registration chains `.catch` so an error is handled
+  explicitly: safety hooks (`sdlc-guard`, `secret-guard`) refuse the action
+  (fail closed), while routing and telemetry hooks (`model-router`,
+  `run-observer`) fall back to pass-through so a non-safety bug never blocks
+  the agent;
+- every `$.state` reference uses `{ plugin, key }` literals and is named in
+  the plugin's type contract (`contract.d.ts`, declared via the `types`
+  field of `.claude-plugin/plugin.json`).
 
 Or manually link the plugins in your project's `.claude/` directory:
 

@@ -1,17 +1,4 @@
 {
-  "description": "run-observer: appends one metadata line per tool call to .ai-kit/state/run-observer/events.jsonl (PostToolUse). Never blocks.",
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/record.js\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
+  "description": "run-observer hooks: pass-through telemetry for session.start, turn.start, turn.step (streaming observer), tool.call and turn.complete — real $.clock.now() timestamps, never blocks the chain.",
+  "modules": ["./register.ts"]
 }

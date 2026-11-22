@@ -7,8 +7,8 @@
 // which requires approval, so the classifier never silently passes what it
 // could not read.
 
-import { parseCommand, type SimpleCommand } from './command-parser.js';
-import type { ClassifiedAction } from './types.js';
+import { parseCommand, type SimpleCommand } from './command-parser';
+import type { ClassifiedAction } from './types';
 
 const WRAPPERS = new Set(['sudo', 'doas', 'env', 'time', 'nohup', 'nice', 'command', 'exec', 'builtin', 'timeout']);
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh']);

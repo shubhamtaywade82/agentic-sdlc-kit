@@ -1,8 +1,19 @@
 {
   "id": "secret-guard",
   "version": "0.8.0",
-  "hooks": ["PreToolUse:Write|Edit|MultiEdit|NotebookEdit|Bash"],
+  "hooks": [
+    "tool.call"
+  ],
+  "apiAccess": [
+    "ui.log",
+    "process.run",
+    "state.get"
+  ],
+  "filesystemAccess": [],
   "networkAccess": false,
   "processExecution": true,
-  "modifiesToolCalls": true
+  "modifiesPrompts": false,
+  "modifiesToolCalls": true,
+  "modifiesModels": false,
+  "learningAutonomyLevel": "L0"
 }

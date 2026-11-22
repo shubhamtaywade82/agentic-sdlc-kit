@@ -12,7 +12,7 @@ import type {
   RoutingDecision,
   RoutingPolicy,
   RoutingRule,
-} from './types.js';
+} from './types';
 
 export function findMatchingRule(
   ctx: RoutingContext,

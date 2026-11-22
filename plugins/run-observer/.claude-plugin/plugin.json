@@ -1,7 +1,10 @@
 {
   "name": "run-observer",
   "version": "0.8.0",
-  "description": "Records metadata for every tool call (time, session, tool name) to .ai-kit/state. Never records tool input or output. Never blocks.",
-  "author": { "name": "Agentic SDLC Kit" },
+  "types": "./contract.d.ts",
+  "description": "Execution observability Mod: collect session/turn/tool events, persist run reports, redact sensitive output, CLI-first observability via kit runs.",
+  "author": {
+    "name": "Agentic SDLC Kit"
+  },
   "license": "MIT"
 }

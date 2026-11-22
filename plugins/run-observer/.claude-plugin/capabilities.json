@@ -1,26 +1,8 @@
 {
   "id": "run-observer",
   "version": "0.8.0",
-  "hooks": [
-    "session.start",
-    "turn.start",
-    "turn.step",
-    "tool.call",
-    "turn.complete"
-  ],
-  "apiAccess": [
-    "ui.log",
-    "ui.status",
-    "session.id",
-    "clock.now",
-    "state.get",
-    "state.set"
-  ],
-  "filesystemAccess": [],
+  "hooks": ["PostToolUse:*"],
   "networkAccess": false,
   "processExecution": false,
-  "modifiesPrompts": false,
-  "modifiesToolCalls": false,
-  "modifiesModels": false,
-  "learningAutonomyLevel": "L0"
+  "modifiesToolCalls": false
 }

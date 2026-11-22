@@ -1,4 +1,18 @@
 {
-  "description": "sdlc-guard hooks: destructive Bash command governance on tool.call and tool.check, with $.ui.ask approval and fail-closed .catch handling.",
-  "modules": ["./register.ts"]
+  "description": "sdlc-guard: gates destructive Bash commands before they run (PreToolUse). Requires Claude Code >= 2.1.295 for onFailure.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/hooks/guard.js\"",
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -1,20 +1,8 @@
 {
   "id": "sdlc-guard",
   "version": "0.8.0",
-  "hooks": [
-    "tool.call",
-    "tool.check"
-  ],
-  "apiAccess": [
-    "ui.log",
-    "ui.ask",
-    "state.get"
-  ],
-  "filesystemAccess": [],
+  "hooks": ["PreToolUse:Bash"],
   "networkAccess": false,
   "processExecution": false,
-  "modifiesPrompts": false,
-  "modifiesToolCalls": true,
-  "modifiesModels": false,
-  "learningAutonomyLevel": "L0"
+  "modifiesToolCalls": true
 }

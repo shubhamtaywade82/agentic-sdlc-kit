@@ -179,16 +179,16 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 
 | Plugin             | Capability                | Function                                                                                               |
 | :----------------- | :------------------------ | :----------------------------------------------------------------------------------------------------- |
-| **`sdlc-guard`**   | `tool.call`, `tool.check` | Enforces fail-closed safety policy on destructive actions (`rm -rf`, `git push --force`, table drops). |
-| **`secret-guard`** | `tool.call`               | Redacts API keys (Stripe, GitHub, AWS, etc.) before writing or executing tools.                        |
-| **`model-router`** | Routing policy            | Intelligently delegates lightweight jobs to Haiku and complex reasoning to Sonnet/Opus.                |
-| **`run-observer`** | Lifecycle hooks           | Records bounded telemetry streams and audit events for every tool invocation.                          |
+| **`sdlc-guard`**   | PreToolUse (Bash)         | Token-level classifier: asks before destructive commands (`rm -r`, force-push, `reset --hard`, DB drops, deploys, `curl \| sh`); denies when non-interactive. |
+| **`secret-guard`** | PreToolUse (Write/Edit/Bash) | Refuses file writes and `git commit` whose added lines contain a known secret format. Reports kind and line, never the value. |
+| **`model-router`** | UserPromptSubmit (advisory) | Adds routing context when a prompt is high-risk or high-complexity. Advisory only: hooks cannot switch the model. |
+| **`run-observer`** | PostToolUse | Appends one metadata line per tool call (time, session, tool name) to `.ai-kit/state/`, size-capped. Never records tool input or output. |
 
-Install plugins into your runtime environment. Each plugin ships its hooks
-as TypeScript source (`hooks/register.ts`) that Claude Code loads directly —
-no build step is required, so linking works straight from a fresh clone.
-The installer validates each hooks module path before linking and reports
-per-plugin results:
+Install plugins into your runtime environment. All four plugins are Claude Code
+command hooks (`hooks/hooks.json`). They run the built entries under `dist/`,
+so run `pnpm run build` first. The installer validates every built hook entry
+before linking and reports per-plugin results. Hooks that cannot be verified
+are reported and not linked.
 
 ```bash
 kit install --profile full-sdlc --stack node-typescript

@@ -6,7 +6,7 @@
 // dimensions. The classifier must not equate a simple task with a safe
 // task. A simple database deletion is low complexity but critical risk.
 
-import type { Complexity, RoutingRisk, RoutingContext } from './types';
+import type { Complexity, RoutingRisk, RoutingContext } from './types.js';
 
 interface ClassifyInput {
   // The task description or prompt being routed.

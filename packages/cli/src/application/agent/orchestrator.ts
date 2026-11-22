@@ -362,6 +362,9 @@ export async function runFeatureOrchestration(
     const startRes = await startFeatureRun({
       featureId: opts.featureId,
       projectRoot: worktreeRoot,
+      // Mode 1 is kit-orchestrated: the journal records the kit (driving
+      // the provider) as the actor, not a human (ADR-0021 §3).
+      actor: { kind: 'kit' },
     });
     if (!startRes.ok) return startRes;
     runStateRes = { ok: true, value: startRes.value };
@@ -520,6 +523,7 @@ export async function runFeatureOrchestration(
       projectRoot: worktreeRoot,
       taskId: pendingId,
       phase,
+      actor: { kind: 'kit' },
     });
     if (!gateRes.ok) {
       gateErrorMessage = gateRes.error.message;
@@ -556,6 +560,7 @@ export async function runFeatureOrchestration(
   const finalizeRes = await finalizeFeatureRun({
     featureId: opts.featureId,
     projectRoot: worktreeRoot,
+    actor: { kind: 'kit' },
   });
   if (!finalizeRes.ok) {
     await persistState('failed');

@@ -131,7 +131,8 @@ assertions later).
 **Rules:**
 
 - Imports only from `@agentic-sdlc-kit/contracts` and `vitest`.
-- Provides reusable fixtures, assertions, validators, and helpers.
+- Provides reusable fixtures, assertions, validators, helpers, and the
+  host conformance harness.
 
 **M1 surface:**
 
@@ -294,6 +295,16 @@ new packages until proven responsibilities demand extraction):
 - `execution-store.ts` — durable execution records under
   `.ai-kit/state/agent-executions/`; orchestration linkage under
   `.ai-kit/state/orchestrations/`.
+- `journal.ts` (core) + `next-action.ts` (core) — the host-driven agent
+  protocol surface (ADR-0021): `computeNextAction` derives the bounded
+  `NextAction` payload behind `kit next`; every feature-workflow
+  transition appends a hash-chained event to
+  `.ai-kit/journal/feature-runs/<featureId>.jsonl` (runtime data,
+  gitignored like `.ai-kit/state/`; observability, never authority).
+  `packages/testing/src/conformance/tier-c.ts` defines the Tier C
+  golden trace — the protocol conformance target every host must
+  reproduce, proven for the CLI by
+  `packages/cli/src/commands/tier-c-conformance.test.ts`.
 
 Providers are INJECTED (`AgentGatewayOptions.providers`). Since PR4 the
 shipped CLI registers the first real provider — claude-code

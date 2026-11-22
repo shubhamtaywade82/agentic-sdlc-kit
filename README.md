@@ -140,7 +140,16 @@ kit feature FEATURE-001 verify --dry-run
 Completion is blocked until every task has a persisted, complete
 Red(failed) $\to$ Green(passed) $\to$ Refactor(passed) evidence chain.
 
-### 3. Disciplined Bug Fixing (`kit fix`)
+Any host with terminal access (Cursor, AGY, CI) can drive the same
+loop through the host-driven agent protocol (ADR-0021) — one bounded,
+machine-readable entry point instead of prose instructions:
+
+```bash
+kit next --json        # { requiredAction, taskId, verificationCommand, nextInvocation, ... }
+kit journal FEATURE-001 --verify   # tamper-evident executed record (hash-chained)
+```
+
+### 4. Disciplined Bug Fixing (`kit fix`)
 
 Enforces reproduction before code modification:
 
@@ -154,7 +163,7 @@ Workflow:
 - Stage 2: Implement minimal corrective fix (`Green`).
 - Stage 3: Confirm regression avoidance across test suite (`Refactor`).
 
-### 4. Scaffold Greenfield App (`kit new`)
+### 5. Scaffold Greenfield App (`kit new`)
 
 Scaffolds an application repository with baseline ADRs, `.ai-kit/project.yml`, and initial specifications:
 
@@ -164,7 +173,7 @@ kit new my-app --stack node-typescript --dir ./apps
 
 Supported stacks: `node-typescript`, `react-spa`, `rails-hotwire`, `python`, `go`.
 
-### 5. Deterministic Verification (`kit verify`)
+### 6. Deterministic Verification (`kit verify`)
 
 Executes configured test, lint, typecheck, and build steps in isolated process executions without arbitrary shell interpretation:
 
@@ -172,7 +181,7 @@ Executes configured test, lint, typecheck, and build steps in isolated process e
 kit verify
 ```
 
-### 6. Memory & Self-Evolution (CLSE)
+### 7. Memory & Self-Evolution (CLSE)
 
 Hierarchical memory store and Continuous Learning & Self-Evolution engine:
 
@@ -219,7 +228,7 @@ kit install --profile full-sdlc --stack node-typescript
 - [`docs/workflows/WORKFLOWS.md`](docs/workflows/WORKFLOWS.md) — State machine specifications for feature, app, fix, and refactor.
 - [`docs/product/PRODUCT.md`](docs/product/PRODUCT.md) — Vision, target personas, and non-goals.
 - [`docs/security/SECURITY.md`](docs/security/SECURITY.md) — Threat model, security boundaries, and redaction rules.
-- [`docs/adr/`](docs/adr/) — Architecture Decision Records (ADR-0001 through ADR-0017).
+- [`docs/adr/`](docs/adr/) — Architecture Decision Records (ADR-0001 through ADR-0021).
 
 ---
 

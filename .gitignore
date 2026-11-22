@@ -28,6 +28,7 @@ pnpm-debug.log*
 
 # Kit runtime artifacts (do not commit)
 .ai-kit/state/
+.ai-kit/journal/
 .ai-kit/reports/
 
 # Claude Code runtime links (kit install / PR4 mod-parity create these in

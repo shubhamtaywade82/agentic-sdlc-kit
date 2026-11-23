@@ -91,6 +91,7 @@ const DEPENDENCY_PATTERNS: readonly RegExp[] = [
   /Bundler::GemNotFound/, // bundler: version resolution failure
   /Bundler::VersionConflict/, // bundler: incompatible version constraints
   /LoadError:\s+cannot load such file/, // ruby require of a missing file
+  /ModuleNotFoundError/, // python import of an uninstalled/unresolvable module
 ];
 
 const DISCOVERY_PATTERNS: readonly RegExp[] = [
@@ -108,6 +109,7 @@ const COMPILATION_PATTERNS: readonly RegExp[] = [
   /Transform failed/, // esbuild
   /\(esbuild\)/, // esbuild error suffix
   /error during build/i, // rollup/vite build failure
+  /^\S*\.go:\d+:\d+:/m, // go build/type errors (`./main.go:5:2: undefined: Foo`)
 ];
 
 const ASSERTION_PATTERNS: readonly RegExp[] = [
@@ -132,6 +134,17 @@ const ASSERTION_PATTERNS: readonly RegExp[] = [
   // sides so prose such as `3 failed to compile` never counts as Red.
   /expect\(locator\)\./, // Playwright locator assertion header
   /^\s*\d+\s+failed\s*$/m, // bare "N failed" summary line (Playwright reporter)
+  // pytest: the targeted test ran and failed at an assertion. The
+  // `FAILURES` banner is pytest's per-failure section header; the summary
+  // line requires the failing count to be >= 1 (so a green run's
+  // `2 passed in 0.12s` never counts) and is anchored so that "failed"
+  // must be followed by a comma or ` in ` — prose like `3 failed
+  // attempts` or `3 failed to compile` can never match.
+  /={5,}\s+FAILURES\s+={5,}/, // pytest FAILURES section banner
+  /^\s*[1-9]\d*\s+failed(?:\s*,|\s+in\s)/m, // pytest summary (`1 failed, 2 passed in 0.12s`)
+  // go test: `--- FAIL:` is the per-test failure marker the runner emits
+  // only for a test that was discovered, executed, and failed.
+  /^--- FAIL:/m, // go test per-test failure marker
 ];
 
 /**

@@ -220,6 +220,7 @@ kit install --profile full-sdlc --stack node-typescript
 
 ## Documentation
 
+- **[Documentation site](https://shubhamtaywade82.github.io/agentic-sdlc-kit/)** — Complete rendered documentation (guide, workflows, architecture, contracts, ADRs) deployed to GitHub Pages.
 - [`QUICKSTART.md`](QUICKSTART.md) — Step-by-step practical walk-through.
 - [`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md) — Setup and usage guide for Claude Code, Cursor, AGY, and CI/CD.
 - [`AGENTS.md`](AGENTS.md) — Coding conventions and architectural invariants for AI agents.

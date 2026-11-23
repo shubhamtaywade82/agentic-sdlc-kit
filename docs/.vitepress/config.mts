@@ -29,6 +29,7 @@ export default defineConfig({
         text: 'Getting Started',
         items: [
           { text: 'Host Integrations (Claude, Cursor, AGY, CI)', link: '/HOST_INTEGRATIONS' },
+          { text: 'Skills Packs (ruby/node/react)', link: '/skills/SKILL_PACKS' },
           { text: 'Product Vision & Non-Goals', link: '/product/PRODUCT' },
           { text: 'System Requirements', link: '/requirements/REQUIREMENTS' },
           { text: 'Roadmap & Milestones', link: '/roadmap/ROADMAP' },

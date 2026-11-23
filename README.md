@@ -218,11 +218,40 @@ kit install --profile full-sdlc --stack node-typescript
 
 ---
 
+## Skills Packs Integration
+
+The kit integrates three external agent-skills packs as stack-scoped expertise
+for AI coding agents. Each pack follows the open Agent Skills format
+(`skills/<name>/SKILL.md`); the kit never bundles pack content — `kit skills`
+fetches packs from their GitHub repositories at install time and maps the kit's
+SDLC workflow stages (requirements, spec, plan, tdd, verify, review, fix,
+refactor, release) to concrete skills per stack:
+
+| Pack | Repository | Skills | Kit stacks served |
+| :------------------- | :----------------------------------------------------------- | -----: | :------------------ |
+| **`ruby-agent-skills`** | [shubhamtaywade82/ruby-agent-skills](https://github.com/shubhamtaywade82/ruby-agent-skills) | 104 | `ruby-rails`, `ruby` |
+| **`node-agent-skills`** | [shubhamtaywade82/node-agent-skills](https://github.com/shubhamtaywade82/node-agent-skills) | 340 | `node-typescript` |
+| **`react-agent-skills`** | [shubhamtaywade82/react-agent-skills](https://github.com/shubhamtaywade82/react-agent-skills) | 127 | `react-typescript` |
+
+```bash
+kit skills                                          # list the integrated packs
+kit skills recommend --stack ruby-rails --stage tdd # which expertise to load per SDLC stage
+kit skills install node-agent-skills --dir ./my-app # install into .claude/skills (idempotent)
+```
+
+Installed skills land in `<project>/.claude/skills/<skill>/` and are recorded
+in `<project>/.ai-kit/skills-manifest.json` with the pack commit. See
+[`docs/skills/SKILL_PACKS.md`](docs/skills/SKILL_PACKS.md) for the full
+workflow mapping, install options, and the core registry API.
+
+---
+
 ## Documentation
 
 - **[Documentation site](https://shubhamtaywade82.github.io/agentic-sdlc-kit/)** — Complete rendered documentation (guide, workflows, architecture, contracts, ADRs) deployed to GitHub Pages.
 - [`QUICKSTART.md`](QUICKSTART.md) — Step-by-step practical walk-through.
 - [`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md) — Setup and usage guide for Claude Code, Cursor, AGY, and CI/CD.
+- [`docs/skills/SKILL_PACKS.md`](docs/skills/SKILL_PACKS.md) — Integrating the ruby/node/react agent-skills packs with kit stacks and workflows.
 - [`AGENTS.md`](AGENTS.md) — Coding conventions and architectural invariants for AI agents.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution standards and verification requirements.
 - [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) — Monorepo design, boundaries, and invariants.

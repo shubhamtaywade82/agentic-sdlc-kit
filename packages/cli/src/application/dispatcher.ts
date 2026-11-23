@@ -22,6 +22,7 @@ import { refactorCommand } from '../commands/refactor.js';
 import { optimizeCommand } from '../commands/optimize.js';
 import { nextCommand } from '../commands/next.js';
 import { journalCommand } from '../commands/journal.js';
+import { skillsCommand } from '../commands/skills.js';
 import type { Command, CommandContext, CommandResult } from '../commands/types.js';
 import { createCommandRegistry, type CommandRegistry } from './registry.js';
 import { VERSION } from './version.js';
@@ -58,6 +59,7 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   if (!registry.get('optimize')) registry.register(optimizeCommand);
   if (!registry.get('next')) registry.register(nextCommand);
   if (!registry.get('journal')) registry.register(journalCommand);
+  if (!registry.get('skills')) registry.register(skillsCommand);
   if (!registry.get('help')) registry.register(makeHelpCommand(registry));
 
   return {

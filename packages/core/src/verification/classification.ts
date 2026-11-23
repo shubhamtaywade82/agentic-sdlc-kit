@@ -127,6 +127,11 @@ const ASSERTION_PATTERNS: readonly RegExp[] = [
   /Failure\/Error:/, // RSpec per-failure block header
   /[1-9]\d*\s+examples?,\s+[1-9]\d*\s+failures?/, // RSpec summary
   /[1-9]\d*\s+runs?,\s+\d+\s+assertions?,\s+[1-9]\d*\s+failures?/, // Minitest summary
+  // Playwright: locator-assertion failure headers and the reporter's bare
+  // `N failed` summary line. The summary pattern is line-anchored on both
+  // sides so prose such as `3 failed to compile` never counts as Red.
+  /expect\(locator\)\./, // Playwright locator assertion header
+  /^\s*\d+\s+failed\s*$/m, // bare "N failed" summary line (Playwright reporter)
 ];
 
 /**

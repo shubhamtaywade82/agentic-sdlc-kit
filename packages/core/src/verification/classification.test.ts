@@ -194,6 +194,45 @@ describe('classifyFailure', () => {
     expect(res.classification).toBe('assertion');
   });
 
+  // --- Playwright (frontend e2e; the react-typescript stack pack ships
+  // vitest + playwright conventions, so the gate must recognize a real
+  // Playwright failure as Red). ---
+
+  it('classifies Playwright locator assertion failures as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        '  1) [chromium] › e2e/smoke.spec.ts:8:5 › increments the counter',
+        '',
+        '    Error: expect(locator).toHaveText(expected)',
+        '',
+        "    Locator: getByRole('button', { name: /count is/i })",
+        '    Expected string: "Count is 2"',
+        '    Received string: "Count is 1"',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('classifies the Playwright reporter summary line as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        '  1 failed',
+        '    [chromium] › e2e/smoke.spec.ts:8:5 › increments the counter',
+        '  1 passed (2.3s)',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('does NOT classify prose containing "N failed to compile" as assertion', () => {
+    // The bare `N failed` pattern is line-anchored: build/tooling prose
+    // that merely contains the words must never count as Red.
+    const res = classifyFailure({ ...base, output: '3 failed to compile in src/' });
+    expect(res.classification).not.toBe('assertion');
+  });
+
   it('classifies tsc diagnostics as compilation', () => {
     const res = classifyFailure({
       ...base,

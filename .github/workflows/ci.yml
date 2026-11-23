@@ -13,7 +13,8 @@
 #   install (frozen-lockfile) → architecture check → typecheck → lint →
 #   test → build → CLI smoke → mods (claude plugin validate) →
 #   fixture smoke (Node kit verify) → fixture ruby (Ruby kit verify) →
-#   fixture rails (Rails kit verify) → live agent (main, keyed)
+#   fixture rails (Rails kit verify) → fixture react (React kit verify + e2e)
+#   → live agent (main, keyed)
 
 name: CI
 
@@ -246,6 +247,46 @@ jobs:
 
       - name: kit verify on the copied Rails fixture
         run: node packages/cli/dist/index.js verify "$RUNNER_TEMP/fixture"
+
+  fixture-react:
+    # Exercises the react-typescript stack pack end to end: kit verify runs
+    # the fixture's full profile (vitest + oxlint + tsc -b && vite build) in
+    # place — the fixture is a pnpm workspace member, so the root install
+    # above already installed its dependencies. The lane then installs
+    # Playwright's chromium and runs the e2e suite: the kit's first real
+    # browser run in CI. Actions pinned to full SHAs (SECURITY.md §6).
+    name: fixture react (kit verify + e2e on the committed React fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 12.21.0
+
+      - name: Setup Node 22
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install and build the kit
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: kit verify on the React fixture
+        run: node packages/cli/dist/index.js verify fixtures/fixture-react-spa
+
+      - name: Install Playwright browsers
+        working-directory: fixtures/fixture-react-spa
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright e2e tests
+        working-directory: fixtures/fixture-react-spa
+        run: pnpm test:e2e
 
   live-agent:
     # Runs only on main pushes, and only when the secret exists. Forks and

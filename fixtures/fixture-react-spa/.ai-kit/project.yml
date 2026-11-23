@@ -1,0 +1,12 @@
+schemaVersion: 1
+name: fixture-react-spa
+stack:
+  - react-typescript
+  - node-typescript
+commands:
+  test:
+    - ['npm', 'test']
+  lint:
+    - ['npm', 'run', 'lint']
+  build:
+    - ['npm', 'run', 'build']

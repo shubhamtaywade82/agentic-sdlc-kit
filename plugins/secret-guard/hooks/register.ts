@@ -105,7 +105,7 @@ const WORKTREE: GitRead = {
 // configuration, covering alternate branches and local tags conservatively.
 const UNPUSHED: GitRead = {
   args: ['git', 'log', '-p', '--format=', '--all', '--not', '--remotes'],
-  noun: 'the locally reachable commits and tags that may be pushed',
+  noun: 'the locally reachable commits and tags',
   source: 'git-push',
   advice: 'Remove the secret from history (amend or rewrite the commits) before pushing.',
 };

@@ -49,10 +49,11 @@ function fromText(text: string, depth: number): GitAction[] {
   for (const cmd of parseCommand(text)) {
     const [program] = unwrap(cmd.argv);
     const name = program === undefined ? '' : baseName(program);
-    if (name === 'cd' || name === 'pushd' || name === 'popd' || hasRepositoryEnvOverride(cmd.argv)) {
+    if (name === 'cd' || name === 'pushd' || name === 'popd') {
       directoryChanged = true;
       continue;
     }
+    if (hasRepositoryEnvOverride(cmd.argv)) directoryChanged = true;
     if (name === 'export' && cmd.argv.slice(1).some(isRepositoryEnvAssignment)) {
       directoryChanged = true;
       continue;

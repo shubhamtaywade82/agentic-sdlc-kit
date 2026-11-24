@@ -15,12 +15,24 @@
 import type { RedactionPolicy, SecretFinding } from '@agentic-sdlc-kit/contracts';
 import { detectSecrets } from './detector.js';
 
+/**
+ * verified-clean: scanned, nothing found. redacted: scanned, every found value
+ * verified gone. not-scanned: NOT scanned (over the size limit), never "clean".
+ * failed: scanned, but redaction could not be verified complete.
+ */
+export type RedactionStatus = 'verified-clean' | 'redacted' | 'not-scanned' | 'failed';
+
 export interface RedactionResult {
   redactedText: string;
   findings: SecretFinding[]; // with `redacted` flag updated
-  // True if every finding was verified redacted; false if any value still
-  // appears in the output.
+  status: RedactionStatus;
+  // True only if the text was scanned AND every finding was verified redacted.
   fullyRedacted: boolean;
+}
+
+/** Stands in for text that was not scanned: the raw text must never be kept. */
+export function withheldMarker(bytes: number, limit: number): string {
+  return `[WITHHELD: ${bytes} bytes exceed the secret-scan limit of ${limit}; text was not scanned]`;
 }
 
 /**
@@ -86,16 +98,20 @@ export function redactSecrets(
   source: SecretFinding['location']['source'],
   filePath?: string,
 ): RedactionResult {
-  // Bound the input size.
-  if (Buffer.byteLength(text, 'utf8') > policy.maxInputBytes) {
-    // Skip — return the text unchanged with no findings. The caller
-    // should have used the scanner contract to mark this as
-    // "skipped-too-large" instead.
-    return { redactedText: text, findings: [], fullyRedacted: true };
+  // Bound the input size. Unscanned is not clean: return a marker, never the
+  // raw text, and never claim verification.
+  const bytes = Buffer.byteLength(text, 'utf8');
+  if (bytes > policy.maxInputBytes) {
+    return {
+      redactedText: withheldMarker(bytes, policy.maxInputBytes),
+      findings: [],
+      status: 'not-scanned',
+      fullyRedacted: false,
+    };
   }
   const findings = detectSecrets(text, source, filePath);
   if (findings.length === 0) {
-    return { redactedText: text, findings: [], fullyRedacted: true };
+    return { redactedText: text, findings: [], status: 'verified-clean', fullyRedacted: true };
   }
   // To redact, we need the original values. We can recover them from the
   // text using the finding offsets and lengths.
@@ -124,7 +140,12 @@ export function redactSecrets(
     updatedFindings.push({ ...f, redacted: !stillAppears });
   }
   const fullyRedacted = updatedFindings.every((f) => f.redacted) && recheck.length === 0;
-  return { redactedText, findings: updatedFindings, fullyRedacted };
+  return {
+    redactedText,
+    findings: updatedFindings,
+    status: fullyRedacted ? 'redacted' : 'failed',
+    fullyRedacted,
+  };
 }
 
 function formatPlaceholder(policy: RedactionPolicy, finding: SecretFinding): string {

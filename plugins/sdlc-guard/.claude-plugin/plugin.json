@@ -1,6 +1,6 @@
 {
   "name": "sdlc-guard",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "types": "./contract.d.ts",
   "description": "Runtime governance Mod: destructive-operation protection, approval gates, migration and deployment controls. Uses the M10 policy evaluator and action classification.",
   "author": {

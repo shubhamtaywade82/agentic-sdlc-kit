@@ -5,7 +5,12 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { FileSystemRepositoryScanner, generateProfile, writeProfile } from '@agentic-sdlc-kit/core';
+import {
+  FileSystemRepositoryScanner,
+  generateProfile,
+  kitStateRoot,
+  writeProfile,
+} from '@agentic-sdlc-kit/core';
 import type { ProjectProfile } from '@agentic-sdlc-kit/contracts';
 import type { Command, CommandContext, CommandResult } from './types.js';
 
@@ -71,8 +76,10 @@ async function fileExists(p: string): Promise<boolean> {
 }
 
 async function ensureDirectories(root: string): Promise<void> {
-  await fs.mkdir(path.join(root, '.ai-kit', 'state'), { recursive: true });
-  await fs.mkdir(path.join(root, '.ai-kit', 'reports'), { recursive: true });
+  // Machinery dirs follow KIT_STATE_DIR; project.yml itself stays project-rooted.
+  const stateRoot = kitStateRoot(root);
+  await fs.mkdir(path.join(stateRoot, 'state'), { recursive: true });
+  await fs.mkdir(path.join(stateRoot, 'reports'), { recursive: true });
 }
 
 function formatOutput(root: string, profile: ProjectProfile): string {

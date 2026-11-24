@@ -40,16 +40,19 @@ describe('redactSecrets', () => {
     expect(r.fullyRedacted).toBe(true);
   });
 
-  it('marks fullyRedacted=false if a value somehow survives (adversarial)', () => {
-    // This is a defensive test: if the redactor fails to remove a value,
-    // fullyRedacted must be false. We simulate this by using a policy
-    // whose maxInputBytes is so small it skips redaction.
+  it('reports not-scanned (never verified-clean) for oversized input and withholds the text', () => {
     const tinyPolicy: RedactionPolicy = { ...policy, maxInputBytes: 1 };
     const text = 'AKIAIOSFODNN7EXAMPLE';
     const r = redactSecrets(text, tinyPolicy, 'file-read');
-    // Skipped (too large) — text is unchanged, no findings, fullyRedacted=true
-    // because there are no findings to check.
-    expect(r.redactedText).toBe(text);
+    expect(r.status).toBe('not-scanned');
+    expect(r.fullyRedacted).toBe(false);
+    expect(r.redactedText).not.toContain(text);
+    expect(r.redactedText).toMatch(/WITHHELD/);
     expect(r.findings).toEqual([]);
+  });
+
+  it('reports verified-clean for scanned clean text and redacted for scanned secrets', () => {
+    expect(redactSecrets('nothing here', policy, 'file-read').status).toBe('verified-clean');
+    expect(redactSecrets('k = "AKIAIOSFODNN7EXAMPLE"', policy, 'file-read').status).toBe('redacted');
   });
 });

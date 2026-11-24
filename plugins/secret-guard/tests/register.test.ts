@@ -109,7 +109,7 @@ describe('secret-guard register', () => {
     runtime.load(register);
     runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
     const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin main' });
-    expect((result.value as { deny?: string }).deny).toMatch(/could not read the unpushed commits/);
+    expect((result.value as { deny?: string }).deny).toMatch(/could not read the locally reachable commits/);
   });
 
   it('does not run git for a non-git Bash command', async () => {
@@ -231,9 +231,25 @@ describe('secret-guard register', () => {
       const runtime = new MockRuntime();
       runtime.load(register);
       runtime.queueProcessResults({ stdout: secretDiff });
-      const result = await fire(runtime, 'git push origin main');
-      expect((result.value as { deny?: string }).deny).toMatch(/unpushed commits contain/);
-      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes']]);
+      const result = await fire(runtime, 'git push origin');
+      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commits and tags contain/);
+      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', '--all', '--not', '--remotes']]);
+    });
+
+    it.each([
+      'git push origin main',
+      'git push --all',
+      'git push --tags',
+      'git push --mirror',
+      'git push origin feature:production',
+      'git -C sub push',
+      'cd sub && git push',
+    ])('denies unsupported push scope without running a misleading scan: %s', async (command) => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      const result = await fire(runtime, command);
+      expect((result.value as { deny?: string }).deny).toMatch(/target scope cannot be verified/i);
+      expect(runtime.getProcessCalls()).toEqual([]);
     });
 
     it('forwards a push whose unpushed commits are clean', async () => {

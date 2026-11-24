@@ -1,6 +1,6 @@
 {
   "name": "model-router",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "types": "./contract.d.ts",
   "description": "Model + effort routing Mod: classify task complexity and risk, select model and effort, preserve explicit user choices, escalate on verification failure.",
   "author": {

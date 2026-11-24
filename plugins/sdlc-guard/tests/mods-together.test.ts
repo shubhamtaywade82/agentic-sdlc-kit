@@ -102,6 +102,28 @@ describe('four Mods in one runtime', () => {
       const result = await bash(runtime, 'git commit -m "add config"');
       expect(deny(result)).toMatch(/staged changes contain/);
     });
+
+    it('a commit behind git global options (-C) is still scanned and denied', async () => {
+      const runtime = load(order);
+      runtime.queueProcessResults({ stdout: `+k = "${AWS_KEY}"\n` });
+      const result = await bash(runtime, 'git -C sub commit -m "add config"');
+      expect(deny(result)).toMatch(/staged changes contain/);
+    });
+
+    it('a push is denied when an unpushed commit already contains a credential', async () => {
+      const runtime = load(order);
+      runtime.queueProcessResults({ stdout: `+k = "${AWS_KEY}"\n` });
+      const result = await bash(runtime, 'git push origin main');
+      expect(deny(result)).toMatch(/unpushed commits contain/);
+      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes']]);
+    });
+
+    it('quoted text that only mentions git push is not scanned and not blocked', async () => {
+      const runtime = load(order);
+      const result = await bash(runtime, 'echo "git push"');
+      expect(result.forwarded).toBe(true);
+      expect(runtime.getProcessCalls()).toEqual([]);
+    });
   });
 
   it('model-router keeps an explicit subagent model next to the other Mods', async () => {

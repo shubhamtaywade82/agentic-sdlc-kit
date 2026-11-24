@@ -57,4 +57,6 @@ skills, seam fix). The kit clones pack default branches at install time.
 
 CI matrix green on the merged main: verify (node 20/22 × ubuntu/macos), the
 four committed fixtures, Claude plugin validation, shellcheck, GitGuardian,
-live agent smoke test, and the documentation deploy.
+and the documentation deploy. The live Claude provider smoke-test job was
+skipped because `ANTHROPIC_API_KEY` was not configured; no live Claude Code
+session or real-provider smoke test was exercised by this run.

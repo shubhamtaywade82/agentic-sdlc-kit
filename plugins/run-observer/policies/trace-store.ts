@@ -56,6 +56,7 @@ export class TraceStore {
   }
 
   nextEventId(): string {
-    return `EVT-${(++this.#idCounter).toString().padStart(4, '0')}`;
+    this.#idCounter = this.#idCounter + 1;
+    return `EVT-${this.#idCounter.toString().padStart(4, '0')}`;
   }
 }

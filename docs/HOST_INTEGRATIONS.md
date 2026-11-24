@@ -163,9 +163,8 @@ When working on features, bug fixes, or quality verification:
    implement / refactor) → run its `nextInvocation`, until
    `requiredAction` is `run.completed`. Set KIT_HOST=agy so the journal
    attributes actions honestly.
-3. For bug fixes: run the same evidence-gated loop with a `BUG-NNN` id
-   (regression test must fail as an assertion first). Do not use `kit fix`:
-   it does not observe a failing test.
+3. For bug fixes: `kit fix BUG-NNN <phase>`, the same evidence-gated engine as
+   `kit feature` (the regression test must fail as an assertion first).
 4. Before completing any turn with code changes, run: `kit verify`
 5. After a run: `kit journal <feature-id> --verify` (tamper-evident record)
 ```

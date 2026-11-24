@@ -6,8 +6,8 @@
 //   - the machine (`kit next --json`) decides the next action, not prose;
 //   - Red advances only on an ASSERTION failure (missing module, compile error,
 //     no tests found and timeouts are rejected);
-//   - `kit fix` is NOT used for defects: it does not observe a failing test.
-//     Defects run through the same evidence-gated feature engine.
+//   - defects run through the same evidence-gated engine: `kit fix <BUG-NNN> ...`
+//     delegates to `kit feature`, so Green is refused until Red was observed.
 
 /** Short root-instruction block (WORKFLOWS §9C: root files stay short). */
 export function protocolBlock(host: string): string {
@@ -29,8 +29,9 @@ export function protocolBlock(host: string): string {
     '   - green: the minimum code that passes. - refactor: behavior-preserving only.',
     '   On ANY rejection: stop, report classification and reason, fix the cause. Never bypass a gate.',
     '4. At run.completed: `kit journal <ID> --verify` and `kit verify`; report the evidence chain.',
-    '5. Defects: same loop with a BUG-NNN id; the regression test must fail as an assertion first.',
-    '   Do not use `kit fix` (it does not observe a failing test). Never combine a fix with a refactor.',
+    '5. Defects: same loop with a BUG-NNN id (`kit fix BUG-NNN <phase>` is the same engine as',
+    '   `kit feature`); the regression test must fail as an assertion first.',
+    '   Never combine a fix with a refactor.',
     'Never edit .ai-kit/state or .ai-kit/journal. No unrelated changes.',
   ].join('\n');
 }

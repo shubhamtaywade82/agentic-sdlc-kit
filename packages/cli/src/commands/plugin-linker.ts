@@ -40,7 +40,14 @@ export interface PluginLinkResult {
   name: string;
   /** Where the symlink was created (or already existed) inside the project. */
   linkPath: string;
-  status: 'linked' | 'already-linked' | 'incomplete' | 'not-found';
+  /**
+   * `conflict`: something that is not the kit's own link to this plugin
+   * occupies the path (foreign or dangling symlink, real file/dir, or a
+   * symlinked parent). Left untouched and never recorded as kit-owned.
+   */
+  status: 'linked' | 'already-linked' | 'incomplete' | 'not-found' | 'conflict';
+  /** For linked/already-linked: the absolute path the link points at. */
+  target?: string;
   detail?: string;
 }
 
@@ -86,6 +93,9 @@ export async function validatePluginHooks(
   } catch {
     return { ok: false, missing: [manifestPath] };
   }
+  if (modules.length === 0) {
+    return { ok: false, missing: [`${manifestPath} (declares no hooks modules)`] };
+  }
   const missing: string[] = [];
   for (const mod of modules) {
     const resolved = path.resolve(hooksDir, mod);
@@ -96,6 +106,37 @@ export async function validatePluginHooks(
     }
   }
   return { ok: missing.length === 0, missing };
+}
+
+/** Where a symlink points, resolved to an absolute path (works for dangling links). */
+export async function linkTarget(linkPath: string): Promise<string> {
+  return path.resolve(path.dirname(linkPath), await fs.readlink(linkPath));
+}
+
+type Occupant = 'none' | 'ours' | 'foreign';
+
+/**
+ * Classify what already sits at `linkPath`. Only a symlink that resolves to
+ * this kit's own plugin directory is "ours"; a foreign or dangling symlink,
+ * a real file or directory are all "foreign".
+ */
+async function classifyOccupant(linkPath: string, pluginDir: string): Promise<Occupant> {
+  const stat = await fs.lstat(linkPath).catch(() => null);
+  if (!stat) return 'none';
+  if (!stat.isSymbolicLink()) return 'foreign';
+  try {
+    return (await fs.realpath(linkPath)) === (await fs.realpath(pluginDir)) ? 'ours' : 'foreign';
+  } catch {
+    return 'foreign'; // dangling
+  }
+}
+
+/** A symlinked .claude or .claude/plugins would redirect every write elsewhere. */
+async function symlinkedParent(projectRoot: string): Promise<string | null> {
+  for (const dir of [path.join(projectRoot, '.claude'), path.join(projectRoot, '.claude', 'plugins')]) {
+    if ((await fs.lstat(dir).catch(() => null))?.isSymbolicLink()) return dir;
+  }
+  return null;
 }
 
 /**
@@ -121,6 +162,15 @@ export async function linkRuntimePlugins(
   }
 
   const targetBase = path.join(projectRoot, '.claude', 'plugins');
+  const redirected = await symlinkedParent(projectRoot);
+  if (redirected !== null) {
+    return RUNTIME_PLUGIN_NAMES.map((name) => ({
+      name,
+      linkPath: path.join(targetBase, name),
+      status: 'conflict' as const,
+      detail: `refusing to link: ${redirected} is a symlink, so links would land outside the project`,
+    }));
+  }
   await fs.mkdir(targetBase, { recursive: true });
 
   for (const name of RUNTIME_PLUGIN_NAMES) {
@@ -162,27 +212,25 @@ export async function linkRuntimePlugins(
       continue;
     }
 
-    // Idempotent linking: replace a symlink we own; keep anything else.
-    try {
-      const stat = await fs.lstat(linkPath);
-      if (stat.isSymbolicLink()) {
-        results.push({ name, linkPath, status: 'already-linked' });
-        continue;
-      }
-      // A real file/dir already occupies the path: do not clobber it.
+    // Idempotent linking. Only our own link counts as already linked;
+    // anything else at the path is a conflict and is never adopted.
+    const occupant = await classifyOccupant(linkPath, pluginDir);
+    if (occupant === 'ours') {
+      results.push({ name, linkPath, status: 'already-linked', target: await linkTarget(linkPath) });
+      continue;
+    }
+    if (occupant === 'foreign') {
       results.push({
         name,
         linkPath,
-        status: 'already-linked',
-        detail: 'path already exists and is not a kit symlink; left untouched',
+        status: 'conflict',
+        detail: 'path exists and is not a link to this kit plugin; left untouched and not recorded as kit-owned',
       });
       continue;
-    } catch {
-      // Path does not exist: create the symlink.
     }
     try {
       await fs.symlink(pluginDir, linkPath, 'dir');
-      results.push({ name, linkPath, status: 'linked' });
+      results.push({ name, linkPath, status: 'linked', target: await linkTarget(linkPath) });
     } catch (err) {
       results.push({
         name,

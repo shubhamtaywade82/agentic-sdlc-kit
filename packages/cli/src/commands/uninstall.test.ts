@@ -58,4 +58,65 @@ describe('uninstallCommand', () => {
     await empty.cleanup();
     expect(r.exitCode).toBe(1);
   });
+
+  describe('ownership integrity', () => {
+    const manifestPath = (): string => path.join(dir.path, '.ai-kit/ownership-manifest.json');
+    const readManifest = async (): Promise<{ entries: Array<Record<string, unknown>> }> =>
+      JSON.parse(await fs.readFile(manifestPath(), 'utf8'));
+    const writeManifest = (m: unknown): Promise<void> =>
+      fs.writeFile(manifestPath(), JSON.stringify(m, null, 2));
+    const pluginLink = (): string => path.join(dir.path, '.claude/plugins/sdlc-guard');
+
+    it('removes the kit-created plugin links (the link, never its target)', async () => {
+      const target = await fs.realpath(pluginLink());
+      await uninstallCommand.run(ctxFor(['--dir', dir.path], dir.path));
+      expect(await exists(pluginLink())).toBe(false);
+      expect(await exists(path.join(target, '.claude-plugin/plugin.json'))).toBe(true);
+    });
+
+    it('keeps a recorded link the user has since re-pointed elsewhere', async () => {
+      const mine = await makeTempDir('kit-mine-');
+      await fs.rm(pluginLink());
+      await fs.symlink(mine.path, pluginLink(), 'dir');
+      const r = await uninstallCommand.run(ctxFor(['--dir', dir.path], dir.path));
+      expect(r.exitCode).toBe(0);
+      expect(await fs.readlink(pluginLink())).toBe(mine.path);
+      await mine.cleanup();
+    });
+
+    it('keeps a real directory at a recorded path and still removes the rest (no crash)', async () => {
+      await fs.rm(pluginLink());
+      await fs.mkdir(pluginLink());
+      await fs.writeFile(path.join(pluginLink(), 'mine.txt'), 'user data');
+      const r = await uninstallCommand.run(ctxFor(['--dir', dir.path], dir.path));
+      expect(r.exitCode).toBe(0);
+      expect(await exists(path.join(pluginLink(), 'mine.txt'))).toBe(true);
+      expect(await exists(path.join(dir.path, 'docs/specifications/.gitkeep'))).toBe(false);
+      expect(await exists(manifestPath())).toBe(false);
+    });
+
+    it('never deletes outside the root, even if the manifest says so', async () => {
+      const outside = await makeTempDir('kit-outside-');
+      const victim = path.join(outside.path, 'victim.txt');
+      await fs.writeFile(victim, 'precious');
+      const m = await readManifest();
+      m.entries.push({
+        ...m.entries[0]!,
+        path: path.relative(dir.path, victim),
+        sha256: (await import('node:crypto')).createHash('sha256').update('precious').digest('hex'),
+      });
+      await writeManifest(m);
+      await uninstallCommand.run(ctxFor(['--dir', dir.path], dir.path));
+      expect(await exists(victim)).toBe(true);
+      await outside.cleanup();
+    });
+
+    it('still removes a legacy link entry (no recorded target) that points at the kit plugin', async () => {
+      const m = await readManifest();
+      for (const e of m.entries) delete e['target'];
+      await writeManifest(m);
+      await uninstallCommand.run(ctxFor(['--dir', dir.path], dir.path));
+      expect(await exists(pluginLink())).toBe(false);
+    });
+  });
 });

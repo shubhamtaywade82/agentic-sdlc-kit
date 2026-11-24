@@ -20,6 +20,10 @@ export const OwnershipEntrySchema = z.object({
   installedAt: z.string(),
   // Whether the file was preserved (not overwritten) on upgrade.
   preserved: z.boolean().default(false),
+  // For symlink entries: the absolute path the link pointed to when the kit
+  // created or verified it. Uninstall removes the link only while it still
+  // points here. Absent on manifests written before this field existed.
+  target: z.string().optional(),
 });
 
 export const OwnershipManifestSchema = z.object({

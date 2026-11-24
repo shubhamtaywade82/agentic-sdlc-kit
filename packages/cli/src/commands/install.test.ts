@@ -59,3 +59,34 @@ describe('installCommand --dir', () => {
     expect(await exists(path.join(elsewhere.path, '.ai-kit'))).toBe(false);
   });
 });
+
+describe('installCommand plugin ownership', () => {
+  let target: TempDir;
+  beforeEach(async () => {
+    target = await makeTempDir('kit-install-own-');
+  });
+  afterEach(() => target.cleanup());
+
+  const manifest = async (): Promise<{ entries: Array<{ path: string; target?: string }> }> =>
+    JSON.parse(await fs.readFile(path.join(target.path, '.ai-kit/ownership-manifest.json'), 'utf8'));
+
+  it('records the link target for the links it creates', async () => {
+    const r = await installCommand.run(makeCtx(['--profile', 'full-sdlc', '--dir', target.path], target.path));
+    expect(r.exitCode).toBe(0);
+    const link = (await manifest()).entries.find((e) => e.path === '.claude/plugins/sdlc-guard');
+    expect(link?.target).toBe(await fs.realpath(path.join(target.path, '.claude/plugins/sdlc-guard')));
+  });
+
+  it('does not record a foreign symlink as kit-owned, leaves it alone, and exits non-zero', async () => {
+    const foreign = await makeTempDir('kit-foreign-');
+    const linkPath = path.join(target.path, '.claude/plugins/sdlc-guard');
+    await fs.mkdir(path.dirname(linkPath), { recursive: true });
+    await fs.symlink(foreign.path, linkPath, 'dir');
+    const ctx = makeCtx(['--profile', 'full-sdlc', '--dir', target.path], target.path);
+    const r = await installCommand.run(ctx);
+    expect(r.exitCode).toBe(1);
+    expect(await fs.readlink(linkPath)).toBe(foreign.path);
+    expect((await manifest()).entries.some((e) => e.path === '.claude/plugins/sdlc-guard')).toBe(false);
+    await foreign.cleanup();
+  });
+});

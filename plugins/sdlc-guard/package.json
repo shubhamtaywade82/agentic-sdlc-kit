@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/plugin-sdlc-guard",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "description": "sdlc-guard runtime governance Mod.",
   "license": "MIT",

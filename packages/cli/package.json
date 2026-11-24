@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/cli",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "The `kit` executable: user-facing entry point for the Agentic SDLC Kit.",
   "license": "MIT",
   "type": "module",

@@ -21,15 +21,17 @@ Events observed:
   `e.isAborted` / `e.agentId`; marks `partial: true` if usage is missing).
 - Timestamps come from `$.clock.now()` — never a fabricated or frozen
   clock value.
-- An observer must never block: every handler wraps its work in try/catch
-  (failures log a single notice) and `next(e)` always runs.
+- An observer must never block: observation work and state publication are
+  wrapped in a best-effort boundary, and `next(e)` still runs if either fails.
 
 ## Bounded state
 
-Per RESEARCH.md §F (Mission Control reference): the store caps events per
-run at `maxEventsPerRun` (default 10,000). When the cap is hit, the run is
-marked `truncated: true` and further events are dropped. This prevents
-unbounded memory growth in long sessions.
+The store caps events per run at `maxEventsPerRun` (default 10,000). When the
+cap is hit, the run is marked `truncated: true` and further events are dropped.
+It also retains at most 100 runs; when a new run arrives at capacity, the
+oldest retained run is evicted. This bounds memory across long sessions as
+well as within an individual run. The limit is currently an in-memory policy,
+not durable retention.
 
 ## Honest telemetry
 

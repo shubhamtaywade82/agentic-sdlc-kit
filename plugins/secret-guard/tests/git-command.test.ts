@@ -13,17 +13,29 @@ describe('parseGitActions: commands that create or publish history', () => {
   it.each([
     ['git commit -m x', ['commit']],
     ['git push', ['push']],
-    ['git push --force origin main', ['push']],
-    ['git -C /tmp/repo commit -m x', ['commit']],
-    ['git -c user.name=x commit -m x', ['commit']],
-    ['git --no-pager commit -m x', ['commit']],
-    ['git --git-dir /a/.git push', ['push']],
-    ['git --git-dir=/a/.git push', ['push']],
+    ['git push --force origin', ['push']],
+    ['git push origin main', ['push?']],
+    ['git push --all', ['push?']],
+    ['git push --tags', ['push?']],
+    ['git push --mirror', ['push?']],
+    ['git push origin feature:production', ['push?']],
+    ['git push --force-with-lease origin', ['push?']],
+    ['git -C /tmp/repo commit -m x', ['commit?']],
+    ['git -c user.name=x commit -m x', ['commit?']],
+    ['git --no-pager commit -m x', ['commit?']],
+    ['git --git-dir /a/.git push', ['push?']],
+    ['git --git-dir=/a/.git push', ['push?']],
+    ['git --exec-path /tmp push', ['push?']],
     ['/usr/bin/git commit -m x', ['commit']],
     ['sudo git push', ['push']],
     ['env GIT_AUTHOR_NAME=x git commit -m x', ['commit']],
     ['command git commit -m x', ['commit']],
-    ['cd sub && git push', ['push']],
+    ['cd sub && git push', ['push?']],
+    ['git -C sub push', ['push?']],
+    ['cd sub && git commit -m x', ['commit?']],
+    ['GIT_DIR=/tmp/other/.git git push', ['push?']],
+    ['env GIT_WORK_TREE=/tmp/other git push', ['push?']],
+    ['export GIT_DIR=/tmp/other/.git && git push', ['push?']],
     ['echo hi; git commit -m x', ['commit']],
     ['bash -lc "git commit -m x"', ['commit']],
     ["sh -c 'git push'", ['push']],
@@ -64,7 +76,7 @@ describe('parseGitActions: what a commit includes', () => {
 });
 
 describe('parseGitActions: fail closed when it cannot read the command', () => {
-  it('treats nesting too deep to inspect as an uncertain commit with tracked changes', () => {
+  it('treats nesting too deep to inspect as an uncertain history mutation', () => {
     expect(actions('eval eval eval eval eval git push')).toEqual(['commit+tracked?']);
   });
 });

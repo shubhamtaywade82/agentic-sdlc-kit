@@ -108,8 +108,8 @@ describe('secret-guard register', () => {
     const runtime = new MockRuntime();
     runtime.load(register);
     runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
-    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin main' });
-    expect((result.value as { deny?: string }).deny).toMatch(/could not read the unpushed commits/);
+    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin' });
+    expect((result.value as { deny?: string }).deny).toMatch(/could not read the locally reachable commit history/);
   });
 
   it('does not run git for a non-git Bash command', async () => {
@@ -197,13 +197,13 @@ describe('secret-guard register', () => {
       runtime.fire('tool.call', { tool: 'Bash', command });
     const secretDiff = `+k = "${AWS_KEY_SAMPLE}"\n`;
 
-    it('sees a commit behind git global options (-C, -c) that the old regex missed', async () => {
-      for (const command of ['git -C sub commit -m x', 'git -c user.name=x commit -m x']) {
+    it('denies commits whose git global options can redirect the scan context', async () => {
+      for (const command of ['git -C sub commit -m x', 'git -c user.name=x commit -m x', 'cd sub && git commit -m x']) {
         const runtime = new MockRuntime();
         runtime.load(register);
-        runtime.queueProcessResults({ stdout: secretDiff });
         const result = await fire(runtime, command);
-        expect((result.value as { deny?: string }).deny, command).toMatch(/staged changes contain/);
+        expect((result.value as { deny?: string }).deny, command).toMatch(/repository context or push target scope cannot be verified/);
+        expect(runtime.getProcessCalls()).toEqual([]);
       }
     });
 
@@ -227,13 +227,32 @@ describe('secret-guard register', () => {
       ]);
     });
 
-    it('scans the unpushed commits (not just the index) before a push', async () => {
+    it('scans local commit history across refs before a push', async () => {
       const runtime = new MockRuntime();
       runtime.load(register);
       runtime.queueProcessResults({ stdout: secretDiff });
-      const result = await fire(runtime, 'git push origin main');
-      expect((result.value as { deny?: string }).deny).toMatch(/unpushed commits contain/);
-      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes']]);
+      const result = await fire(runtime, 'git push origin');
+      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commit history contain/);
+      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', '--all', '--not', '--remotes']]);
+    });
+
+    it.each([
+      'git push origin main',
+      'git push --all',
+      'git push --tags',
+      'git push --mirror',
+      'git push origin feature:production',
+      'git -C sub push',
+      'cd sub && git push',
+      'GIT_DIR=/tmp/other/.git git push',
+      'env GIT_WORK_TREE=/tmp/other git push',
+      'export GIT_DIR=/tmp/other/.git && git push',
+    ])('denies unsupported push scope without running a misleading scan: %s', async (command) => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      const result = await fire(runtime, command);
+      expect((result.value as { deny?: string }).deny).toMatch(/target scope cannot be verified|repository context or push target scope cannot be verified/i);
+      expect(runtime.getProcessCalls()).toEqual([]);
     });
 
     it('forwards a push whose unpushed commits are clean', async () => {
@@ -262,7 +281,7 @@ describe('secret-guard register', () => {
       runtime.load(register);
       runtime.queueProcessResults({ stdout: '+ok\n' }, { stdout: secretDiff });
       const result = await fire(runtime, 'git commit -m x && git push');
-      expect((result.value as { deny?: string }).deny).toMatch(/unpushed commits contain/);
+      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commit history contain/);
     });
   });
 });

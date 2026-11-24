@@ -209,9 +209,10 @@ export function register(on: On): void {
       $.ui.status(
         `kit: ${store.getRun(currentRunId)?.events.length ?? 0} events · run=${currentRunId}`,
       );
+      // Publishing is telemetry too: a state backend failure must not prevent
+      // the lifecycle event from reaching downstream handlers.
+      await update($, STORE, () => store);
     });
-    // Expose the store via $.state so kit runs can read it.
-    await update($, STORE, () => store);
     return next(e);
   });
 }

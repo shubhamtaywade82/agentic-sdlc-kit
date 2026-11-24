@@ -100,6 +100,25 @@ describe('run-observer register', () => {
     expect(call?.summary).toMatch(/ok=false/);
   });
 
+  it('NEVER blocks turn.complete when publishing observer state fails', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    Object.defineProperty(runtime.api.state, 'set', {
+      value: async () => {
+        throw new Error('state backend unavailable');
+      },
+    });
+
+    const result = await runtime.fire('turn.complete', {
+      turnId: 'TURN-STATE-FAIL',
+      answer: 'done',
+      durationMs: 1,
+    });
+
+    expect(result.forwarded).toBe(true);
+    expect(result.answered).toBe(false);
+  });
+
   it('NEVER blocks the chain when its own work fails', async () => {
     const runtime = new MockRuntime();
     runtime.load(register);

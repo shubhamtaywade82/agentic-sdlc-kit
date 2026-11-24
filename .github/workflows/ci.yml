@@ -102,6 +102,9 @@ jobs:
     # The Mods' own static check (code.claude.com/docs/en/plugins/mods).
     # Mods need Claude Code 2.1.287 or newer. 2.1.319 was the newest release
     # at least two weeks old when pinned. Bump on purpose. No API key needed.
+    # The declarations in plugins/*/.claude-plugin/types were verified on 2.1.329
+    # (eligible here from 2026-12-03); see docs/HOST_INTEGRATIONS.md, "Claude Code
+    # version baseline", which lists all three versions in one place.
     # `claude plugin test` is not run here: these Mods' tests use Vitest and
     # the kit's MockRuntime, and already run in the verify job.
     name: mods (claude plugin validate)

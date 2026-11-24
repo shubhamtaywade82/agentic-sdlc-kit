@@ -1,7 +1,9 @@
 # SECURITY.md — Agentic SDLC Kit
 
-Status: M0 frozen. Threat model, trust boundaries, approval rules, and the
-non-negotiable limitation that the kit is **not** an OS sandbox. Implements
+Status: written at M0 and extended since (installer, secret guard, agent
+permission boundary: see ADR-0009, ADR-0015, ADR-0020). Where this text and an
+accepted ADR or the code disagree, the ADR and the code are current. Threat
+model, trust boundaries, approval rules, and the non-negotiable limitation that the kit is **not** an OS sandbox. Implements
 the security policy referenced by `PRODUCT.md` §4 and `ARCHITECTURE.md` §4
 and §6.
 

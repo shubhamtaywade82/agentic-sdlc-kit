@@ -274,3 +274,19 @@ Files you edited, or that the kit did not write, are never overwritten without `
 Shared files (`AGENTS.md`, `GEMINI.md`, `CONVENTIONS.md`) only receive a replaceable managed
 block. Blocking elicitation answers, `sdlc-guard` approvals and Mode 1's committed-artifact
 requirement are unchanged: they stay with the human by design.
+
+---
+
+## Claude Code version baseline
+
+| What | Version | Where |
+| --- | --- | --- |
+| Minimum for Mods | 2.1.287 | Mods docs; `plugins/*/.claude-plugin/plugin.json` |
+| Engine declarations verified against | 2.1.329 | `plugins/*/.claude-plugin/types/claude-code/index.d.ts`, `packages/mod-sdk/src/types/events.ts` |
+| CI validates with (`claude plugin validate`) | 2.1.319 | `.github/workflows/ci.yml` (`mods` and `live-agent` jobs) |
+
+CI pins the newest release that is at least two weeks old. 2.1.329 was published
+on 2026-11-19 and becomes eligible on 2026-12-03; until then CI validates on an
+older release than the declarations were verified against. That gap is known and
+intended, not an incompatibility. When bumping, change both CI pins and the
+table together.

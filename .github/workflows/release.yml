@@ -38,23 +38,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        # Pin: actions/checkout@v7.0.1 (targets node24).
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        # Pin: pnpm/action-setup@v4 → SHA at tag v4.0.0.
-        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        # Pin: pnpm/action-setup@v6.1.1 (targets node24).
+        uses: pnpm/action-setup@9bbca1e9dc2902adb87e8780fe5c98796985a62d
         with:
           version: 12.21.0
 
       - name: Setup Node 22
-        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        # Pin: actions/setup-node@v7.1.0 (targets node24).
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
-          cache: pnpm
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies (frozen-lockfile)

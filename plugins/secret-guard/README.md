@@ -93,7 +93,7 @@ Pushes use a deliberately narrow allowlist:
 | `git push -v origin` | Allowed; verbose is transport/output-only |
 | `git push origin main` | Denied: explicit refspec |
 | `git push --all`, `--tags`, or `--mirror` | Denied: unsupported ref selection |
-| `git -C sub push`, `git --git-dir ... push`, or `cd sub && git push` | Denied: scan repository context cannot be proven |
+| `git -C sub push`, `git --git-dir ... push`, `cd sub && git push`, or a `GIT_DIR`/`GIT_WORK_TREE` override | Denied: scan repository context cannot be proven |
 | Unknown flags, multiple positional arguments, or nesting too deep to inspect | Denied: target scope is uncertain |
 
 For an accepted push, the guard runs
@@ -105,8 +105,9 @@ is not a byte-for-byte reconstruction of Git's transport negotiation.
 
 Only a bare push or one remote argument is accepted, with transport/output
 flags from a small allowlist. Ref specs, `--all`, `--tags`, `--mirror`,
-repository-redirection options, and directory changes are refused before a
-scan can accidentally approve the wrong repository. This restriction also
+repository-redirection options, Git repository environment overrides, and
+directory changes are refused before a scan can accidentally approve the
+wrong repository. This restriction also
 applies to commit commands when Git global options or a preceding `cd` would
 make the scan run against a different repository.
 

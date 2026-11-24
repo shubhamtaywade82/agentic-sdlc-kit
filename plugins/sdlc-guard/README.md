@@ -52,3 +52,11 @@ Declared in `.claude-plugin/capabilities.json`:
 
 The installer (M15) validates the source against this manifest before
 enabling the Mod.
+
+## Install (user scope)
+
+```
+/plugin install sdlc-guard --marketplace shubhamtaywade82/agentic-sdlc-kit
+```
+
+Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude plugin install sdlc-guard@agentic-sdlc-kit --scope user`.

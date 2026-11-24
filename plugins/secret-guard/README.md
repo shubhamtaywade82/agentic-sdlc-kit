@@ -59,3 +59,11 @@ fail-closed (deny) so unscanned content is never written.
 - Gitleaks integration (optional extended scanner; M11-03).
 - Redaction of non-text result fields (currently only the `text` the
   model reads is rewritten).
+
+## Install (user scope)
+
+```
+/plugin install secret-guard --marketplace shubhamtaywade82/agentic-sdlc-kit
+```
+
+Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude plugin install secret-guard@agentic-sdlc-kit --scope user`.

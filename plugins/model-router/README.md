@@ -54,3 +54,11 @@ is selected.
 The Switchboard Mod (hamzafer/claude-code-mods) is the reference
 implementation for subagent model routing. Our router extends it with
 main-turn routing, effort selection, and verification-driven escalation.
+
+## Install (user scope)
+
+```
+/plugin install model-router --marketplace shubhamtaywade82/agentic-sdlc-kit
+```
+
+Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude plugin install model-router@agentic-sdlc-kit --scope user`.

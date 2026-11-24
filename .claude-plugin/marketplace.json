@@ -1,0 +1,11 @@
+{
+  "name": "agentic-sdlc-kit",
+  "owner": { "name": "shubhamtaywade82" },
+  "description": "Runtime guard Mods for the Agentic SDLC Kit (user-scope install, no per-project files)",
+  "plugins": [
+    { "name": "sdlc-guard", "source": "./plugins/sdlc-guard", "description": "Fail-closed approval for destructive commands" },
+    { "name": "secret-guard", "source": "./plugins/secret-guard", "description": "Blocks writes that introduce secrets" },
+    { "name": "model-router", "source": "./plugins/model-router", "description": "Cost-aware model routing" },
+    { "name": "run-observer", "source": "./plugins/run-observer", "description": "Bounded run telemetry" }
+  ]
+}

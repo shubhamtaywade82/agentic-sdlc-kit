@@ -1,69 +1,58 @@
 // packages/cli/src/commands/fix.ts
 //
-// `kit fix <issue-id> [--dry-run] [--json]`.
-// Executes the disciplined bug-fix and refactoring workflow (M9).
+// `kit fix <issue-id> [action] [task-id] [options]`.
+//
+// A defect is driven through the SAME evidence-gated engine as a feature
+// (`kit feature`): the regression test must fail as an ASSERTION (Red) before
+// the correction is accepted (Green), then the suite must stay green
+// (Refactor), with a hash-chained journal and `kit next` guidance.
+//
+// This command used to run the whole-profile verification and report a
+// "confirmed" regression without ever observing a failing test. It no longer
+// carries any workflow of its own: it only delegates, so it cannot assert more
+// than the engine has measured.
 
-import path from 'node:path';
-import { runBugfixWorkflow, type BugfixReport } from '@agentic-sdlc-kit/core';
+import { featureCommand } from './feature.js';
 import type { Command, CommandContext, CommandResult } from './types.js';
 
-export const fixCommand: Command = {
-  name: 'fix',
-  summary:
-    'Execute disciplined bug-fix workflow with reproduction and regression verification (M9).',
-  async run(ctx: CommandContext): Promise<CommandResult> {
-    if (ctx.argv.includes('--help') || ctx.argv.includes('-h')) {
-      ctx.stdout(formatHelp());
-      return { exitCode: 0 };
-    }
-
-    const issueId = ctx.argv.find((a) => !a.startsWith('-'));
-    if (!issueId) {
-      ctx.stderr('kit fix: error: missing required issue identifier (e.g. BUG-001)\n');
-      return { exitCode: 1, message: 'Missing issue ID' };
-    }
-
-    const isJson = ctx.argv.includes('--json');
-    const isDryRun = ctx.argv.includes('--dry-run');
-    const targetRoot = path.resolve(ctx.cwd, '.');
-
-    const res = await runBugfixWorkflow({ issueId, projectRoot: targetRoot, dryRun: isDryRun });
-    if (!res.ok) {
-      ctx.stderr(`kit fix: workflow error: ${res.error.message}\n`);
-      return { exitCode: 1, message: res.error.message };
-    }
-
-    if (isJson) {
-      ctx.stdout(JSON.stringify(res.value, null, 2) + '\n');
-    } else {
-      ctx.stdout(formatSummary(res.value));
-    }
-    return { exitCode: res.value.status === 'passed' ? 0 : 1 };
-  },
-};
-
-function formatSummary(report: BugfixReport): string {
-  const lines: string[] = [
-    `Bugfix Run:        ${report.issueId}`,
-    `Status:            ${report.status.toUpperCase()}`,
-    `Regression Cover:  ${report.regressionCovered ? 'CONFIRMED' : 'MISSING'}`,
-    `Verification:      ${report.verification.status.toUpperCase()}`,
-    `Duration:          ${report.durationMs}ms`,
-  ];
-  return lines.join('\n') + '\n';
+export function createFixCommand(engine: Command = featureCommand): Command {
+  return {
+    name: 'fix',
+    summary:
+      'Fix a defect through the evidence-gated engine: failing regression test first (Red/Green/Refactor).',
+    async run(ctx: CommandContext): Promise<CommandResult> {
+      if (ctx.argv.includes('--help') || ctx.argv.includes('-h')) {
+        ctx.stdout(formatHelp());
+        return { exitCode: 0 };
+      }
+      const issueId = ctx.argv.find((a) => !a.startsWith('-'));
+      if (!issueId) {
+        ctx.stderr('kit fix: error: missing required issue identifier (e.g. BUG-001)\n');
+        return { exitCode: 1, message: 'Missing issue ID' };
+      }
+      return engine.run(ctx);
+    },
+  };
 }
+
+export const fixCommand: Command = createFixCommand();
 
 function formatHelp(): string {
   return [
-    'Usage: kit fix <issue-id> [--dry-run] [--json]',
+    'Usage: kit fix <issue-id> [start|red|green|refactor|status|verify|run] [task-id] [options]',
     '',
-    'Execute a bug-fix workflow: reproduce via failing test (red), implement fix (green),',
-    'and run full regression verification.',
+    'Drive a bug fix through the same evidence gates as a feature. The issue id is the',
+    'run id (e.g. BUG-101): author docs/specifications/features/<id>/SPEC.md (expected vs',
+    'actual behavior) and docs/plans/<id>/plan.json, then:',
     '',
-    'Options:',
-    '  --dry-run   Simulate execution without running active subprocesses',
-    '  --json      Output machine-readable BugfixReport',
-    '  --help      Show this message',
+    '  kit fix BUG-101 start            begin the run (no action: start, or status if it exists)',
+    '  kit fix BUG-101 red TASK-001     the regression test must FAIL as an assertion',
+    '  kit fix BUG-101 green TASK-001   the smallest correction must pass it',
+    '  kit fix BUG-101 refactor TASK-001  the suite must stay green',
+    '  kit fix BUG-101 verify           audit every chain + whole-profile regression',
+    '',
+    'Options are those of `kit feature` (--json, --host <id>, --dry-run, ...).',
+    'Do not combine a behavior fix with a refactor in one run.',
     '',
   ].join('\n');
 }

@@ -32,7 +32,7 @@ export const MILESTONES: readonly Milestone[] = [
     evidence: ['packages/cli/src/commands/new.ts', 'packages/core/src/scaffolding/generator.ts'],
     gaps: 'no per-stack source templates; greenfield apps get ADR, profile and spec only' },
   { id: 9, name: 'Bug-fix and refactoring workflows', status: 'partial',
-    evidence: ['packages/cli/src/commands/fix.ts', 'packages/core/src/workflows/fix-workflow.ts', 'packages/core/src/workflows/refactor/transitions.ts'],
+    evidence: ['packages/cli/src/commands/fix.ts', 'packages/core/src/workflows/feature-workflow.ts', 'packages/core/src/workflows/refactor/transitions.ts'],
     gaps: 'kit refactor and kit optimize are informational by design (ADR-0013); no end-to-end refactor run is wired' },
   { id: 10, name: 'Runtime governance Mod', status: 'partial',
     evidence: ['plugins/sdlc-guard/hooks/register.ts', 'plugins/sdlc-guard/policies/classify.ts'],

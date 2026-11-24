@@ -44,6 +44,22 @@ describe('TraceStore', () => {
     expect(run?.truncated).toBe(true);
   });
 
+  it('evicts the oldest run when the retained-run limit is reached', () => {
+    const store = new TraceStore(policy, 2);
+    store.record(makeEvent('RUN-001', 'turn-start', 'first'));
+    store.record(makeEvent('RUN-002', 'turn-start', 'second'));
+    store.record(makeEvent('RUN-003', 'turn-start', 'third'));
+
+    expect(store.getRun('RUN-001')).toBeUndefined();
+    expect(store.getRun('RUN-002')).toBeDefined();
+    expect(store.getRun('RUN-003')).toBeDefined();
+    expect(store.listRuns().map((run) => run.runId)).toEqual(['RUN-002', 'RUN-003']);
+  });
+
+  it('rejects a non-positive retained-run limit', () => {
+    expect(() => new TraceStore(policy, 0)).toThrow(/maxRuns must be a positive integer/);
+  });
+
   it('lists all runs', () => {
     const store = new TraceStore(policy);
     store.record(makeEvent('RUN-001', 'turn-start', 'r1'));

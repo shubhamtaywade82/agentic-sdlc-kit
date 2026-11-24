@@ -103,19 +103,19 @@ describe('four Mods in one runtime', () => {
       expect(deny(result)).toMatch(/staged changes contain/);
     });
 
-    it('a commit behind git global options (-C) is still scanned and denied', async () => {
+    it('a commit with a repository redirect (-C) is denied before a scan can inspect the wrong repo', async () => {
       const runtime = load(order);
-      runtime.queueProcessResults({ stdout: `+k = "${AWS_KEY}"\n` });
       const result = await bash(runtime, 'git -C sub commit -m "add config"');
-      expect(deny(result)).toMatch(/staged changes contain/);
+      expect(deny(result)).toMatch(/repository context or push target scope cannot be verified/);
+      expect(runtime.getProcessCalls()).toEqual([]);
     });
 
-    it('a push is denied when an unpushed commit already contains a credential', async () => {
+    it('a supported push is denied when local commit history contains a credential', async () => {
       const runtime = load(order);
       runtime.queueProcessResults({ stdout: `+k = "${AWS_KEY}"\n` });
-      const result = await bash(runtime, 'git push origin main');
-      expect(deny(result)).toMatch(/unpushed commits contain/);
-      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes']]);
+      const result = await bash(runtime, 'git push origin');
+      expect(deny(result)).toMatch(/locally reachable commit history contain/);
+      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', '--all', '--not', '--remotes']]);
     });
 
     it('quoted text that only mentions git push is not scanned and not blocked', async () => {

@@ -163,7 +163,9 @@ When working on features, bug fixes, or quality verification:
    implement / refactor) → run its `nextInvocation`, until
    `requiredAction` is `run.completed`. Set KIT_HOST=agy so the journal
    attributes actions honestly.
-3. For bug fixes: `kit fix <issue-id>`
+3. For bug fixes: run the same evidence-gated loop with a `BUG-NNN` id
+   (regression test must fail as an assertion first). Do not use `kit fix`:
+   it does not observe a failing test.
 4. Before completing any turn with code changes, run: `kit verify`
 5. After a run: `kit journal <feature-id> --verify` (tamper-evident record)
 ```
@@ -252,3 +254,24 @@ the journal, and agent execution/orchestration records to
 `$KIT_STATE_DIR/<repo>-<hash>/` (including the `state/` and `reports/` directories `kit init` creates). A relative value is rejected. `project.yml`,
 specs and plans are not relocated (they are project-rooted evidence). Mode 1
 (`kit feature <id> run`) still requires committed spec, plan and profile.
+
+---
+
+## One-time host setup (`kit host`)
+
+Install the standing procedure once per host; per ticket you then type one line.
+
+```bash
+kit host list
+kit host install claude-code      # ~/.claude/commands/kit-{feature,fix,resume}.md + user skill
+kit host install all              # every host at its default scope (user where global, else project)
+kit host install cursor --dir .   # .cursor/rules/sdlc.mdc (project scope)
+```
+
+Daily usage in Claude Code: `/kit-feature STORY-123 <ticket text and acceptance criteria>`.
+Other hosts: `Implement STORY-123 per the kit protocol: <ticket>`.
+
+Files you edited, or that the kit did not write, are never overwritten without `--force`.
+Shared files (`AGENTS.md`, `GEMINI.md`, `CONVENTIONS.md`) only receive a replaceable managed
+block. Blocking elicitation answers, `sdlc-guard` approvals and Mode 1's committed-artifact
+requirement are unchanged: they stay with the human by design.

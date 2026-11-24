@@ -60,3 +60,11 @@ A dashboard is a later interface, not a prerequisite for observability.
 - apiAccess: `ui.log`, `ui.status`, `session.id`, `clock.now`, `state.get`, `state.set`
 - learningAutonomyLevel: L0 (collect evidence only — feeds the M28
   ExperienceEpisode contract via the fast learning loop)
+
+## Install (user scope)
+
+```
+/plugin install run-observer --marketplace shubhamtaywade82/agentic-sdlc-kit
+```
+
+Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude plugin install run-observer@agentic-sdlc-kit --scope user`.

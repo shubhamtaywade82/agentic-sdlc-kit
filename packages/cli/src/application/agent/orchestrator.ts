@@ -47,6 +47,7 @@ import {
 import {
   finalizeFeatureRun,
   getFeatureRunState,
+  kitStateRoot,
   loadPlan,
   loadSpecification,
   runTddPhase,
@@ -150,7 +151,7 @@ const DEFAULT_MAX_DURATION_MS = 600_000;
 const DEFAULT_MAX_TOOL_CALLS = 200;
 
 function orchestrationPath(projectRoot: string, featureId: string): string {
-  return path.resolve(projectRoot, '.ai-kit', 'state', 'orchestrations', `${featureId}.json`);
+  return path.join(kitStateRoot(projectRoot), 'state', 'orchestrations', `${featureId}.json`);
 }
 
 /**

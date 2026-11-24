@@ -20,3 +20,4 @@ export * from './elicit.js';
 export * from './next.js';
 export * from './journal.js';
 export * from './skills.js';
+export * from './attach.js';

@@ -36,9 +36,10 @@ import {
   type JournalEventKind,
   type Result,
 } from '@agentic-sdlc-kit/contracts';
+import { kitStateRoot } from './state-root.js';
 import { DEFAULT_REDACTION_POLICY, redactSecrets } from '../secret-guard/redactor.js';
 
-const JOURNAL_DIR = path.join('.ai-kit', 'journal', 'feature-runs');
+const JOURNAL_DIR = path.join('journal', 'feature-runs');
 
 /** What the caller provides; seq/prevHash/hash are owned by the journal. */
 export interface JournalAppendInput {
@@ -59,7 +60,7 @@ export interface JournalVerification {
 }
 
 export function journalPath(projectRoot: string, featureId: string): string {
-  return path.resolve(projectRoot, JOURNAL_DIR, `${featureId}.jsonl`);
+  return path.join(kitStateRoot(projectRoot), JOURNAL_DIR, `${featureId}.jsonl`);
 }
 
 /**

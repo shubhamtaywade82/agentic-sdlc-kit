@@ -229,3 +229,26 @@ evidence gate still refuses completion without a valid
 Red → Green → Refactor chain. Parity is a tested claim — the Tier C
 conformance suite (`packages/testing/src/conformance/tier-c.ts`)
 defines the golden trace every host must reproduce.
+
+---
+
+## Zero-footprint setup
+
+**Plugins at user scope.** The kit repo is a Claude Code marketplace
+(`.claude-plugin/marketplace.json`):
+
+```bash
+claude plugin marketplace add <path-to-kit-clone>
+claude plugin install sdlc-guard@agentic-sdlc-kit --scope user   # likewise secret-guard, model-router, run-observer
+```
+
+**Working paths without tracking.** `kit attach local|global|status|detach`
+provisions `.ai-kit`, `.claude`, `docs/specifications`, `docs/plans` hidden via
+`.git/info/exclude` and refuses to succeed unless git cannot see them.
+`global` symlinks them into `$KIT_ATTACH_HOME` (default `~/.agentic-sdlc/projects`).
+
+**Machinery elsewhere.** Set `KIT_STATE_DIR=/abs/path` to relocate run state,
+the journal, and agent execution/orchestration records to
+`$KIT_STATE_DIR/<repo>-<hash>/`. A relative value is rejected. `project.yml`,
+specs and plans are not relocated (they are project-rooted evidence). Mode 1
+(`kit feature <id> run`) still requires committed spec, plan and profile.

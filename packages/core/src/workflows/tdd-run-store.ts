@@ -13,6 +13,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Errors, type Result } from '@agentic-sdlc-kit/contracts';
 import type { TddStepRecord } from '../tdd/cycle.js';
+import { kitStateRoot } from './state-root.js';
 
 /**
  * v2 (ADR-0018 P1): step records carry task-targeted verification
@@ -60,7 +61,7 @@ export function validateFeatureId(featureId: string): Result<true> {
 }
 
 export function featureRunPath(projectRoot: string, featureId: string): string {
-  return path.resolve(projectRoot, '.ai-kit', RUN_DIR, `${featureId}.json`);
+  return path.join(kitStateRoot(projectRoot), RUN_DIR, `${featureId}.json`);
 }
 
 export async function saveFeatureRunState(

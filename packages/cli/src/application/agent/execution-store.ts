@@ -17,6 +17,7 @@
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { kitStateRoot } from '@agentic-sdlc-kit/core';
 import type {
   AgentExecutionEvent,
   AgentExecutionRequest,
@@ -85,7 +86,7 @@ export function validateExecutionId(executionId: string): boolean {
 }
 
 export function executionStoreDir(projectRoot: string): string {
-  return path.resolve(projectRoot, '.ai-kit', 'state', 'agent-executions');
+  return path.join(kitStateRoot(projectRoot), 'state', 'agent-executions');
 }
 
 export function executionRecordPath(projectRoot: string, executionId: string): string {

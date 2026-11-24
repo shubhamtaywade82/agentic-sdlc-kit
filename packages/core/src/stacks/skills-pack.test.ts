@@ -32,8 +32,8 @@ describe('Skills Packs registry', () => {
 
   it('declares measured skill counts and a skills directory', () => {
     expect(RUBY_SKILLS_PACK.skillCount).toBe(104);
-    expect(NODE_SKILLS_PACK.skillCount).toBe(340);
-    expect(REACT_SKILLS_PACK.skillCount).toBe(127);
+    expect(NODE_SKILLS_PACK.skillCount).toBe(322);
+    expect(REACT_SKILLS_PACK.skillCount).toBe(129);
     for (const pack of listSkillsPacks()) {
       expect(pack.skillsPath).toBe('skills');
       expect(pack.repository).toMatch(/^[^/]+\/[^/]+$/);

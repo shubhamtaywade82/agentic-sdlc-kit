@@ -233,6 +233,117 @@ describe('classifyFailure', () => {
     expect(res.classification).not.toBe('assertion');
   });
 
+  // --- Python / pytest and Go (the python and go stack packs ship
+  // `python3 -m pytest` and `go test`, so the gate must recognize a real
+  // pytest or go-test failure as Red, and must NOT recognize green,
+  // errored, or build-broken runs as Red). ---
+
+  it('classifies the pytest FAILURES banner as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        '=================================== FAILURES ===================================',
+        '_________________________________ test_withdraw ________________________________',
+        '',
+        '    def test_withdraw():',
+        '        account = Account(balance=100)',
+        '>       account.withdraw(150)',
+        'E       assert 100 >= 150',
+        '',
+        'test_account.py:7: AssertionError',
+        '=========================== short summary info ===========================',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('classifies the pytest summary line as assertion', () => {
+    const res = classifyFailure({ ...base, output: '1 failed, 2 passed in 0.12s' });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('classifies a pytest run where everything failed as assertion', () => {
+    const res = classifyFailure({ ...base, output: '1 failed in 0.05s' });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('does NOT classify a green pytest summary as assertion', () => {
+    // A passing run exits 0 and is never classified, but defensively the
+    // pattern requires the failing count to be >= 1.
+    const res = classifyFailure({ ...base, output: '2 passed in 0.12s' });
+    expect(res.classification).not.toBe('assertion');
+  });
+
+  it('does NOT classify an error-only pytest run (no failed count) as assertion', () => {
+    // An errored test raised before reaching an assertion; that is not a
+    // Red established by an assertion failure — fail closed.
+    const res = classifyFailure({ ...base, output: '1 error in 0.10s' });
+    expect(res.classification).not.toBe('assertion');
+  });
+
+  it('does NOT classify prose containing "N failed attempts" as assertion', () => {
+    // The pytest summary pattern requires "failed" to be followed by a
+    // comma or ` in ` on a line that starts with the count; retry/log
+    // prose must never count as Red.
+    const res = classifyFailure({ ...base, output: '3 failed attempts were made before success' });
+    expect(res.classification).not.toBe('assertion');
+  });
+
+  it('classifies go test --- FAIL: markers as assertion', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        '=== RUN   TestTransfer',
+        '    transfer_test.go:12: got 1, want 2',
+        '--- FAIL: TestTransfer (0.00s)',
+        'FAIL',
+        'FAIL\texample.com/ledger\t0.5s',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('does NOT classify a go failure-detail line without a FAIL marker as assertion', () => {
+    // `file.go:LINE:` detail lines also appear inside failed runs, but a
+    // line WITHOUT its column (and without `--- FAIL:`) proves nothing on
+    // its own — a truncated run must stay unclassified (fail closed).
+    const res = classifyFailure({ ...base, output: 'transfer_test.go:12: got 1, want 2' });
+    expect(res.classification).not.toBe('assertion');
+    expect(res.classification).not.toBe('compilation');
+  });
+
+  it('classifies go build failures (file.go:line:col) as compilation', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        '# example.com/ledger',
+        './main.go:5:2: undefined: Foo',
+        'FAIL\texample.com/ledger [build failed]',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('compilation');
+  });
+
+  it('prefers assertion over compilation when go output has both a FAIL marker and a build error', () => {
+    const res = classifyFailure({
+      ...base,
+      output: [
+        './broken.go:9:1: undefined: helper',
+        '--- FAIL: TestTransfer (0.00s)',
+        '    transfer_test.go:12: got 1, want 2',
+      ].join('\n'),
+    });
+    expect(res.classification).toBe('assertion');
+  });
+
+  it('classifies python ModuleNotFoundError as dependency', () => {
+    const res = classifyFailure({
+      ...base,
+      output: "E   ModuleNotFoundError: No module named 'requests'",
+    });
+    expect(res.classification).toBe('dependency');
+  });
+
   it('classifies tsc diagnostics as compilation', () => {
     const res = classifyFailure({
       ...base,

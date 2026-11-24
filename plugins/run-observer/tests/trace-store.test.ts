@@ -54,3 +54,12 @@ describe('TraceStore', () => {
     expect(list.map((r) => r.runId)).toContain('RUN-002');
   });
 });
+
+describe('TraceStore when frozen by the host', () => {
+  it('still records events and issues ids', () => {
+    const store = Object.freeze(new TraceStore(policy));
+    expect(store.nextEventId()).toBe('EVT-0001');
+    store.record(makeEvent('RUN-001', 'turn-start', 'r'));
+    expect(store.getRun('RUN-001')?.events).toHaveLength(1);
+  });
+});

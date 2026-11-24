@@ -19,7 +19,8 @@ interface RunRecord {
 
 export class TraceStore {
   private runs = new Map<string, RunRecord>();
-  private idCounter = 0;
+  // #private: the host freezes atom() values; a frozen object can't bump a normal field.
+  #idCounter = 0;
 
   constructor(private readonly policy: RetentionPolicy) {}
 
@@ -55,6 +56,7 @@ export class TraceStore {
   }
 
   nextEventId(): string {
-    return `EVT-${(++this.idCounter).toString().padStart(4, '0')}`;
+    this.#idCounter = this.#idCounter + 1;
+    return `EVT-${this.#idCounter.toString().padStart(4, '0')}`;
   }
 }

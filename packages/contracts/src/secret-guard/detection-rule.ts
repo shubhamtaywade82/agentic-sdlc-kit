@@ -17,18 +17,25 @@ const PLACEHOLDER_WORDS = ['your', 'xxx', 'example', 'changeme', 'placeholder', 
 
 /**
  * DhanHQ credentials, matched by NAME because no official token format is
- * pinned here: a variable whose name contains "dhan" and token/secret/key,
- * assigned a 20+ char value that contains a digit and is not a placeholder.
- * The digit requirement keeps references such as
- * `self.config.dhan_access_token` from matching.
+ * pinned here.
+ *  - NAMED: DHAN_ACCESS_TOKEN / DHAN_API_SECRET / DHAN_PIN / DHAN_TOTP_SECRET
+ *    assigned a literal of 6+ chars; placeholders are skipped.
+ *  - GENERIC: any other variable named dhan...token/secret/key assigned a 20+
+ *    char value that contains a digit (so `self.config.dhan_access_token`
+ *    does not match) and is not a placeholder.
  */
-const DHAN_CREDENTIAL_PATTERN =
-  `${ci('dhan')}[A-Za-z0-9_-]{0,30}?(?:${ci('token')}|${ci('secret')}|${ci('key')})["']?\\s*[:=]\\s*["']?` +
-  `(?!(?:${PLACEHOLDER_WORDS.map(ci).join('|')}))(?=[A-Za-z0-9_.+/=-]*[0-9])([A-Za-z0-9_.+/=-]{20,})`;
+const PLACEHOLDER = `(?!(?:${PLACEHOLDER_WORDS.map(ci).join('|')}))`;
 
-/** Three base64url segments with JWT header and payload prefixes (`{"`). */
-const JWT_PATTERN =
-  '(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}';
+const DHAN_NAMED_PATTERN =
+  `${ci('dhan')}[_-]?(?:${ci('access')}[_-]?${ci('token')}|${ci('api')}[_-]?${ci('secret')}|${ci('pin')}|${ci('totp')}[_-]?${ci('secret')})` +
+  `["']?\\s*[:=]\\s*["']?(?![$<{])${PLACEHOLDER}([^\\s"']{6,})`;
+
+const DHAN_GENERIC_PATTERN =
+  `${ci('dhan')}[A-Za-z0-9_-]{0,30}?(?:${ci('token')}|${ci('secret')}|${ci('key')})["']?\\s*[:=]\\s*["']?` +
+  `${PLACEHOLDER}(?=[A-Za-z0-9_.+/=-]*[0-9])([A-Za-z0-9_.+/=-]{20,})`;
+
+/** Bearer credential: header.payload.signature, base64url '{"' prefixes. */
+const JWT_PATTERN = 'eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}';
 
 export const DetectionRuleSchema = z.object({
   id: z.string(),
@@ -134,20 +141,27 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     enabled: true,
   },
   {
-    id: 'jwt',
-    name: 'JSON Web Token',
-    kind: 'jwt',
+    id: 'jwt-token',
+    name: 'JSON Web Token (bearer credential)',
+    kind: 'jwt-token',
     pattern: JWT_PATTERN,
-    severity: 'high',
+    severity: 'critical',
     enabled: true,
   },
   {
     id: 'dhan-credential',
-    name: 'DhanHQ token, secret or key assignment',
+    name: 'DhanHQ access token / API secret / PIN / TOTP secret assignment',
     kind: 'dhan-credential',
-    pattern: DHAN_CREDENTIAL_PATTERN,
+    pattern: DHAN_NAMED_PATTERN,
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'dhan-credential-generic',
+    name: 'DhanHQ-named token, secret or key assignment',
+    kind: 'dhan-credential',
+    pattern: DHAN_GENERIC_PATTERN,
     severity: 'critical',
     enabled: true,
   },
 ];
-

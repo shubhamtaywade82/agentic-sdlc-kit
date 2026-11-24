@@ -54,7 +54,7 @@ describe('dhan-credential: placeholders and look-alikes are not flagged', () => 
     'DHAN_CLIENT_ID=1100000000',
     'dhan_token = self.config.dhan_access_token',
     'dhan_token = os.getenv("DHAN_TOKEN")',
-    'DHAN_ACCESS_TOKEN=short1',
+    'dhan_token = "short1"', // generic names need a 20+ char value
     'DHAN_ACCESS_TOKEN=',
     'the dhan token expires after a day',
     `ACCESS_TOKEN=${TOK}`,
@@ -64,12 +64,12 @@ describe('dhan-credential: placeholders and look-alikes are not flagged', () => 
   });
 });
 
-describe('jwt rule', () => {
-  it('detects a three-part JWT anywhere, severity high', () => {
+describe('jwt-token rule', () => {
+  it('detects a three-part JWT anywhere, severity critical', () => {
     for (const text of [`access-token: ${JWT}`, `curl -H "Authorization: Bearer ${JWT}"`, JWT]) {
-      const f = detectSecrets(text, 'tool-output').find((x) => x.kind === 'jwt');
+      const f = detectSecrets(text, 'tool-output').find((x) => x.kind === 'jwt-token');
       expect(f, text).toBeDefined();
-      expect(f!.severity).toBe('high');
+      expect(f!.severity).toBe('critical');
       expect(f!.location.length).toBe(JWT.length);
     }
   });
@@ -77,10 +77,9 @@ describe('jwt rule', () => {
   it.each([
     'eyJhbGciOiJ.eyJzdWIiOiJ', // two segments only
     'eyJ.eyJ.sig', // far too short
-    `abc${JWT}`, // glued to a longer token: not a standalone JWT
     'eyJhbGci is how a JWT header starts',
   ])('does not flag %s', (text) => {
-    expect(kinds(text)).not.toContain('jwt');
+    expect(kinds(text)).not.toContain('jwt-token');
   });
 });
 

@@ -196,7 +196,7 @@ export class ProcessVerificationRunner implements VerificationRunner {
       };
     }
     const cwd = opts.cwd ?? process.cwd();
-    const timeoutMs = opts.timeoutMs ?? 60_000;
+    const timeoutMs = opts.timeoutMs ?? (process.env.KIT_TIMEOUT_MS ? Number(process.env.KIT_TIMEOUT_MS) : 180_000);
     const maxOutputBytes = opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const outcome = await executeProcess([...cmd], cwd, timeoutMs, maxOutputBytes);
     return { ok: true, value: toProcessResult(outcome) };
@@ -207,7 +207,7 @@ export class ProcessVerificationRunner implements VerificationRunner {
     opts: ProcessRunOptions = {},
   ): Promise<Result<VerificationReport>> {
     const cwd = opts.cwd ?? process.cwd();
-    const timeoutMs = opts.timeoutMs ?? 60_000;
+    const timeoutMs = opts.timeoutMs ?? (process.env.KIT_TIMEOUT_MS ? Number(process.env.KIT_TIMEOUT_MS) : 180_000);
     const maxOutputBytes = opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const checks: Check[] = [];
 

@@ -23,9 +23,10 @@ describe('protocolBlock', () => {
     expect(t).toContain('kit journal <ID> --verify');
   });
 
-  it('never routes defects through `kit fix` (it observes no failing test)', () => {
-    expect(protocolBlock('codex')).toContain('Do not use `kit fix`');
-    expect(protocolBlock('codex')).not.toMatch(/run `kit fix/);
+  it('routes defects through the gated engine and never says kit fix is unsafe', () => {
+    const t = protocolBlock('codex');
+    expect(t).toContain('`kit fix BUG-NNN <phase>` is the same engine');
+    expect(t).not.toContain('Do not use `kit fix`');
   });
 });
 

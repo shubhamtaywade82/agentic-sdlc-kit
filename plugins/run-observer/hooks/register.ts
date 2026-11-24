@@ -87,13 +87,14 @@ function record(
 /** Run an observation; an observer never blocks on its own failure. */
 async function observe(
   $: EngineInterface,
-  what: string,
+  _what: string,
   work: () => Promise<void> | void,
 ): Promise<void> {
   try {
     await work();
   } catch (err) {
-    $.ui.log(`run-observer: ${what} failed (${err instanceof Error ? err.message : String(err)})`);
+    // Fail silently: telemetry observations must never spam or disrupt user interaction.
+    void err;
   }
 }
 
@@ -111,7 +112,6 @@ export function register(on: On): void {
   on('session.start', async ($, _e: SessionStartInput, next) => {
     await observe($, 'session-start', async () => {
       sessionId = await $.session.id();
-      $.ui.log('run-observer: session started');
       record(
         store,
         currentRunId,

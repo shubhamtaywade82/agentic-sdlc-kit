@@ -16,6 +16,7 @@ import { featureCommand } from '../commands/feature.js';
 import { newCommand } from '../commands/new.js';
 import { fixCommand } from '../commands/fix.js';
 import { installCommand } from '../commands/install.js';
+import { uninstallCommand } from '../commands/uninstall.js';
 import { memoryCommand } from '../commands/memory.js';
 import { evolveCommand } from '../commands/evolve.js';
 import { refactorCommand } from '../commands/refactor.js';
@@ -55,6 +56,7 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   if (!registry.get('new')) registry.register(newCommand);
   if (!registry.get('fix')) registry.register(fixCommand);
   if (!registry.get('install')) registry.register(installCommand);
+  if (!registry.get('uninstall')) registry.register(uninstallCommand);
   if (!registry.get('memory')) registry.register(memoryCommand);
   if (!registry.get('evolve')) registry.register(evolveCommand);
   if (!registry.get('refactor')) registry.register(refactorCommand);

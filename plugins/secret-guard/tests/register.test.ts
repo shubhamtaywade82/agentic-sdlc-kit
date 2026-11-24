@@ -109,7 +109,7 @@ describe('secret-guard register', () => {
     runtime.load(register);
     runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
     const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin' });
-    expect((result.value as { deny?: string }).deny).toMatch(/could not read the locally reachable commits/);
+    expect((result.value as { deny?: string }).deny).toMatch(/could not read the locally reachable commit history/);
   });
 
   it('does not run git for a non-git Bash command', async () => {
@@ -227,7 +227,7 @@ describe('secret-guard register', () => {
       ]);
     });
 
-    it('scans the unpushed commits (not just the index) before a push', async () => {
+    it('scans local commit history across refs before a push', async () => {
       const runtime = new MockRuntime();
       runtime.load(register);
       runtime.queueProcessResults({ stdout: secretDiff });

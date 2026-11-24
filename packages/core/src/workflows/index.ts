@@ -2,6 +2,7 @@
 export * from './engine.js';
 export * from './feature-workflow.js';
 export * from './tdd-run-store.js';
+export * from './state-root.js';
 export * from './journal.js';
 export * from './next-action.js';
 export * from './app-workflow.js';

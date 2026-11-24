@@ -4,11 +4,10 @@ Secret protection Mod for the Agentic SDLC Kit.
 
 ## What it does
 
-- **`tool.call` (Bash, git commit/push)**: runs
-  `$.process.run(['git','diff','--cached'])` and scans the staged diff
-  BEFORE the command runs — a secret in what is about to be committed
-  refuses the commit. If the diff cannot be read, the operation is
-  refused (fail closed: unverifiable is not verified-clean).
+- **`tool.call` (Bash, git commit/push)**: scans staged changes before commits
+  and scans locally reachable commit history before supported pushes. Pushes
+  with ambiguous ref scope or repository context are refused before execution.
+  If any scan cannot be read or verified, the operation is refused (fail closed).
 - **`tool.call` (Write / NotebookEdit / Edit)**: scans the content being
   written (`e.content` / `e.new_source` / `e.new_string`) before the write.
   Blocks writes that contain detected secrets. **Fail-closed**: a scanner
@@ -80,12 +79,40 @@ Text over `maxInputChars` is never reported as clean. `redactSecrets` returns `s
 
 ## Git commit/push detection and what is scanned
 
-The hook finds `git commit` / `git push` from the **parsed command** (`policies/git-command.ts`, over a copy of sdlc-guard's tokenizer, kept identical by a test), not a substring regex. It sees through git's global options (`git -C d commit`, `-c k=v`, `--git-dir`), wrappers (`sudo`, `env`, `command`), `sh -c` / `eval` nesting and quoting, and it ignores quoted text (`echo "git push"`). Nesting too deep to read is treated as an uncertain commit and scanned.
+The hook finds history-changing Git commands from the parsed command
+(`policies/git-command.ts`), not a substring regex. It sees wrappers and
+nested shells, and ignores quoted text that merely mentions Git.
 
-| Command | Scanned before it runs |
+Pushes use a deliberately narrow allowlist:
+
+| Command | Result |
 | --- | --- |
-| `git commit` | `git diff --cached` |
-| `git commit -a/--all` or with a pathspec | also `git diff` (tracked working-tree changes) |
-| `git push` | the unpushed commits: `git log -p HEAD --not --remotes` |
+| `git push` | Allowed after scanning locally reachable commits and tags |
+| `git push origin` | Allowed after the same conservative scan |
+| `git push --force origin` | Allowed; force changes update semantics, not the source-ref scope |
+| `git push -v origin` | Allowed; verbose is transport/output-only |
+| `git push origin main` | Denied: explicit refspec |
+| `git push --all`, `--tags`, or `--mirror` | Denied: unsupported ref selection |
+| `git -C sub push`, `git --git-dir ... push`, or `cd sub && git push` | Denied: scan repository context cannot be proven |
+| Unknown flags, multiple positional arguments, or nesting too deep to inspect | Denied: target scope is uncertain |
 
-A scan that cannot read its input, or finds it too large, denies the operation. Not covered: aliases, variables and `$(...)` (not expandable), and publishing paths that never say `git commit/push` (for example `gh`). A first push of a very large history can exceed `maxInputChars`; raise it in the policy state.
+For an accepted push, the guard runs
+`git log -p --format= --all --not --remotes`. This is intentionally broader
+than the current branch: it checks locally reachable commit history rather
+than assuming that only `HEAD` will be published. It also covers pushes whose
+configured default selects another local branch. The scan is conservative; it
+is not a byte-for-byte reconstruction of Git's transport negotiation.
+
+Only a bare push or one remote argument is accepted, with transport/output
+flags from a small allowlist. Ref specs, `--all`, `--tags`, `--mirror`,
+repository-redirection options, and directory changes are refused before a
+scan can accidentally approve the wrong repository. This restriction also
+applies to commit commands when Git global options or a preceding `cd` would
+make the scan run against a different repository.
+
+A scan that cannot read its input, finds it too large, or cannot establish
+the operation's scope denies the operation. Not covered: aliases, variables
+and `$(...)` (not expandable), and publishing paths that never invoke
+`git commit/push` (for example `gh`). A first push of a very large history
+can exceed `maxInputChars`; raise it in the policy state only after assessing
+the memory and latency impact.

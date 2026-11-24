@@ -244,6 +244,9 @@ describe('secret-guard register', () => {
       'git push origin feature:production',
       'git -C sub push',
       'cd sub && git push',
+      'GIT_DIR=/tmp/other/.git git push',
+      'env GIT_WORK_TREE=/tmp/other git push',
+      'export GIT_DIR=/tmp/other/.git && git push',
     ])('denies unsupported push scope without running a misleading scan: %s', async (command) => {
       const runtime = new MockRuntime();
       runtime.load(register);

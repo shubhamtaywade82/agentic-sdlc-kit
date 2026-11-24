@@ -38,7 +38,7 @@ describe('kit skills list/show/recommend', () => {
     expect(text).toContain('node-agent-skills');
     expect(text).toContain('react-agent-skills');
     expect(text).toContain('shubhamtaywade82/node-agent-skills');
-    expect(text).toContain('340 skills');
+    expect(text).toContain('322 skills');
   });
 
   it('shows one pack with its workflow mapping', async () => {
@@ -156,7 +156,7 @@ describe('kit skills install', () => {
     expect(r.exitCode).toBe(0);
     const plan = JSON.parse(ctx.out.join('')) as { dryRun: boolean; expectedSkills: number };
     expect(plan.dryRun).toBe(true);
-    expect(plan.expectedSkills).toBe(340);
+    expect(plan.expectedSkills).toBe(322);
     expect(await exists(path.join(project.path, '.claude'))).toBe(false);
     expect(await exists(path.join(project.path, '.ai-kit'))).toBe(false);
   });

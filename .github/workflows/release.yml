@@ -1,0 +1,77 @@
+# Release and publish workflow for the Agentic SDLC Kit.
+#
+# SECURITY.md §6: GitHub Actions are pinned to full SHAs (not @v4) to
+# defend against supply-chain tampering of the action ref.
+#
+# Triggers:
+#   - Pushing a release tag (e.g., v0.9.1)
+#   - Publishing a GitHub Release
+#   - Manual trigger (workflow_dispatch) with optional dry_run flag
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (verify and simulate publish without writing to npm)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: 'release-${{ github.ref }}'
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        # Pin: pnpm/action-setup@v4 → SHA at tag v4.0.0.
+        uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2
+        with:
+          version: 12.21.0
+
+      - name: Setup Node 22
+        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies (frozen-lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Full verification (architecture, milestones, build, lint, typecheck, test)
+        run: pnpm run verify
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -e
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "Running dry-run publish..."
+            pnpm -r --filter "./packages/*" publish --access public --dry-run --no-git-checks
+          else
+            echo "Publishing packages to npm registry..."
+            pnpm -r --filter "./packages/*" publish --access public --no-git-checks
+          fi

@@ -21,6 +21,7 @@ export const SecretKindSchema = z.enum([
   'generic-api-key',
   'private-key-pem',
   'jwt',
+  'dhan-credential',
   'connection-string',
   'bearer-token',
   'unknown',

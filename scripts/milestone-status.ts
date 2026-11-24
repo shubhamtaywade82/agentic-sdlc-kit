@@ -39,7 +39,7 @@ export const MILESTONES: readonly Milestone[] = [
     gaps: 'not yet validated with claude plugin validate / claude plugin test or in a live session' },
   { id: 11, name: 'Secret Guard Mod', status: 'partial',
     evidence: ['plugins/secret-guard/hooks/register.ts', 'plugins/secret-guard/policies/detect.ts'],
-    gaps: 'DhanHQ token format not covered; not validated with claude plugin validate' },
+    gaps: 'DhanHQ credentials are matched by variable name plus JWT shape, not by an official token format; not validated in a live session' },
   { id: 12, name: 'Model and effort Router Mod', status: 'partial',
     evidence: ['plugins/model-router/hooks/register.ts', 'plugins/model-router/policies/router.ts'],
     gaps: 'suggest-only by default; no verification-driven escalation loop wired to real runs' },

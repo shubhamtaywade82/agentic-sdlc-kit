@@ -98,10 +98,18 @@ describe('secret-guard register', () => {
     runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
     const result = await runtime.fire('tool.call', {
       tool: 'Bash',
-      command: 'git push origin main',
+      command: "git commit -m 'x'",
     });
     expect(result.answered).toBe(true);
     expect((result.value as { deny?: string }).deny).toMatch(/could not read the staged changes/);
+  });
+
+  it('fails closed when the unpushed commits cannot be read', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
+    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin main' });
+    expect((result.value as { deny?: string }).deny).toMatch(/could not read the unpushed commits/);
   });
 
   it('does not run git for a non-git Bash command', async () => {
@@ -182,5 +190,79 @@ describe('secret-guard register', () => {
     expect(text).not.toContain(AWS_KEY_SAMPLE);
     expect(text).toMatch(/WITHHELD/);
     expect(runtime.getLogs().some((l) => /not scanned/i.test(l))).toBe(true);
+  });
+
+  describe('git detection and what gets scanned', () => {
+    const fire = (runtime: MockRuntime, command: string) =>
+      runtime.fire('tool.call', { tool: 'Bash', command });
+    const secretDiff = `+k = "${AWS_KEY_SAMPLE}"\n`;
+
+    it('sees a commit behind git global options (-C, -c) that the old regex missed', async () => {
+      for (const command of ['git -C sub commit -m x', 'git -c user.name=x commit -m x']) {
+        const runtime = new MockRuntime();
+        runtime.load(register);
+        runtime.queueProcessResults({ stdout: secretDiff });
+        const result = await fire(runtime, command);
+        expect((result.value as { deny?: string }).deny, command).toMatch(/staged changes contain/);
+      }
+    });
+
+    it('does not scan quoted text that merely mentions git push', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      const result = await fire(runtime, 'echo "git push"');
+      expect(result.forwarded).toBe(true);
+      expect(runtime.getProcessCalls()).toEqual([]);
+    });
+
+    it('scans tracked working-tree changes too when the commit stages them (-a)', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      runtime.queueProcessResults({ stdout: '' }, { stdout: secretDiff });
+      const result = await fire(runtime, 'git commit -am "x"');
+      expect((result.value as { deny?: string }).deny).toMatch(/working-tree changes being committed contain/);
+      expect(runtime.getProcessCalls()).toEqual([
+        ['git', 'diff', '--cached'],
+        ['git', 'diff'],
+      ]);
+    });
+
+    it('scans the unpushed commits (not just the index) before a push', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      runtime.queueProcessResults({ stdout: secretDiff });
+      const result = await fire(runtime, 'git push origin main');
+      expect((result.value as { deny?: string }).deny).toMatch(/unpushed commits contain/);
+      expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes']]);
+    });
+
+    it('forwards a push whose unpushed commits are clean', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      runtime.queueProcessResults({ stdout: '+const x = 1;\n' });
+      const result = await fire(runtime, 'git push');
+      expect(result.forwarded).toBe(true);
+      expect(result.answered).toBe(false);
+    });
+
+    it('denies a push when the unpushed history is too large to scan', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      runtime.setState(
+        { plugin: 'secret-guard', key: 'policy' },
+        { ...DEFAULT_REDACTION_POLICY, maxInputChars: 64 },
+      );
+      runtime.queueProcessResults({ stdout: '+' + 'x'.repeat(500) });
+      const result = await fire(runtime, 'git push');
+      expect((result.value as { deny?: string }).deny).toMatch(/not scanned|too large/i);
+    });
+
+    it('scans a commit and a push chained in one command', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      runtime.queueProcessResults({ stdout: '+ok\n' }, { stdout: secretDiff });
+      const result = await fire(runtime, 'git commit -m x && git push');
+      expect((result.value as { deny?: string }).deny).toMatch(/unpushed commits contain/);
+    });
   });
 });

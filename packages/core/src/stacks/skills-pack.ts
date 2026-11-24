@@ -28,7 +28,7 @@ export interface SkillsPackSource {
   readonly url: string;
   /** Directory inside the repository that holds the skills. */
   readonly skillsPath: string;
-  /** Number of skills (directories containing SKILL.md) measured 2026-11-23. */
+  /** Number of skills (directories containing SKILL.md) measured 2026-11-25. */
   readonly skillCount: number;
   /** Coarse content categories, derived from skill-name prefixes. */
   readonly categories: readonly string[];
@@ -60,7 +60,7 @@ export const NODE_SKILLS_PACK: SkillsPackSource = {
   repository: 'shubhamtaywade82/node-agent-skills',
   url: 'https://github.com/shubhamtaywade82/node-agent-skills',
   skillsPath: 'skills',
-  skillCount: 340,
+  skillCount: 322,
   categories: [
     'runtime',
     'architecture',
@@ -86,7 +86,7 @@ export const REACT_SKILLS_PACK: SkillsPackSource = {
   repository: 'shubhamtaywade82/react-agent-skills',
   url: 'https://github.com/shubhamtaywade82/react-agent-skills',
   skillsPath: 'skills',
-  skillCount: 127,
+  skillCount: 129,
   categories: [
     'react',
     'frontend',

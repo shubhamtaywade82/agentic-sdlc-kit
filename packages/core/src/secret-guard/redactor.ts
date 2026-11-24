@@ -37,6 +37,45 @@ export const DEFAULT_REDACTION_POLICY: RedactionPolicy = {
   ignorePaths: [],
 };
 
+interface Span {
+  start: number;
+  end: number;
+  finding: SecretFinding;
+}
+
+const SEVERITY_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+
+/**
+ * Findings can overlap or share a range (a name-anchored rule and a
+ * token-shape rule both match one value). Each region must be replaced
+ * exactly once: replacing twice uses stale offsets and destroys the text
+ * next to the secret. Overlaps merge into one span labelled by the most
+ * severe finding.
+ */
+function mergeSpans(findings: ReadonlyArray<SecretFinding>): Span[] {
+  const spans: Span[] = findings
+    .filter((f) => f.location.offset !== undefined)
+    .map((f) => ({
+      start: f.location.offset as number,
+      end: (f.location.offset as number) + f.location.length,
+      finding: f,
+    }))
+    .sort((a, b) => a.start - b.start || b.end - a.end);
+  const merged: Span[] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && s.start < last.end) {
+      last.end = Math.max(last.end, s.end);
+      if ((SEVERITY_RANK[s.finding.severity] ?? 0) > (SEVERITY_RANK[last.finding.severity] ?? 0)) {
+        last.finding = s.finding;
+      }
+    } else {
+      merged.push({ ...s });
+    }
+  }
+  return merged;
+}
+
 /**
  * Replace every detected secret value in the input with a placeholder.
  * The placeholder format is controlled by the RedactionPolicy.
@@ -62,20 +101,10 @@ export function redactSecrets(
   // text using the finding offsets and lengths.
   let redactedText = text;
   const updatedFindings: SecretFinding[] = [];
-  // Sort findings by offset descending so replacements don't shift later
-  // offsets.
-  const sorted = [...findings].sort((a, b) => {
-    const aOffset = a.location.offset ?? 0;
-    const bOffset = b.location.offset ?? 0;
-    return bOffset - aOffset;
-  });
-  for (const f of sorted) {
-    const offset = f.location.offset;
-    const length = f.location.length;
-    if (offset === undefined) continue;
-    const placeholder = formatPlaceholder(policy, f);
+  // Replace from the end so earlier offsets stay valid.
+  for (const sp of mergeSpans(findings).reverse()) {
     redactedText =
-      redactedText.slice(0, offset) + placeholder + redactedText.slice(offset + length);
+      redactedText.slice(0, sp.start) + formatPlaceholder(policy, sp.finding) + redactedText.slice(sp.end);
   }
   // Verify: re-run the detector on the redacted output. None of the
   // original values should appear.

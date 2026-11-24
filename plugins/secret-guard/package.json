@@ -1,6 +1,6 @@
 {
   "name": "@agentic-sdlc-kit/plugin-secret-guard",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "secret-guard secret-detection Mod.",
   "license": "MIT",

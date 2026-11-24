@@ -77,3 +77,15 @@ Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude
 ## Unscanned input fails closed
 
 Text over `maxInputChars` is never reported as clean. `redactSecrets` returns `status: 'not-scanned'` (`fullyRedacted: false`) with a `[WITHHELD: ...]` marker instead of the raw text; the tool-result hook surfaces the marker and logs it. A staged diff the scanner skipped (`skipped-too-large`, `skipped-ignored`) denies the commit/push instead of passing it through. `status` is one of `verified-clean`, `redacted`, `not-scanned`, `failed`.
+
+## Git commit/push detection and what is scanned
+
+The hook finds `git commit` / `git push` from the **parsed command** (`policies/git-command.ts`, over a copy of sdlc-guard's tokenizer, kept identical by a test), not a substring regex. It sees through git's global options (`git -C d commit`, `-c k=v`, `--git-dir`), wrappers (`sudo`, `env`, `command`), `sh -c` / `eval` nesting and quoting, and it ignores quoted text (`echo "git push"`). Nesting too deep to read is treated as an uncertain commit and scanned.
+
+| Command | Scanned before it runs |
+| --- | --- |
+| `git commit` | `git diff --cached` |
+| `git commit -a/--all` or with a pathspec | also `git diff` (tracked working-tree changes) |
+| `git push` | the unpushed commits: `git log -p HEAD --not --remotes` |
+
+A scan that cannot read its input, or finds it too large, denies the operation. Not covered: aliases, variables and `$(...)` (not expandable), and publishing paths that never say `git commit/push` (for example `gh`). A first push of a very large history can exceed `maxInputChars`; raise it in the policy state.

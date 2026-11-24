@@ -36,6 +36,7 @@
 import type { EngineInterface, On, ToolCallInput, ToolCallResult } from 'claude-code';
 import { atom, read } from 'claude-code';
 import { DEFAULT_REDACTION_POLICY, redactSecrets, scanText } from '../policies/detect';
+import { parseGitActions, type GitAction } from '../policies/git-command';
 import type { RedactionPolicy } from '../policies/detect';
 
 // The policy state key, declared in contract.d.ts. read() resolves to
@@ -79,6 +80,79 @@ async function scanWrite(
   return null;
 }
 
+interface GitRead {
+  args: string[];
+  /** Noun phrase used in messages: "the staged changes". */
+  noun: string;
+  source: 'git-staged' | 'git-push';
+  advice: string;
+}
+
+const STAGED: GitRead = {
+  args: ['git', 'diff', '--cached'],
+  noun: 'the staged changes',
+  source: 'git-staged',
+  advice: 'Unstage the secret, move it to an environment variable or secret manager, and retry.',
+};
+const WORKTREE: GitRead = {
+  args: ['git', 'diff'],
+  noun: 'the tracked working-tree changes being committed',
+  source: 'git-staged',
+  advice: 'Remove the secret from the file, move it to an environment variable or secret manager, and retry.',
+};
+// Commits reachable from HEAD that no remote-tracking branch has: what a push publishes.
+const UNPUSHED: GitRead = {
+  args: ['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes'],
+  noun: 'the unpushed commits',
+  source: 'git-push',
+  advice: 'Remove the secret from history (amend or rewrite the commits) before pushing.',
+};
+
+/** What each parsed action needs scanned, in order, without duplicates. */
+function gitReads(actions: GitAction[]): GitRead[] {
+  const reads: GitRead[] = [];
+  const add = (r: GitRead): void => {
+    if (!reads.includes(r)) reads.push(r);
+  };
+  for (const a of actions) {
+    if (a.action === 'commit') {
+      add(STAGED);
+      if (a.stageTracked) add(WORKTREE);
+    } else {
+      add(UNPUSHED);
+    }
+  }
+  return reads;
+}
+
+async function scanGitRead($: EngineInterface, policy: RedactionPolicy, read: GitRead): Promise<string | null> {
+  const out = await $.process.run(read.args);
+  if (out.exitCode !== 0) {
+    // Could not read it (not a repo, git error): an unverifiable operation is
+    // not a verified-clean one.
+    $.ui.log(`secret-guard: could not read ${read.noun}; refusing git operation`);
+    return (
+      `secret-guard: could not read ${read.noun} (${read.args.join(' ')} failed), so it was not ` +
+      'scanned for secrets. Run from a git repository and retry.'
+    );
+  }
+  const result = scanText(out.stdout, policy, read.source);
+  if (result.outcome === 'clean') return null;
+  if (result.outcome === 'findings') {
+    $.ui.log(`secret-guard: blocked git operation — ${result.findings.length} secret(s) in ${read.noun}`);
+    return (
+      `secret-guard: ${read.noun} contain ${result.findings.length} possible secret(s) ` +
+      `(${result.findings.map((f) => f.kind).join(', ')}). ${read.advice} If a real key was committed, rotate it.`
+    );
+  }
+  // failed / skipped-too-large / skipped-ignored: NOT scanned, so not verified clean.
+  $.ui.log(`secret-guard: ${read.noun} not scanned (${result.outcome}); refusing git operation`);
+  return (
+    `secret-guard: ${read.noun} were not scanned (${result.outcome}; too large to verify or the scan ` +
+    'failed). Work in smaller pieces, or raise maxInputChars in the secret-guard policy, and retry.'
+  );
+}
+
 export function register(on: On): void {
   // 1. Writes: Write (e.file_path + e.content) and NotebookEdit
   //    (e.notebook_path + e.new_source). The matcher narrows e to the
@@ -103,51 +177,18 @@ export function register(on: On): void {
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 
-  // 2. Git: scan the staged diff before a commit or push enters history.
+  // 2. Git: scan what a commit or push is about to put into (or publish from)
+  //    history, found from the parsed command, not a substring regex.
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     const command = e.command;
     if (typeof command !== 'string') return next(e);
-    if (!/\bgit\s+(commit|push)\b/.test(command)) return next(e);
-    // Read what is about to be committed — before the command runs.
-    const diff = await $.process.run(['git', 'diff', '--cached']);
-    if (diff.exitCode !== 0) {
-      // Could not read the staged changes (not a repo, git error): fail
-      // closed — an unverifiable commit is not a verified-clean one.
-      $.ui.log('secret-guard: could not read staged changes; refusing git operation');
-      return {
-        deny:
-          'secret-guard: could not read the staged changes (git diff --cached failed), so they ' +
-          'were not scanned for secrets. Run git add and retry from a git repository.',
-      };
-    }
+    const actions = parseGitActions(command);
+    if (actions.length === 0) return next(e);
     const policy = await getPolicy($);
-    const result = scanText(diff.stdout, policy, 'git-staged');
-    if (result.outcome === 'findings') {
-      $.ui.log(
-        `secret-guard: blocked git operation — ${result.findings.length} secret(s) in staged changes`,
-      );
-      return {
-        deny:
-          `secret-guard: the staged changes contain ${result.findings.length} possible secret(s) ` +
-          `(${result.findings.map((f) => f.kind).join(', ')}). Unstage the secret, move it to an ` +
-          'environment variable or secret manager, and retry. If a real key was committed, rotate it.',
-      };
-    }
-    if (result.outcome === 'failed') {
-      $.ui.log('secret-guard: staged-diff scan failed; refusing git operation');
-      return {
-        deny: 'secret-guard: staged-diff scan failed; refusing to let the commit proceed unverified',
-      };
-    }
-    if (result.outcome !== 'clean') {
-      // skipped-too-large / skipped-ignored: the diff was NOT scanned, so it
-      // is not verified clean. Only an actual scan result may let it through.
-      $.ui.log(`secret-guard: staged diff not scanned (${result.outcome}); refusing git operation`);
-      return {
-        deny:
-          `secret-guard: the staged changes were not scanned (${result.outcome}; the diff is ` +
-          'too large to verify). Commit in smaller pieces, or scan it separately, and retry.',
-      };
+    for (const read of gitReads(actions)) {
+      // Read before the command runs, so nothing has entered history yet.
+      const deny = await scanGitRead($, policy, read);
+      if (deny !== null) return { deny };
     }
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));

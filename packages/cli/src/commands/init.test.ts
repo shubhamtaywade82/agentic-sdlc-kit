@@ -62,4 +62,26 @@ describe('initCommand', () => {
       await fs.rm(tmp, { recursive: true, force: true });
     }
   });
+
+  it('creates state/reports under KIT_STATE_DIR, not in the project', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-init-state-'));
+    const proj = path.join(tmp, 'proj');
+    const stateDir = path.join(tmp, 'state');
+    await fs.mkdir(proj);
+    await fs.writeFile(
+      path.join(proj, 'package.json'),
+      JSON.stringify({ name: 'p', scripts: { test: 'node --test' } }),
+    );
+    process.env['KIT_STATE_DIR'] = stateDir;
+    try {
+      const r = await initCommand.run(makeCtx([], proj));
+      expect(r.exitCode).toBe(0);
+      expect(await fs.readdir(path.join(proj, '.ai-kit'))).toEqual(['project.yml']);
+      const [sub] = await fs.readdir(stateDir);
+      expect((await fs.readdir(path.join(stateDir, sub!))).sort()).toEqual(['reports', 'state']);
+    } finally {
+      delete process.env['KIT_STATE_DIR'];
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
 });

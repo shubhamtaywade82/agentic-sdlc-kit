@@ -249,6 +249,6 @@ provisions `.ai-kit`, `.claude`, `docs/specifications`, `docs/plans` hidden via
 
 **Machinery elsewhere.** Set `KIT_STATE_DIR=/abs/path` to relocate run state,
 the journal, and agent execution/orchestration records to
-`$KIT_STATE_DIR/<repo>-<hash>/`. A relative value is rejected. `project.yml`,
+`$KIT_STATE_DIR/<repo>-<hash>/` (including the `state/` and `reports/` directories `kit init` creates). A relative value is rejected. `project.yml`,
 specs and plans are not relocated (they are project-rooted evidence). Mode 1
 (`kit feature <id> run`) still requires committed spec, plan and profile.

@@ -7,9 +7,9 @@
 //      (e.content / e.new_source / e.new_string; tool arguments are FIELDS
 //      of a tool.call event, narrowed per tool by the matcher) and refuse
 //      the write when a secret matches.
-//   2. Bash `git commit` / `git push` — read the staged diff with
-//      $.process.run(['git','diff','--cached']) and scan it BEFORE the
-//      command runs; a secret in the diff refuses the commit.
+//   2. Bash `git commit` / narrow `git push` — scan staged changes before
+//      commits and all local refs that may be published before a push.
+//      Ambiguous push targets, refspecs and directory changes are denied.
 //   3. Tool results — after `await next(e)`, redact secrets from the
 //      result's text (the field the model reads) and return the copy.
 //
@@ -100,10 +100,12 @@ const WORKTREE: GitRead = {
   source: 'git-staged',
   advice: 'Remove the secret from the file, move it to an environment variable or secret manager, and retry.',
 };
-// Commits reachable from HEAD that no remote-tracking branch has: what a push publishes.
+// Scan every local ref not already reachable from a remote-tracking ref.
+// This is intentionally broader than a particular push.default/remote.push
+// configuration, covering alternate branches and local tags conservatively.
 const UNPUSHED: GitRead = {
-  args: ['git', 'log', '-p', '--format=', 'HEAD', '--not', '--remotes'],
-  noun: 'the unpushed commits',
+  args: ['git', 'log', '-p', '--format=', '--all', '--not', '--remotes'],
+  noun: 'the locally reachable commits and tags that may be pushed',
   source: 'git-push',
   advice: 'Remove the secret from history (amend or rewrite the commits) before pushing.',
 };
@@ -184,6 +186,10 @@ export function register(on: On): void {
     if (typeof command !== 'string') return next(e);
     const actions = parseGitActions(command);
     if (actions.length === 0) return next(e);
+    if (actions.some((action) => action.uncertain)) {
+      $.ui.log('secret-guard: refusing git push with an unsupported or ambiguous target; use a bare push or one remote without refspecs, directory changes, or git global options');
+      return { deny: 'secret-guard: refusing git push because its target scope cannot be verified. Use git push or git push <remote> with supported transport-only flags; refspecs, --all, --tags, --mirror, -C, --git-dir, --work-tree, and cd-based directory changes are not supported.' };
+    }
     const policy = await getPolicy($);
     for (const read of gitReads(actions)) {
       // Read before the command runs, so nothing has entered history yet.

@@ -202,9 +202,9 @@ The kit includes 4 installable plugins in [`plugins/`](plugins/):
 | Plugin             | Capability                | Function                                                                                               |
 | :----------------- | :------------------------ | :----------------------------------------------------------------------------------------------------- |
 | **`sdlc-guard`**   | `tool.call`, `tool.check` | Token-level classifier: asks before destructive commands (`rm -r`, force-push, `reset --hard`, DB drops, deploys, `curl \| sh`) via `$.ui.ask`; denies when non-interactive; fails closed via `.catch`. |
-| **`secret-guard`** | `tool.call`               | Redacts secrets in tool output and refuses writes, commits and pushes that add a known secret format; fails closed. |
+| **`secret-guard`** | `tool.call`               | Redacts secrets in tool output, refuses secret-bearing writes/commits, and scans local commit history before a narrow push; ambiguous push scopes are denied. |
 | **`model-router`** | `turn.step`, `agent.spawn` | Routes model and effort per request and per subagent; suggest-only by default, preserves explicit model choices. |
-| **`run-observer`** | Lifecycle events          | Records bounded telemetry for sessions, turns and tool calls. Never blocks the chain. |
+| **`run-observer`** | Lifecycle events          | Records telemetry with per-run event caps and a bounded retained-run window. Telemetry and state-publication failures never block the chain. |
 
 Install plugins into your runtime environment. Each plugin is a Claude Code
 Mod (v2.1.287 or later): it ships its hooks as TypeScript source

@@ -151,17 +151,17 @@ kit journal FEATURE-001 --verify   # tamper-evident executed record (hash-chaine
 
 ### 4. Disciplined Bug Fixing (`kit fix`)
 
-Enforces reproduction before code modification:
+A defect runs through the same evidence-gated engine as a feature (the issue id is the run id):
 
 ```bash
-kit fix BUG-101
+kit fix BUG-101 start
+kit fix BUG-101 red TASK-001      # regression test must FAIL as an assertion
+kit fix BUG-101 green TASK-001    # smallest correction must pass it
+kit fix BUG-101 refactor TASK-001 # suite must stay green
+kit fix BUG-101 verify            # audits the chain + whole-profile regression
 ```
 
-Workflow:
-
-- Stage 1: Reproduce defect with a failing test (`Red`).
-- Stage 2: Implement minimal corrective fix (`Green`).
-- Stage 3: Confirm regression avoidance across test suite (`Refactor`).
+Green is refused until Red was observed; the run is journaled like any feature run.
 
 ### 5. Scaffold Greenfield App (`kit new`)
 

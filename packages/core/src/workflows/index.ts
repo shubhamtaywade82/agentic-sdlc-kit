@@ -6,7 +6,6 @@ export * from './state-root.js';
 export * from './journal.js';
 export * from './next-action.js';
 export * from './app-workflow.js';
-export * from './fix-workflow.js';
 export * as ApplicationWorkflow from './application/index.js';
 export * as BugFixWorkflow from './bug-fix/index.js';
 export * as RefactorWorkflow from './refactor/index.js';

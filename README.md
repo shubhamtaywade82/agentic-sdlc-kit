@@ -13,7 +13,7 @@ agentic-sdlc-kit/
 ├── packages/
 │   ├── contracts/            # Shared Zod schemas and TypeScript domain contracts (imports nothing)
 │   ├── core/                 # Runtime-independent workflow engine, DAG planner, TDD machine, CLSE
-│   ├── cli/                  # `kit` command-line interface (16 commands)
+│   ├── cli/                  # `kit` command-line interface (17 commands)
 │   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
 │   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
 │   └── testing/              # Test fixtures, assertion helpers, and contract validators

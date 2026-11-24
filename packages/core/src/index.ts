@@ -11,6 +11,7 @@
 // contracts is a Critical bug and fails scripts/check-architecture.ts.
 
 export * from './workflows/index.js';
+export * from './host-instructions/index.js';
 export * from './project-profile/index.js';
 export * from './policy/index.js';
 export * from './artifacts/index.js';

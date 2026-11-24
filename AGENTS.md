@@ -9,7 +9,7 @@
 - **Architecture:** Modular monorepo under `packages/` and `plugins/`:
   - `packages/contracts`: shared types and zod schemas (depends on nothing).
   - `packages/core`: runtime-independent workflow engine, planning DAG, TDD machine, CLSE engine.
-  - `packages/cli`: `kit` executable CLI commands (16 commands).
+  - `packages/cli`: `kit` executable CLI commands (17 commands).
   - `packages/claude-code-adapter`: adapter boundary separating host runtime from core.
   - `packages/mod-sdk`: mod development framework (MockRuntime, capabilities, middleware).
   - `packages/testing`: shared fixtures, assertions, and contract validators.

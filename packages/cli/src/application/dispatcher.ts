@@ -24,6 +24,7 @@ import { nextCommand } from '../commands/next.js';
 import { journalCommand } from '../commands/journal.js';
 import { skillsCommand } from '../commands/skills.js';
 import { attachCommand } from '../commands/attach.js';
+import { hostCommand } from '../commands/host.js';
 import type { Command, CommandContext, CommandResult } from '../commands/types.js';
 import { createCommandRegistry, type CommandRegistry } from './registry.js';
 import { VERSION } from './version.js';
@@ -62,6 +63,7 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   if (!registry.get('journal')) registry.register(journalCommand);
   if (!registry.get('skills')) registry.register(skillsCommand);
   if (!registry.get('attach')) registry.register(attachCommand);
+  if (!registry.get('host')) registry.register(hostCommand);
   if (!registry.get('help')) registry.register(makeHelpCommand(registry));
 
   return {

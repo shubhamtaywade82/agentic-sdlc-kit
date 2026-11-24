@@ -17,7 +17,10 @@ export interface GitAction {
 const WRAPPERS = new Set(['sudo', 'doas', 'env', 'time', 'nohup', 'nice', 'command', 'exec', 'builtin', 'timeout']);
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh']);
 const MAX_DEPTH = 4;
-const GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--config-env', '--super-prefix']);
+const GLOBAL_WITH_VALUE = new Set([
+  '-C', '-c', '--git-dir', '--work-tree', '--namespace', '--config-env', '--super-prefix',
+  '--exec-path', '--html-path', '--man-path', '--info-path',
+]);
 const COMMIT_LONG_WITH_VALUE = new Set([
   '--message', '--file', '--author', '--date', '--template', '--reuse-message',
   '--reedit-message', '--fixup', '--squash', '--cleanup', '--trailer',
@@ -94,6 +97,14 @@ function fromGit(args: string[]): GitAction[] {
     i += GLOBAL_WITH_VALUE.has(args[i] as string) ? 2 : 1;
   }
   const sub = args[i];
+  // Unknown global options may take a separate value. If a history-changing
+  // subcommand appears later, classify it as uncertain rather than missing it.
+  if (sub !== 'push' && sub !== 'commit' && hasGlobalOptions) {
+    const laterPush = args.indexOf('push', i + 1);
+    const laterCommit = args.indexOf('commit', i + 1);
+    if (laterPush !== -1) return [{ action: 'push', stageTracked: false, uncertain: true }];
+    if (laterCommit !== -1) return [{ action: 'commit', stageTracked: true, uncertain: true }];
+  }
   const rest = args.slice(i + 1);
   if (sub === 'push') {
     return [{

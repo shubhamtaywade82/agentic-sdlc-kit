@@ -232,7 +232,7 @@ describe('secret-guard register', () => {
       runtime.load(register);
       runtime.queueProcessResults({ stdout: secretDiff });
       const result = await fire(runtime, 'git push origin');
-      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commits and tags contain/);
+      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commit history contain/);
       expect(runtime.getProcessCalls()).toEqual([['git', 'log', '-p', '--format=', '--all', '--not', '--remotes']]);
     });
 
@@ -278,7 +278,7 @@ describe('secret-guard register', () => {
       runtime.load(register);
       runtime.queueProcessResults({ stdout: '+ok\n' }, { stdout: secretDiff });
       const result = await fire(runtime, 'git commit -m x && git push');
-      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commits and tags contain/);
+      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commit history contain/);
     });
   });
 });

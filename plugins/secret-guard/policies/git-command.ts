@@ -36,7 +36,7 @@ export function parseGitActions(command: string): GitAction[] {
 }
 
 function fromText(text: string, depth: number): GitAction[] {
-  if (depth > MAX_DEPTH) return [{ action: 'push', stageTracked: false, uncertain: true }];
+  if (depth > MAX_DEPTH) return [{ action: 'commit', stageTracked: true, uncertain: true }];
   let directoryChanged = false;
   const actions: GitAction[] = [];
   for (const cmd of parseCommand(text)) {
@@ -47,7 +47,7 @@ function fromText(text: string, depth: number): GitAction[] {
     }
     const found = fromSimple(cmd, depth);
     actions.push(...found.map((action) =>
-      directoryChanged && action.action === 'push' ? { ...action, uncertain: true } : action,
+      directoryChanged ? { ...action, uncertain: true } : action,
     ));
   }
   return actions;
@@ -103,7 +103,7 @@ function fromGit(args: string[]): GitAction[] {
     }];
   }
   if (sub === 'commit') {
-    return [{ action: 'commit', stageTracked: commitTakesTracked(rest), uncertain: false }];
+    return [{ action: 'commit', stageTracked: commitTakesTracked(rest), uncertain: hasGlobalOptions }];
   }
   return [];
 }

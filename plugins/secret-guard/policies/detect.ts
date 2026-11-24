@@ -53,6 +53,36 @@ export interface DetectionRule {
   enabled: boolean;
 }
 
+// Vendored from @agentic-sdlc-kit/contracts (detection-rule.ts); keep in sync.
+/** ECMAScript has no (?i) flag: build case-insensitive classes explicitly. */
+const ci = (word: string): string =>
+  [...word].map((c) => `[${c.toLowerCase()}${c.toUpperCase()}]`).join('');
+
+const PLACEHOLDER_WORDS = ['your', 'xxx', 'example', 'changeme', 'placeholder', 'replace', 'none', 'null', 'todo'];
+
+/**
+ * DhanHQ credentials, matched by NAME because no official token format is
+ * pinned here.
+ *  - NAMED: DHAN_ACCESS_TOKEN / DHAN_API_SECRET / DHAN_PIN / DHAN_TOTP_SECRET
+ *    assigned a literal of 6+ chars; placeholders are skipped.
+ *  - GENERIC: any other variable named dhan...token/secret/key assigned a 20+
+ *    char value that contains a digit (so `self.config.dhan_access_token`
+ *    does not match) and is not a placeholder.
+ */
+// The redactor's own output must never re-match as a credential (idempotence).
+const PLACEHOLDER = `(?!(?:${PLACEHOLDER_WORDS.map(ci).join('|')}|\\[REDACTED))`;
+
+const DHAN_NAMED_PATTERN =
+  `${ci('dhan')}[_-]?(?:${ci('access')}[_-]?${ci('token')}|${ci('api')}[_-]?${ci('secret')}|${ci('pin')}|${ci('totp')}[_-]?${ci('secret')})` +
+  `["']?\\s*[:=]\\s*["']?(?![$<{])${PLACEHOLDER}([^\\s"']{6,})`;
+
+const DHAN_GENERIC_PATTERN =
+  `${ci('dhan')}[A-Za-z0-9_-]{0,30}?(?:${ci('token')}|${ci('secret')}|${ci('key')})["']?\\s*[:=]\\s*["']?` +
+  `${PLACEHOLDER}(?=[A-Za-z0-9_.+/=-]*[0-9])([A-Za-z0-9_.+/=-]{20,})`;
+
+/** Bearer credential: header.payload.signature, base64url '{"' prefixes. */
+const JWT_PATTERN = 'eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}';
+
 /**
  * Built-in detection rules (the kit's M11 baseline set). ECMAScript regex
  * sources; applied with the global flag. A rule with a capture group
@@ -139,17 +169,14 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     kind: 'jwt-token',
     // DhanHQ access tokens are JWTs; any header.payload.signature triple
     // starting with the base64url '{"' prefix is a bearer credential.
-    pattern: 'eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}',
+    pattern: JWT_PATTERN,
     severity: 'critical',
     enabled: true,
   },
   {
     id: 'dhan-credential',
     kind: 'dhan-credential',
-    // DHAN_ACCESS_TOKEN / DHAN_API_SECRET / DHAN_PIN / DHAN_TOTP assigned a
-    // literal; the captured group is the value. Placeholders are skipped.
-    pattern:
-      '[Dd][Hh][Aa][Nn][_-]?(?:[Aa][Cc][Cc][Ee][Ss][Ss][_-]?[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Ii][Nn]|[Tt][Oo][Tt][Pp][_-]?[Ss][Ee][Cc][Rr][Ee][Tt])["\']?\\s*[:=]\\s*["\']?(?![$<{])([^\\s"\']{6,})',
+    pattern: DHAN_NAMED_PATTERN,
     severity: 'critical',
     enabled: true,
   },
@@ -181,6 +208,13 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     pattern:
       '(?:[Aa][Pp][Ii][_\\-]?[Kk][Ee][Yy]|[Aa][Uu][Tt][Hh][_\\-]?[Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt])\\s*[:=]\\s*["\']([A-Za-z0-9_+/=-]{32,})["\']',
     severity: 'medium',
+    enabled: true,
+  },
+  {
+    id: 'dhan-credential-generic',
+    kind: 'dhan-credential',
+    pattern: DHAN_GENERIC_PATTERN,
+    severity: 'critical',
     enabled: true,
   },
 ];
@@ -364,6 +398,44 @@ function formatPlaceholder(policy: RedactionPolicy, f: SecretFinding): string {
  * redaction: a finding's `redacted` flag is set only after its value is
  * confirmed gone from the output.
  */
+interface Span {
+  start: number;
+  end: number;
+  finding: SecretFinding;
+}
+
+const SEVERITY_RANK: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+
+/**
+ * Findings can overlap or share a range (a name-anchored rule and a
+ * token-shape rule both match one value). Each region must be replaced
+ * exactly once: replacing twice uses stale offsets and destroys the text
+ * next to the secret. Overlaps merge into one span labelled by the most
+ * severe finding.
+ */
+function mergeSpans(findings: ReadonlyArray<SecretFinding>): Span[] {
+  const spans: Span[] = findings
+    .map((f) => ({
+      start: f.location.offset,
+      end: f.location.offset + f.location.length,
+      finding: f,
+    }))
+    .sort((a, b) => a.start - b.start || b.end - a.end);
+  const merged: Span[] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && s.start < last.end) {
+      last.end = Math.max(last.end, s.end);
+      if ((SEVERITY_RANK[s.finding.severity] ?? 0) > (SEVERITY_RANK[last.finding.severity] ?? 0)) {
+        last.finding = s.finding;
+      }
+    } else {
+      merged.push({ ...s });
+    }
+  }
+  return merged;
+}
+
 export function redactSecrets(
   text: string,
   policy: RedactionPolicy,
@@ -380,11 +452,9 @@ export function redactSecrets(
   let redactedText = text;
   const updatedFindings: SecretFinding[] = [];
   // Replace from the end so earlier offsets stay valid.
-  const sorted = [...findings].sort((a, b) => b.location.offset - a.location.offset);
-  for (const f of sorted) {
-    const { offset, length } = f.location;
+  for (const sp of mergeSpans(findings).reverse()) {
     redactedText =
-      redactedText.slice(0, offset) + formatPlaceholder(policy, f) + redactedText.slice(offset + length);
+      redactedText.slice(0, sp.start) + formatPlaceholder(policy, sp.finding) + redactedText.slice(sp.end);
   }
   // Verify: re-run the detector on the redacted output and check each
   // original value is really gone.

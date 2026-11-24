@@ -9,6 +9,35 @@
 import { z } from 'zod';
 import { SecretKindSchema } from './finding.js';
 
+/** ECMAScript has no (?i) flag: build case-insensitive classes explicitly. */
+const ci = (word: string): string =>
+  [...word].map((c) => `[${c.toLowerCase()}${c.toUpperCase()}]`).join('');
+
+const PLACEHOLDER_WORDS = ['your', 'xxx', 'example', 'changeme', 'placeholder', 'replace', 'none', 'null', 'todo'];
+
+/**
+ * DhanHQ credentials, matched by NAME because no official token format is
+ * pinned here.
+ *  - NAMED: DHAN_ACCESS_TOKEN / DHAN_API_SECRET / DHAN_PIN / DHAN_TOTP_SECRET
+ *    assigned a literal of 6+ chars; placeholders are skipped.
+ *  - GENERIC: any other variable named dhan...token/secret/key assigned a 20+
+ *    char value that contains a digit (so `self.config.dhan_access_token`
+ *    does not match) and is not a placeholder.
+ */
+// The redactor's own output must never re-match as a credential (idempotence).
+const PLACEHOLDER = `(?!(?:${PLACEHOLDER_WORDS.map(ci).join('|')}|\\[REDACTED))`;
+
+const DHAN_NAMED_PATTERN =
+  `${ci('dhan')}[_-]?(?:${ci('access')}[_-]?${ci('token')}|${ci('api')}[_-]?${ci('secret')}|${ci('pin')}|${ci('totp')}[_-]?${ci('secret')})` +
+  `["']?\\s*[:=]\\s*["']?(?![$<{])${PLACEHOLDER}([^\\s"']{6,})`;
+
+const DHAN_GENERIC_PATTERN =
+  `${ci('dhan')}[A-Za-z0-9_-]{0,30}?(?:${ci('token')}|${ci('secret')}|${ci('key')})["']?\\s*[:=]\\s*["']?` +
+  `${PLACEHOLDER}(?=[A-Za-z0-9_.+/=-]*[0-9])([A-Za-z0-9_.+/=-]{20,})`;
+
+/** Bearer credential: header.payload.signature, base64url '{"' prefixes. */
+const JWT_PATTERN = 'eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}';
+
 export const DetectionRuleSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -110,6 +139,30 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     pattern:
       '(?:[Aa][Pp][Ii][_\\-]?[Kk][Ee][Yy]|[Aa][Uu][Tt][Hh][_\\-]?[Tt][Oo][Kk][Ee][Nn]|[Ss][Ee][Cc][Rr][Ee][Tt])\\s*[:=]\\s*["\']([A-Za-z0-9_+/=-]{32,})["\']',
     severity: 'medium',
+    enabled: true,
+  },
+  {
+    id: 'jwt-token',
+    name: 'JSON Web Token (bearer credential)',
+    kind: 'jwt-token',
+    pattern: JWT_PATTERN,
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'dhan-credential',
+    name: 'DhanHQ access token / API secret / PIN / TOTP secret assignment',
+    kind: 'dhan-credential',
+    pattern: DHAN_NAMED_PATTERN,
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'dhan-credential-generic',
+    name: 'DhanHQ-named token, secret or key assignment',
+    kind: 'dhan-credential',
+    pattern: DHAN_GENERIC_PATTERN,
+    severity: 'critical',
     enabled: true,
   },
 ];

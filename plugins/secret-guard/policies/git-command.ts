@@ -26,6 +26,10 @@ const COMMIT_LONG_WITH_VALUE = new Set([
   '--reedit-message', '--fixup', '--squash', '--cleanup', '--trailer',
 ]);
 const COMMIT_SHORT_WITH_VALUE = 'mFCct';
+const REPOSITORY_ENV_NAMES = new Set([
+  'GIT_DIR', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CEILING_DIRECTORIES',
+]);
 
 // These options affect transport/output only. Ref-selection and configuration
 // flags are intentionally excluded; scanning all local refs is still required.
@@ -44,7 +48,12 @@ function fromText(text: string, depth: number): GitAction[] {
   const actions: GitAction[] = [];
   for (const cmd of parseCommand(text)) {
     const [program] = unwrap(cmd.argv);
-    if (program !== undefined && baseName(program) === 'cd') {
+    const name = program === undefined ? '' : baseName(program);
+    if (name === 'cd' || name === 'pushd' || name === 'popd' || hasRepositoryEnvOverride(cmd.argv)) {
+      directoryChanged = true;
+      continue;
+    }
+    if (name === 'export' && cmd.argv.slice(1).some(isRepositoryEnvAssignment)) {
       directoryChanged = true;
       continue;
     }
@@ -62,6 +71,15 @@ function baseName(program: string): string {
 
 function isAssignment(token: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
+}
+
+function isRepositoryEnvAssignment(token: string): boolean {
+  const name = token.slice(0, token.indexOf('='));
+  return REPOSITORY_ENV_NAMES.has(name);
+}
+
+function hasRepositoryEnvOverride(argv: string[]): boolean {
+  return argv.some(isRepositoryEnvAssignment);
 }
 
 function unwrap(argv: string[]): string[] {

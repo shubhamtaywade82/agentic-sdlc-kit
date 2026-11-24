@@ -115,7 +115,9 @@ describe('run-observer register', () => {
     });
     const result = await runtime.fire('turn.start', { turnId: 'TURN-X' });
     expect(result.forwarded).toBe(true);
-    // ...and the failure was logged, not swallowed silently.
-    expect(runtime.getLogs().some((l) => l.includes('turn-start failed'))).toBe(true);
+    // ...and (per e21a473) the failure is swallowed silently: telemetry must
+    // never spam or disrupt the user, so the old "turn-start failed" notice
+    // is intentionally gone.
+    expect(runtime.getLogs().some((l) => l.includes('turn-start failed'))).toBe(false);
   });
 });

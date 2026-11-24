@@ -1,7 +1,10 @@
 # ARCHITECTURE.md — Agentic SDLC Kit
 
-Status: M0 frozen. System boundaries and component architecture for release 0.1
-(M0 + M1). Boundary changes require an ADR.
+Status: boundaries frozen at M0; this document was written for release 0.1
+(M0 + M1) and the system has grown since (Mods, runtime plugins, hybrid
+execution, host-driven agent protocol: ADR-0014 to ADR-0021). Where this text
+and an accepted ADR or the code disagree, the ADR and the code are current.
+Boundary changes require an ADR.
 
 ## 1. System boundaries
 

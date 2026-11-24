@@ -13,7 +13,7 @@ agentic-sdlc-kit/
 ├── packages/
 │   ├── contracts/            # Shared Zod schemas and TypeScript domain contracts (imports nothing)
 │   ├── core/                 # Runtime-independent workflow engine, DAG planner, TDD machine, CLSE
-│   ├── cli/                  # `kit` command-line interface (17 commands)
+│   ├── cli/                  # `kit` command-line interface (23 commands)
 │   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
 │   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
 │   └── testing/              # Test fixtures, assertion helpers, and contract validators
@@ -75,7 +75,7 @@ pnpm add -g ./packages/cli
 
 ## Core Workflows
 
-The kit provides 16 commands covering the complete SDLC:
+The kit provides 23 commands covering the complete SDLC:
 
 ### 1. Repository Discovery & Initialization
 

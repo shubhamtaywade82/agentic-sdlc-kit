@@ -148,17 +148,20 @@ the audit without executing anything.
 
 ## 5. Disciplined Bug Fixing
 
-Fixes require reproduction tests before applying fixes:
+A defect runs through the same evidence-gated engine as a feature; the issue id
+is the run id. Author a spec (expected vs actual) and a one-task plan first.
 
 ```bash
-kit fix BUG-042
+kit fix BUG-042 start
+kit fix BUG-042 red TASK-001       # the regression test must FAIL as an assertion
+kit fix BUG-042 green TASK-001     # the smallest correction must pass it
+kit fix BUG-042 refactor TASK-001  # the suite must stay green
+kit fix BUG-042 verify
 ```
 
-The workflow enforces:
-
-1. **Red**: Capturing a failing regression test replicating the issue.
-2. **Green**: Applying the minimal code change to satisfy the test.
-3. **Refactor**: Running the complete test suite to prevent regressions.
+1. **Red**: capture a failing regression test that reproduces the issue.
+2. **Green**: apply the minimal change; refused until Red was observed.
+3. **Refactor**: the suite must still pass.
 
 ---
 
@@ -202,11 +205,18 @@ Runtime mods provide active governance during interactive coding sessions:
 ### Installing into Claude Code
 
 ```bash
-kit install --profile full-sdlc --stack node-typescript
+kit install --profile full-sdlc --stack node-typescript   # project scope
+kit uninstall                                              # removes only what install created
 ```
 
 Each plugin contains a `.claude-plugin/plugin.json` and a `hooks/hooks.json`
 that declares its hooks module (`./register.ts`, TypeScript source loaded
 directly by Claude Code — no build step).
+
+To keep the kit out of a repository, install the plugins once at user scope
+from this repo's marketplace (`claude plugin marketplace add <clone>`, then
+`claude plugin install <name>@agentic-sdlc-kit --scope user`) and use
+`kit attach local|global` for the working paths. To teach an AI host the
+evidence-gated loop once, run `kit host install <host|all>`.
 
 For setup guides covering **Claude Code**, **Cursor**, **Antigravity (AGY)**, and **CI/CD**, see [`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md).

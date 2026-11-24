@@ -73,3 +73,7 @@ Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude
 - `dhan-credential` (critical): a variable whose name contains `dhan` and `token`, `secret` or `key`, assigned a 20+ character value that contains a digit and is not a placeholder (`your_...`, `changeme`, `${VAR}`, `<...>`). Matched by name because no official token format is pinned in this repo; references such as `self.config.dhan_access_token` are not flagged.
 - `jwt` (high): any three-part `eyJ...` token. This is what catches a bare DhanHQ access token, on the assumption that it is a JWT; verify that against a redacted real sample.
 - `DHAN_CLIENT_ID` and short numeric values are not secrets and are not flagged.
+
+## Unscanned input fails closed
+
+Text over `maxInputChars` is never reported as clean. `redactSecrets` returns `status: 'not-scanned'` (`fullyRedacted: false`) with a `[WITHHELD: ...]` marker instead of the raw text; the tool-result hook surfaces the marker and logs it. A staged diff the scanner skipped (`skipped-too-large`, `skipped-ignored`) denies the commit/push instead of passing it through. `status` is one of `verified-clean`, `redacted`, `not-scanned`, `failed`.

@@ -15,9 +15,10 @@
 // — which is exactly the fabricated-data bug this kit refuses to ship).
 //
 // An observer MUST NEVER BLOCK the chain: every handler body is wrapped
-// in try/catch that swallows errors and logs a single notice, and next(e)
-// always runs. No .catch is needed on the observe-only handlers; the
-// one tool.call observer carries a residual .catch net.
+// in try/catch that swallows errors silently (e21a473: telemetry must never
+// spam or disrupt the user), and next(e) always runs. No .catch is needed
+// on the observe-only handlers; the one tool.call observer carries a
+// residual .catch net.
 //
 // NOTE on the atom() line in register(): an offline
 // `claude plugin validate` run types the atom ref against an EMPTY
@@ -86,7 +87,9 @@ function record(
 
 /** Run an observation; an observer never blocks on its own failure. */
 async function observe(
-  $: EngineInterface,
+  // Underscore-prefixed: e21a473 removed the only use of `$` (the catch now
+  // fails silently), so the parameter must not trip noUnusedParameters.
+  _$: EngineInterface,
   _what: string,
   work: () => Promise<void> | void,
 ): Promise<void> {

@@ -230,8 +230,8 @@ refactor, release) to concrete skills per stack:
 | Pack | Repository | Skills | Kit stacks served |
 | :------------------- | :----------------------------------------------------------- | -----: | :------------------ |
 | **`ruby-agent-skills`** | [shubhamtaywade82/ruby-agent-skills](https://github.com/shubhamtaywade82/ruby-agent-skills) | 104 | `ruby-rails`, `ruby` |
-| **`node-agent-skills`** | [shubhamtaywade82/node-agent-skills](https://github.com/shubhamtaywade82/node-agent-skills) | 340 | `node-typescript` |
-| **`react-agent-skills`** | [shubhamtaywade82/react-agent-skills](https://github.com/shubhamtaywade82/react-agent-skills) | 127 | `react-typescript` |
+| **`node-agent-skills`** | [shubhamtaywade82/node-agent-skills](https://github.com/shubhamtaywade82/node-agent-skills) | 322 | `node-typescript` |
+| **`react-agent-skills`** | [shubhamtaywade82/react-agent-skills](https://github.com/shubhamtaywade82/react-agent-skills) | 129 | `react-typescript` |
 
 ```bash
 kit skills                                          # list the integrated packs

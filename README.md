@@ -149,6 +149,8 @@ kit next --json        # { requiredAction, taskId, verificationCommand, nextInvo
 kit journal FEATURE-001 --verify   # tamper-evident executed record (hash-chained)
 ```
 
+> **AI Assistant Shortcut:** In Claude Code, run `/kit-feature FEATURE-001 <story text>` to let the agent drive the complete specification, planning, and TDD loop automatically without typing individual CLI steps.
+
 ### 4. Disciplined Bug Fixing (`kit fix`)
 
 A defect runs through the same evidence-gated engine as a feature (the issue id is the run id):
@@ -162,6 +164,8 @@ kit fix BUG-101 verify            # audits the chain + whole-profile regression
 ```
 
 Green is refused until Red was observed; the run is journaled like any feature run.
+
+> **AI Assistant Shortcut:** In Claude Code, run `/kit-fix BUG-101 <expected vs actual>` to initiate the regression-first defect repair workflow.
 
 ### 5. Scaffold Greenfield App (`kit new`)
 
@@ -192,6 +196,52 @@ kit memory "architecture invariants" --domain architecture
 # Run continuous learning distillation, hypothesis generation & benchmarks
 kit evolve
 ```
+
+---
+
+## AI Assistant Slash Commands & Host Workflows
+
+While deterministic CLI commands (`kit inspect`, `kit verify`, `kit doctor`, etc.) run directly in terminal sessions and CI/CD pipelines, AI-driven workflows are initiated from inside your AI coding assistant (ADR-0013).
+
+### Available Slash Commands (Claude Code)
+
+After a one-time setup (`kit host install claude-code`), interact with your assistant using high-level slash commands:
+
+| Slash Command | Arguments | Purpose & Workflow |
+| :--- | :--- | :--- |
+| **`/kit-feature`** | `<TICKET-ID> <story text / acceptance criteria>` | Initiates and drives the vertical-slice feature workflow: guides specification and DAG task planning, validates schemas, and drives the Red $\to$ Green $\to$ Refactor TDD cycle per task until verified. |
+| **`/kit-fix`** | `<BUG-ID> <expected vs actual behavior>` | Executes disciplined defect fixing: captures a failing regression test as an assertion first before applying the minimal fix and verifying behavior preservation. |
+| **`/kit-resume`** | `<TICKET-ID>` | Inspects the recorded run state and resumes an existing workflow from its current phase without restarting or discarding prior evidence. |
+
+*(Note: Informational CLI commands like `kit refactor` and `kit optimize` provide guidance for corresponding AI assistant workflows `/kit:refactor` and `/kit:optimize`.)*
+
+### One-Time Host Setup (`kit host`)
+
+`kit host` installs standing instructions, slash commands, and skills into each AI host's configuration surface, allowing agents to drive the kit's machine protocol (`kit next --json`) autonomously:
+
+```bash
+# List instruction surfaces across all supported hosts
+kit host list
+
+# Install slash commands and standing skill for Claude Code (~/.claude/commands/ & ~/.claude/skills/)
+kit host install claude-code
+
+# Install for all detected hosts at default scopes (user where global, else project)
+kit host install all
+
+# Install project-level rules for Cursor
+kit host install cursor --dir .
+```
+
+Supported host surfaces include:
+- **Claude Code**: Slash commands (`/kit-feature`, `/kit-fix`, `/kit-resume`) and standing skill in `~/.claude/`
+- **Cursor / Cursor CLI**: Always-on SDLC rules in `.cursor/rules/sdlc.mdc`
+- **Antigravity (AGY)**: Standing skill in `~/.gemini/skills/agentic-sdlc-kit/SKILL.md`
+- **Gemini CLI**: Managed instruction block in `~/.gemini/GEMINI.md` or `GEMINI.md`
+- **Codex**: Managed instruction block in `.codex/AGENTS.md` or `AGENTS.md`
+- **Aider**: Managed convention block in `CONVENTIONS.md`
+
+See [`docs/HOST_INTEGRATIONS.md`](docs/HOST_INTEGRATIONS.md) for full configuration details and host-driven protocol documentation.
 
 ---
 

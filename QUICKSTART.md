@@ -139,6 +139,13 @@ tells them the next action:
 kit next --json   # { requiredAction, taskId, verificationCommand, nextInvocation }
 ```
 
+**Slash Command Shortcut (Claude Code):**
+If you have run `kit host install claude-code`, simply type:
+```text
+/kit-feature FEATURE-001 Implement user authentication with JWT
+```
+The agent executes the entire spec, plan, and TDD loop autonomously.
+
 Alternatively, `kit feature FEATURE-001 run` orchestrates every phase
 through a configured agent provider (Mode 1, ADR-0019) in an isolated
 git worktree, and `kit feature FEATURE-001 verify --dry-run` previews
@@ -162,6 +169,11 @@ kit fix BUG-042 verify
 1. **Red**: capture a failing regression test that reproduces the issue.
 2. **Green**: apply the minimal change; refused until Red was observed.
 3. **Refactor**: the suite must still pass.
+
+**Slash Command Shortcut (Claude Code):**
+```text
+/kit-fix BUG-042 Expected login to succeed with valid credentials, but received 500 error
+```
 
 ---
 

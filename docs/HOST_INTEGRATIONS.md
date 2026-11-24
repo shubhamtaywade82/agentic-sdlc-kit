@@ -80,12 +80,15 @@ source loaded directly by Claude Code — nothing to build.)
 ### Step 2: How Claude Code Uses the Kit
 
 - **Tool Interception**: When Claude Code attempts tool calls (e.g. bash commands or file writes), `sdlc-guard` stops destructive commands and `secret-guard` redacts API keys.
-- **Workflow Execution**: In the Claude Code chat session, instruct Claude:
-  ```
+- **Available Slash Commands**: After running `kit host install claude-code` (see [One-time host setup](#one-time-host-setup-kit-host)), Claude Code has native slash commands for driving SDLC workflows:
+  - `/kit-feature <TICKET-ID> <story text / acceptance criteria>`: Guides spec/plan authoring and loops the Red $\to$ Green $\to$ Refactor TDD cycle per task until verified.
+  - `/kit-fix <BUG-ID> <expected vs actual behavior>`: Runs regression-first defect repair (failing assertion test first, minimal correction, then verification).
+  - `/kit-resume <TICKET-ID>`: Resumes an existing run from its recorded phase.
+- **Direct Prompting / Protocol**: Alternatively, in the Claude Code chat session, instruct Claude:
+  ```text
   Drive the TDD feature workflow for FEATURE-001: run `kit feature FEATURE-001 start`,
-  then for each task write the failing test, run `kit feature FEATURE-001 red <task>`,
-  implement, run `green <task>`, refactor, run `refactor <task>`, and finally
-  `kit feature FEATURE-001 verify`.
+  then loop `kit next --json` until requiredAction is run.completed,
+  and finish with `kit journal FEATURE-001 --verify` and `kit verify`.
   ```
 
 ---

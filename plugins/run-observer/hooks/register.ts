@@ -101,6 +101,15 @@ async function observe(
   }
 }
 
+/** The host clock, or undefined when it fails: an observer's clock is best-effort. */
+async function readClock($: EngineInterface): Promise<number | undefined> {
+  try {
+    return await $.clock.now();
+  } catch {
+    return undefined;
+  }
+}
+
 export function register(on: On): void {
   // The store is per-session; the host's $.state is the sharing surface
   // (the contract declares the 'store' key). In-memory by design (M13);
@@ -153,7 +162,11 @@ export function register(on: On): void {
   });
 
   on('tool.call', async ($, e: ToolCallInput, next) => {
-    const startedAt = await $.clock.now();
+    // Telemetry must never decide whether the chain runs. This registration
+    // fails open (.catch below yields "no result"), so a throw BEFORE next()
+    // would swallow every guard registered inside this observer (approval,
+    // secret scan). Read the clock defensively and always reach next().
+    const startedAt = await readClock($);
     const result = await next(e);
     await observe($, 'tool-call', async () => {
       // Tolerate a host that resolves to nothing (the official engine
@@ -165,7 +178,7 @@ export function register(on: On): void {
         typeof r === 'object' &&
         (r.isError !== undefined || r.deny !== undefined)
       );
-      const durationMs = (await $.clock.now()) - startedAt;
+      const durationMs = startedAt === undefined ? 0 : (await $.clock.now()) - startedAt;
       record(
         store,
         currentRunId,

@@ -187,8 +187,8 @@ export function register(on: On): void {
     const actions = parseGitActions(command);
     if (actions.length === 0) return next(e);
     if (actions.some((action) => action.uncertain)) {
-      $.ui.log('secret-guard: refusing git push with an unsupported or ambiguous target; use a bare push or one remote without refspecs, directory changes, or git global options');
-      return { deny: 'secret-guard: refusing git push because its target scope cannot be verified. Use git push or git push <remote> with supported transport-only flags; refspecs, --all, --tags, --mirror, -C, --git-dir, --work-tree, and cd-based directory changes are not supported.' };
+      $.ui.log('secret-guard: refusing git history mutation with an unsupported or ambiguous target; the repository context or push ref scope cannot be verified');
+      return { deny: 'secret-guard: refusing git operation because its repository context or push target scope cannot be verified. Use git push or git push <remote> with supported transport-only flags; refspecs, --all, --tags, --mirror, git global options, and cd-based directory changes are not supported.' };
     }
     const policy = await getPolicy($);
     for (const read of gitReads(actions)) {

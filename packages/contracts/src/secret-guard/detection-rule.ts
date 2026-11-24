@@ -24,7 +24,8 @@ const PLACEHOLDER_WORDS = ['your', 'xxx', 'example', 'changeme', 'placeholder', 
  *    char value that contains a digit (so `self.config.dhan_access_token`
  *    does not match) and is not a placeholder.
  */
-const PLACEHOLDER = `(?!(?:${PLACEHOLDER_WORDS.map(ci).join('|')}))`;
+// The redactor's own output must never re-match as a credential (idempotence).
+const PLACEHOLDER = `(?!(?:${PLACEHOLDER_WORDS.map(ci).join('|')}|\\[REDACTED))`;
 
 const DHAN_NAMED_PATTERN =
   `${ci('dhan')}[_-]?(?:${ci('access')}[_-]?${ci('token')}|${ci('api')}[_-]?${ci('secret')}|${ci('pin')}|${ci('totp')}[_-]?${ci('secret')})` +

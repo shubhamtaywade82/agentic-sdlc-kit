@@ -1,0 +1,101 @@
+# Ollama Cloud integration gate for the CI agent (tools/ci-agent).
+#
+# Runs the agent's OFFLINE unit tests on every change to the agent itself,
+# then a live connectivity canary (weekly, on demand, and on PRs touching
+# tools/ci-agent/**): auth + model tag + schema-conformant inference
+# (scripts/probe-cloud.ts).
+#
+# The canary degrades to an explicit skip when OLLAMA_API_KEY is absent
+# (fork PRs, unconfigured repositories) — never a failure (README setup §1).
+# On a live problem (bad key, retired model tag, schema drift) it is the one
+# place the workflow is allowed to be red.
+#
+# Actions are pinned to full SHAs (docs/security/SECURITY.md §6) and should
+# be re-verified at every release.
+
+name: Ollama Cloud Integration
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1' # weekly, Monday 03:00 UTC
+  pull_request:
+    branches: [main]
+    paths:
+      - 'tools/ci-agent/**'
+      - '.github/workflows/ollama-cloud.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ollama-cloud-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: agent unit tests (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Node 22
+        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+
+      - name: Install (from the committed lockfile)
+        working-directory: tools/ci-agent
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: tools/ci-agent
+        run: npm run typecheck
+
+      - name: Unit tests (mocked transports — no cloud calls)
+        working-directory: tools/ci-agent
+        run: npm test
+
+  canary:
+    name: connectivity canary (live)
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Check Ollama credentials
+        id: creds
+        env:
+          HAS_KEY: ${{ secrets.OLLAMA_API_KEY != '' }}
+        run: echo "has_key=${HAS_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Report skip when unconfigured (or fork PR)
+        if: steps.creds.outputs.has_key != 'true'
+        run: echo '::notice::OLLAMA_API_KEY is not available for this run — connectivity canary skipped (a skip, never a failure).'
+
+      - name: Setup Node 22
+        if: steps.creds.outputs.has_key == 'true'
+        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+
+      - name: Install (from the committed lockfile)
+        if: steps.creds.outputs.has_key == 'true'
+        working-directory: tools/ci-agent
+        run: npm ci
+
+      - name: Probe Ollama Cloud (auth, model tag, structured inference)
+        if: steps.creds.outputs.has_key == 'true'
+        working-directory: tools/ci-agent
+        env:
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL_REVIEW }}
+        run: npm run probe

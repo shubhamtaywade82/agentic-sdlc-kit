@@ -238,6 +238,7 @@ export const installCommand: Command = {
             sha256: pluginHash,
             installedAt: now,
             preserved: pr.status === 'already-linked',
+            ...(pr.target !== undefined ? { target: pr.target } : {}),
           });
         }
       }
@@ -271,13 +272,19 @@ export const installCommand: Command = {
       ownershipManifest: '.ai-kit/ownership-manifest.json',
     };
 
+    // A plugin that is not linked (conflict, incomplete, not found) means the
+    // guards the profile promised are not active: that is not a success.
+    const problems = pluginResults.filter(
+      (pr) => pr.status !== 'linked' && pr.status !== 'already-linked',
+    );
+
     if (isJson) {
-      ctx.stdout(JSON.stringify(result, null, 2) + '\n');
+      ctx.stdout(JSON.stringify({ ...result, installed: problems.length === 0 }, null, 2) + '\n');
     } else {
-      ctx.stdout(formatResult(result));
+      ctx.stdout(formatResult({ ...result, installed: problems.length === 0 }));
     }
 
-    return { exitCode: 0 };
+    return { exitCode: problems.length === 0 ? 0 : 1 };
   },
 };
 
@@ -321,7 +328,7 @@ interface InstallResult {
 
 function formatResult(r: InstallResult): string {
   const lines: string[] = [
-    'kit install: SUCCESS',
+    r.installed ? 'kit install: SUCCESS' : 'kit install: COMPLETED WITH PROBLEMS (see plugin status below)',
     `  Profile:      ${r.profile}`,
     `  Stack:        ${r.stack}`,
     `  Written:      ${r.writtenFiles.length} file(s)`,

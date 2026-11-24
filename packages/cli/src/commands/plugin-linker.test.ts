@@ -136,4 +136,84 @@ describe('plugin-linker', () => {
       await fs.rm(empty, { recursive: true, force: true });
     }
   });
+
+  describe('ownership: never adopt or replace something the kit did not create', () => {
+    const withKit = async (
+      fn: (kitRoot: string, project: string, linkPath: (n: string) => string) => Promise<void>,
+    ): Promise<void> => {
+      const kitRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-kitroot-'));
+      const project = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-project-'));
+      try {
+        await makeFakeKit(kitRoot, true);
+        await fn(kitRoot, project, (n) => path.join(project, '.claude', 'plugins', n));
+      } finally {
+        await fs.rm(kitRoot, { recursive: true, force: true });
+        await fs.rm(project, { recursive: true, force: true });
+      }
+    };
+    const only = (rs: Awaited<ReturnType<typeof linkRuntimePlugins>>, name: string) =>
+      rs.find((r) => r.name === name)!;
+
+    it('reports conflict for a symlink to somewhere else and leaves it untouched', async () => {
+      await withKit(async (kitRoot, project, link) => {
+        const foreign = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-foreign-'));
+        await fs.mkdir(path.dirname(link('sdlc-guard')), { recursive: true });
+        await fs.symlink(foreign, link('sdlc-guard'), 'dir');
+        const r = only(await linkRuntimePlugins(project, kitRoot), 'sdlc-guard');
+        expect(r.status).toBe('conflict');
+        expect(await fs.readlink(link('sdlc-guard'))).toBe(foreign);
+        await fs.rm(foreign, { recursive: true, force: true });
+      });
+    });
+
+    it('reports conflict for a dangling symlink', async () => {
+      await withKit(async (kitRoot, project, link) => {
+        await fs.mkdir(path.dirname(link('sdlc-guard')), { recursive: true });
+        await fs.symlink('/nonexistent/kit-target', link('sdlc-guard'), 'dir');
+        expect(only(await linkRuntimePlugins(project, kitRoot), 'sdlc-guard').status).toBe('conflict');
+      });
+    });
+
+    it('reports conflict (not already-linked) for a real directory at the path', async () => {
+      await withKit(async (kitRoot, project, link) => {
+        await fs.mkdir(link('sdlc-guard'), { recursive: true });
+        await fs.writeFile(path.join(link('sdlc-guard'), 'mine.txt'), 'user data');
+        const r = only(await linkRuntimePlugins(project, kitRoot), 'sdlc-guard');
+        expect(r.status).toBe('conflict');
+        expect(await fs.readFile(path.join(link('sdlc-guard'), 'mine.txt'), 'utf8')).toBe('user data');
+      });
+    });
+
+    it("reports the verified target for the kit's own link, on create and on re-run", async () => {
+      await withKit(async (kitRoot, project) => {
+        const first = only(await linkRuntimePlugins(project, kitRoot), 'sdlc-guard');
+        const second = only(await linkRuntimePlugins(project, kitRoot), 'sdlc-guard');
+        expect(first.status).toBe('linked');
+        expect(second.status).toBe('already-linked');
+        expect(second.target).toBe(first.target);
+        expect(first.target).toBe(path.join(kitRoot, 'plugins', 'sdlc-guard'));
+      });
+    });
+
+    it('refuses to write through a symlinked .claude directory', async () => {
+      await withKit(async (kitRoot, project) => {
+        const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-elsewhere-'));
+        await fs.symlink(elsewhere, path.join(project, '.claude'), 'dir');
+        const results = await linkRuntimePlugins(project, kitRoot);
+        for (const r of results) expect(r.status).toBe('conflict');
+        expect(await fs.readdir(elsewhere)).toEqual([]);
+        await fs.rm(elsewhere, { recursive: true, force: true });
+      });
+    });
+
+    it('treats a hooks.json that declares no modules as incomplete', async () => {
+      await withKit(async (kitRoot, project) => {
+        await fs.writeFile(
+          path.join(kitRoot, 'plugins', 'sdlc-guard', 'hooks', 'hooks.json'),
+          JSON.stringify({ modules: [] }),
+        );
+        expect(only(await linkRuntimePlugins(project, kitRoot), 'sdlc-guard').status).toBe('incomplete');
+      });
+    });
+  });
 });

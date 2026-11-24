@@ -246,11 +246,18 @@ export const installCommand: Command = {
     // Write ownership manifest so kit uninstall knows what we own.
     const manifestPath = path.join(targetRoot, '.ai-kit', 'ownership-manifest.json');
     await fs.mkdir(path.dirname(manifestPath), { recursive: true });
+    // A re-install skips files it already owns, so carry earlier entries
+    // forward; dropping them would orphan those files from `kit uninstall`.
+    const written = new Set(ownershipEntries.map((e) => e.path));
+    const earlier = await fs.readFile(manifestPath, 'utf8').then(
+      (raw) => (JSON.parse(raw) as { entries?: OwnershipEntry[] }).entries ?? [],
+      () => [] as OwnershipEntry[],
+    );
     const manifest = {
       schemaVersion: 1,
       root: targetRoot,
       scope: 'project',
-      entries: ownershipEntries,
+      entries: [...earlier.filter((e) => !written.has(e.path)), ...ownershipEntries],
     };
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 

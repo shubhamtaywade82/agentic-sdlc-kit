@@ -45,14 +45,9 @@ secret values) lands with the M13 file-backed collector.
 
 ## CLI-first observability
 
-Per post-M7 §7: start with CLI observability. The kit exposes:
-
-- `kit runs` — list runs.
-- `kit runs show RUN-001` — show a run's events.
-- `kit runs report RUN-001` — full run report.
-- `kit runs failed` — list failed runs.
-
-A dashboard is a later interface, not a prerequisite for observability.
+The store is published at `$.state.run-observer.store` for a future
+`kit runs` command (list / show / report / failed). That command does not
+exist yet, and the store is in-memory only: nothing survives the session.
 
 ## Capability manifest
 

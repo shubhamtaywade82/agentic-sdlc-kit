@@ -30,6 +30,8 @@ export type SecretKind =
   | 'generic-api-key'
   | 'openai-key'
   | 'anthropic-key'
+  | 'jwt-token'
+  | 'dhan-credential'
   | 'db-url-credentials'
   | 'password-assignment'
   | 'unknown';
@@ -129,6 +131,25 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     // keeps Anthropic keys (sk-ant-) out of this rule. The digit lookahead
     // rejects English identifiers such as sk-learning-about-sorting.
     pattern: '(?<![A-Za-z0-9])sk-(?!ant-)(?:proj-|svcacct-|admin-)?(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}',
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'jwt-token',
+    kind: 'jwt-token',
+    // DhanHQ access tokens are JWTs; any header.payload.signature triple
+    // starting with the base64url '{"' prefix is a bearer credential.
+    pattern: 'eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}',
+    severity: 'critical',
+    enabled: true,
+  },
+  {
+    id: 'dhan-credential',
+    kind: 'dhan-credential',
+    // DHAN_ACCESS_TOKEN / DHAN_API_SECRET / DHAN_PIN / DHAN_TOTP assigned a
+    // literal; the captured group is the value. Placeholders are skipped.
+    pattern:
+      '[Dd][Hh][Aa][Nn][_-]?(?:[Aa][Cc][Cc][Ee][Ss][Ss][_-]?[Tt][Oo][Kk][Ee][Nn]|[Aa][Pp][Ii][_-]?[Ss][Ee][Cc][Rr][Ee][Tt]|[Pp][Ii][Nn]|[Tt][Oo][Tt][Pp][_-]?[Ss][Ee][Cc][Rr][Ee][Tt])["\']?\\s*[:=]\\s*["\']?(?![$<{])([^\\s"\']{6,})',
     severity: 'critical',
     enabled: true,
   },

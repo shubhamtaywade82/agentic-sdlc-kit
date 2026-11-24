@@ -12,6 +12,7 @@ export * from './feature.js';
 export * from './new.js';
 export * from './fix.js';
 export * from './install.js';
+export * from './uninstall.js';
 export * from './memory.js';
 export * from './evolve.js';
 export * from './refactor.js';

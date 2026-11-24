@@ -94,3 +94,26 @@ describe('redactSecrets', () => {
     expect(result.fullyRedacted).toBe(true);
   });
 });
+
+describe('redactSecrets status (fail closed on unscanned input)', () => {
+  const small = { ...DEFAULT_REDACTION_POLICY, maxInputChars: 32 };
+
+  it('reports not-scanned for oversized text, never verified-clean, and withholds the text', () => {
+    const text = 'filler '.repeat(20) + AWS_KEY_SAMPLE;
+    const r = redactSecrets(text, small, 'tool-output');
+    expect(r.status).toBe('not-scanned');
+    expect(r.fullyRedacted).toBe(false);
+    expect(r.redactedText).not.toContain(AWS_KEY_SAMPLE);
+    expect(r.redactedText).toMatch(/WITHHELD/);
+    expect(r.findings).toEqual([]);
+  });
+
+  it('reports verified-clean for scanned clean text and redacted for scanned secrets', () => {
+    expect(redactSecrets('nothing here', DEFAULT_REDACTION_POLICY, 'tool-output').status).toBe(
+      'verified-clean',
+    );
+    expect(
+      redactSecrets(`k=${AWS_KEY_SAMPLE}`, DEFAULT_REDACTION_POLICY, 'tool-output').status,
+    ).toBe('redacted');
+  });
+});

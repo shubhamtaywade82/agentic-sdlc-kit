@@ -272,11 +272,26 @@ export const DEFAULT_REDACTION_POLICY: RedactionPolicy = {
   ignorePaths: [],
 };
 
+/**
+ * What the redactor can honestly claim about its output:
+ *  - verified-clean: scanned, nothing found.
+ *  - redacted:       scanned, every found value verified gone.
+ *  - not-scanned:    NOT scanned (e.g. over the size limit). Never "clean".
+ *  - failed:         scanned, but redaction could not be verified complete.
+ */
+export type RedactionStatus = 'verified-clean' | 'redacted' | 'not-scanned' | 'failed';
+
 export interface RedactionResult {
   redactedText: string;
   findings: SecretFinding[];
-  // True only after the redactor VERIFIED every value is gone.
+  status: RedactionStatus;
+  // True only after the redactor VERIFIED every value is gone (and scanned).
   fullyRedacted: boolean;
+}
+
+/** Stands in for text that was not scanned: the raw text must never pass through. */
+export function withheldMarker(length: number, limit: number): string {
+  return `[WITHHELD: ${length} chars exceed the secret-scan limit of ${limit}; output was not scanned]`;
 }
 
 function redactedPreview(value: string): string {
@@ -443,11 +458,17 @@ export function redactSecrets(
   filePath?: string,
 ): RedactionResult {
   if (text.length > policy.maxInputChars) {
-    return { redactedText: text, findings: [], fullyRedacted: true };
+    // Unscanned is not clean: withhold the text rather than pass it through.
+    return {
+      redactedText: withheldMarker(text.length, policy.maxInputChars),
+      findings: [],
+      status: 'not-scanned',
+      fullyRedacted: false,
+    };
   }
   const findings = detectSecrets(text, source, filePath);
   if (findings.length === 0) {
-    return { redactedText: text, findings: [], fullyRedacted: true };
+    return { redactedText: text, findings: [], status: 'verified-clean', fullyRedacted: true };
   }
   let redactedText = text;
   const updatedFindings: SecretFinding[] = [];
@@ -465,5 +486,10 @@ export function redactSecrets(
     updatedFindings.push({ ...f, redacted: !stillAppears });
   }
   const fullyRedacted = updatedFindings.every((f) => f.redacted) && recheck.length === 0;
-  return { redactedText, findings: updatedFindings, fullyRedacted };
+  return {
+    redactedText,
+    findings: updatedFindings,
+    status: fullyRedacted ? 'redacted' : 'failed',
+    fullyRedacted,
+  };
 }

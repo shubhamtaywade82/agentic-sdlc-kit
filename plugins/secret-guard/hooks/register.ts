@@ -139,6 +139,16 @@ export function register(on: On): void {
         deny: 'secret-guard: staged-diff scan failed; refusing to let the commit proceed unverified',
       };
     }
+    if (result.outcome !== 'clean') {
+      // skipped-too-large / skipped-ignored: the diff was NOT scanned, so it
+      // is not verified clean. Only an actual scan result may let it through.
+      $.ui.log(`secret-guard: staged diff not scanned (${result.outcome}); refusing git operation`);
+      return {
+        deny:
+          `secret-guard: the staged changes were not scanned (${result.outcome}; the diff is ` +
+          'too large to verify). Commit in smaller pieces, or scan it separately, and retry.',
+      };
+    }
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 
@@ -158,6 +168,11 @@ export function register(on: On): void {
     if (typeof r.text !== 'string') return r;
     const policy = await getPolicy($);
     const redacted = redactSecrets(r.text, policy, 'tool-output');
+    if (redacted.status === 'not-scanned') {
+      // Too large to scan: surface a marker, never the unverified text.
+      $.ui.log(`secret-guard: ${e.tool} output not scanned (over the size limit); withheld`);
+      return { ...r, text: redacted.redactedText };
+    }
     if (redacted.findings.length > 0) {
       $.ui.log(
         `secret-guard: redacted ${redacted.findings.length} secret(s) from ${e.tool} output`,

@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { MockRuntime } from '@agentic-sdlc-kit/mod-sdk';
 import { register } from '../hooks/register';
+import { DEFAULT_REDACTION_POLICY } from '../policies/detect';
 
 // Real-shaped (but fake) samples for detection. None of these are valid
 // credentials.
@@ -152,5 +153,34 @@ describe('secret-guard register', () => {
     });
     expect(result.answered).toBe(true);
     expect((result.value as { deny?: string }).deny).toMatch(/fail closed/);
+  });
+
+  it('denies a commit when the staged diff is too large to scan (never unscanned)', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.setState(
+      { plugin: 'secret-guard', key: 'policy' },
+      { ...DEFAULT_REDACTION_POLICY, maxInputChars: 64 },
+    );
+    runtime.queueProcessResults({ stdout: '+' + 'x'.repeat(500) + '\n', exitCode: 0 });
+    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git commit -m "big"' });
+    expect(result.answered).toBe(true);
+    expect((result.value as { deny?: string }).deny).toMatch(/too large|not scanned/i);
+  });
+
+  it('withholds a tool result too large to scan instead of passing it through', async () => {
+    const runtime = new MockRuntime();
+    runtime.load(register);
+    runtime.setState(
+      { plugin: 'secret-guard', key: 'policy' },
+      { ...DEFAULT_REDACTION_POLICY, maxInputChars: 64 },
+    );
+    const big = 'filler '.repeat(40) + AWS_KEY_SAMPLE;
+    runtime.setHostResult({ text: big });
+    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'cat huge.log' });
+    const text = (result.value as { text?: string }).text ?? '';
+    expect(text).not.toContain(AWS_KEY_SAMPLE);
+    expect(text).toMatch(/WITHHELD/);
+    expect(runtime.getLogs().some((l) => /not scanned/i.test(l))).toBe(true);
   });
 });

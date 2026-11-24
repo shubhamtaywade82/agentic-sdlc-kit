@@ -87,7 +87,7 @@ Pushes use a deliberately narrow allowlist:
 
 | Command | Result |
 | --- | --- |
-| `git push` | Allowed after scanning locally reachable commits and tags |
+| `git push` | Allowed after scanning locally reachable commit history |
 | `git push origin` | Allowed after the same conservative scan |
 | `git push --force origin` | Allowed; force changes update semantics, not the source-ref scope |
 | `git push -v origin` | Allowed; verbose is transport/output-only |

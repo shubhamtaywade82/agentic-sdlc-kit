@@ -108,7 +108,7 @@ describe('secret-guard register', () => {
     const runtime = new MockRuntime();
     runtime.load(register);
     runtime.queueProcessResults({ stdout: '', stderr: 'fatal: not a git repository', exitCode: 128 });
-    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin main' });
+    const result = await runtime.fire('tool.call', { tool: 'Bash', command: 'git push origin' });
     expect((result.value as { deny?: string }).deny).toMatch(/could not read the locally reachable commits/);
   });
 
@@ -197,13 +197,13 @@ describe('secret-guard register', () => {
       runtime.fire('tool.call', { tool: 'Bash', command });
     const secretDiff = `+k = "${AWS_KEY_SAMPLE}"\n`;
 
-    it('sees a commit behind git global options (-C, -c) that the old regex missed', async () => {
-      for (const command of ['git -C sub commit -m x', 'git -c user.name=x commit -m x']) {
+    it('denies commits whose git global options can redirect the scan context', async () => {
+      for (const command of ['git -C sub commit -m x', 'git -c user.name=x commit -m x', 'cd sub && git commit -m x']) {
         const runtime = new MockRuntime();
         runtime.load(register);
-        runtime.queueProcessResults({ stdout: secretDiff });
         const result = await fire(runtime, command);
-        expect((result.value as { deny?: string }).deny, command).toMatch(/staged changes contain/);
+        expect((result.value as { deny?: string }).deny, command).toMatch(/repository context or push target scope cannot be verified/);
+        expect(runtime.getProcessCalls()).toEqual([]);
       }
     });
 
@@ -248,7 +248,7 @@ describe('secret-guard register', () => {
       const runtime = new MockRuntime();
       runtime.load(register);
       const result = await fire(runtime, command);
-      expect((result.value as { deny?: string }).deny).toMatch(/target scope cannot be verified/i);
+      expect((result.value as { deny?: string }).deny).toMatch(/target scope cannot be verified|repository context or push target scope cannot be verified/i);
       expect(runtime.getProcessCalls()).toEqual([]);
     });
 
@@ -278,7 +278,7 @@ describe('secret-guard register', () => {
       runtime.load(register);
       runtime.queueProcessResults({ stdout: '+ok\n' }, { stdout: secretDiff });
       const result = await fire(runtime, 'git commit -m x && git push');
-      expect((result.value as { deny?: string }).deny).toMatch(/unpushed commits contain/);
+      expect((result.value as { deny?: string }).deny).toMatch(/locally reachable commits and tags contain/);
     });
   });
 });

@@ -28,58 +28,10 @@
 import type { AgentSpawnInput, EngineInterface, On, TurnStepInput } from 'claude-code';
 import { atom, read } from 'claude-code';
 import type { RoutingContext, RoutingPolicy } from '../policies/types';
+import { buildRoutingContext } from '../policies/classifier';
+import { classifyText } from '../policies/signals';
 import { route } from '../policies/router';
-
-const DEFAULT_POLICY: RoutingPolicy = {
-  schemaVersion: 1,
-  id: 'default',
-  version: '1.0.0',
-  rules: [
-    {
-      id: 'R-simple',
-      taskType: '*',
-      complexity: 'low',
-      risk: 'low',
-      model: 'haiku',
-      effort: 'low',
-      verification: 'structural',
-      reason: 'simple low-risk task: lightweight model + low effort',
-    },
-    {
-      id: 'R-routing',
-      taskType: '*',
-      complexity: 'medium',
-      risk: 'medium',
-      model: 'sonnet',
-      effort: 'medium',
-      verification: 'tests',
-      reason: 'routine engineering: balanced model + medium effort',
-    },
-    {
-      id: 'R-architecture',
-      taskType: '*',
-      complexity: 'high',
-      risk: 'high',
-      model: 'opus',
-      effort: 'high',
-      verification: 'independent-review',
-      reason: 'complex high-risk task: strongest reasoning + independent review',
-    },
-    {
-      id: 'R-critical-risk',
-      taskType: '*',
-      complexity: '*',
-      risk: 'critical',
-      model: 'opus',
-      effort: 'high',
-      verification: 'mandatory-security',
-      reason: 'critical risk: approval gate; model routing is irrelevant to authorization',
-    },
-  ],
-  defaultModel: 'sonnet',
-  defaultEffort: 'medium',
-  suggestOnly: true,
-};
+import { DEFAULT_POLICY } from '../policies/default-policy';
 
 // The policy state key, declared in contract.d.ts. read() resolves to
 // the stored policy or the module default (initial) when unset.
@@ -90,9 +42,10 @@ async function getPolicy($: EngineInterface): Promise<RoutingPolicy> {
 }
 
 function buildContext(scope: 'main-turn' | 'subagent'): RoutingContext {
-  // Baseline heuristic context (no prompt classifier is wired in this
-  // milestone): the default policy routes on it, and suggest-only mode is
-  // the honest expression of that limitation.
+  // Baseline context, used when the event carries nothing to classify. The
+  // main turn always uses it: turn.step exposes the model and effort but no
+  // prompt text (`request` is untyped on the engine), so classifying it would
+  // mean guessing its shape. Suggest-only mode is the honest default.
   return {
     scope,
     taskType: 'general',
@@ -100,6 +53,22 @@ function buildContext(scope: 'main-turn' | 'subagent'): RoutingContext {
     risk: 'low',
     requiredCapabilities: [],
     previousOutcome: 'none',
+  };
+}
+
+/**
+ * Context for a subagent spawn, from the text the event really carries
+ * (description, name, subagentType). No recognised signal keeps the baseline.
+ */
+function spawnContext(e: AgentSpawnInput): { ctx: RoutingContext; because: string } {
+  const text = [e.description, e.name, e.subagentType]
+    .filter((part): part is string => typeof part === 'string')
+    .join(' ');
+  const found = classifyText(text);
+  if (found === null) return { ctx: buildContext('subagent'), because: '' };
+  return {
+    ctx: buildRoutingContext('subagent', found.input),
+    because: ` because: ${found.evidence.join(', ')}`,
   };
 }
 
@@ -131,12 +100,15 @@ export function register(on: On): void {
       $.ui.log(`model-router: subagent ${e.name ?? '<unnamed>'} keeps explicit model ${e.model}`);
       return next(e);
     }
-    const decision = route(buildContext('subagent'), policy);
+    const { ctx, because } = spawnContext(e);
+    const decision = route(ctx, policy);
     if (policy.suggestOnly) {
-      $.ui.log(`model-router: suggest subagent ${e.name ?? '<unnamed>'} model=${decision.model}`);
+      $.ui.log(
+        `model-router: suggest subagent ${e.name ?? '<unnamed>'} model=${decision.model}${because}`,
+      );
       return next(e);
     }
-    $.ui.log(`model-router: apply subagent ${e.name ?? '<unnamed>'} model=${decision.model}`);
+    $.ui.log(`model-router: apply subagent ${e.name ?? '<unnamed>'} model=${decision.model}${because}`);
     return next({ ...e, model: decision.model });
     // Fail open: routing is advisory, never a safety gate. If the handler or
     // the downstream chain throws, return nothing so the host proceeds with

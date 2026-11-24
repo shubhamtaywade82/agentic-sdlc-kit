@@ -1,0 +1,26 @@
+{
+  "name": "@agentic-sdlc-kit/ci-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Advisory Ollama Cloud CI agents for the Agentic SDLC Kit: automated PR review and CI-failure autofix proposals. Fail-closed, bounded, human-gated.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "review": "tsx src/review.ts",
+    "autofix": "tsx src/autofix.ts",
+    "probe": "tsx scripts/probe-cloud.ts",
+    "test": "tsx test/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nemesis-oss/ollama-sdk": "^1.26.0",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

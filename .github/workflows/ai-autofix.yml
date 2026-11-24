@@ -1,0 +1,112 @@
+# Bounded AI autofix on failed CI runs (tools/ci-agent).
+#
+# SECURITY DESIGN (README invariants 1–5):
+#   - Triggers on the `CI` workflow's completed runs (and manual dispatch
+#     with a run id). Same-repository runs only; fork runs are skipped.
+#     (V4 precheck: the workflow_run name filter must match the `name:`
+#     field of .github/workflows/ci.yml exactly — currently `CI`.)
+#   - Agent tooling is checked out from the DEFAULT BRANCH only. The failed
+#     run's logs, diff, and file contents enter as data through the GitHub
+#     API; the agent never executes PR code and never checks it out.
+#   - The agent opens a DRAFT pull request against the failing branch — it
+#     never merges, never approves, never edits workflows (its edits are
+#     hard-capped to packages/<pkg>/src/** by security-guards.ts).
+#   - Max 2 attempts per failing branch (tracked via open ai-autofix PRs).
+#   - Optional GitHub App (secrets CI_AGENT_APP_ID + CI_AGENT_APP_PRIVATE_KEY):
+#     pushes with the default GITHUB_TOKEN do not re-trigger CI, so without
+#     the App the fix PR exists but CI on it will not run automatically.
+#     With the App, ai-autofix mints an installation token here.
+#
+# Actions are pinned to full SHAs (docs/security/SECURITY.md §6) and should
+# be re-verified at every release.
+
+name: AI CI Autofix (Ollama)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Failed CI run id to repair'
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: ai-autofix-run-${{ github.event.workflow_run.id || inputs.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    name: bounded failure repair (Ollama Cloud)
+    # Dispatch is a maintainer asking for a repair directly; the automatic
+    # path only fires on genuine CI failures from this repository.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.name == 'CI' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (default branch only — trusted agent tooling, never PR code)
+        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Check Ollama credentials
+        id: creds
+        env:
+          HAS_KEY: ${{ secrets.OLLAMA_API_KEY != '' }}
+        run: echo "has_key=${HAS_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Report skip when unconfigured
+        if: steps.creds.outputs.has_key != 'true'
+        run: echo '::notice::OLLAMA_API_KEY is not available for this run — AI autofix skipped (a skip, never a failure).'
+
+      - name: Check GitHub App credentials (optional)
+        id: app
+        env:
+          HAS_APP: ${{ secrets.CI_AGENT_APP_ID != '' && secrets.CI_AGENT_APP_PRIVATE_KEY != '' }}
+        run: echo "has_app=${HAS_APP}" >> "$GITHUB_OUTPUT"
+
+      - name: Mint the GitHub App installation token (when configured)
+        id: app_token
+        if: steps.creds.outputs.has_key == 'true' && steps.app.outputs.has_app == 'true'
+        # Pin: actions/create-github-app-token@v3 → SHA at tag v3.4.0.
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc
+        with:
+          app-id: ${{ secrets.CI_AGENT_APP_ID }}
+          private-key: ${{ secrets.CI_AGENT_APP_PRIVATE_KEY }}
+
+      - name: Setup Node 22
+        if: steps.creds.outputs.has_key == 'true'
+        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+
+      - name: Install the agent (from the default-branch tree only)
+        if: steps.creds.outputs.has_key == 'true'
+        working-directory: tools/ci-agent
+        run: npm ci
+
+      - name: Run the bounded autofix agent
+        if: steps.creds.outputs.has_key == 'true'
+        working-directory: tools/ci-agent
+        env:
+          # App token when present; GITHUB_TOKEN still works but cannot
+          # re-trigger CI on the pushed fix branch.
+          CI_AGENT_TOKEN: ${{ steps.app_token.outputs.token || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL_FIX }}
+          RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+        run: npm run autofix

@@ -1,0 +1,82 @@
+# Advisory AI PR review on Ollama Cloud (tools/ci-agent).
+#
+# SECURITY DESIGN (README invariants 1–5):
+#   - Agent tooling is checked out from the DEFAULT BRANCH only. PR diffs
+#     enter as data through the GitHub API; the agent never executes PR
+#     code. Do NOT change this checkout to the merge ref.
+#   - `pull_request` (never `pull_request_target`): fork PRs never receive
+#     OLLAMA_API_KEY, and the run degrades to an explicit skip, not failure.
+#     The agent double-checks head repo == event repo before doing work.
+#   - The agent posts exactly one advisory COMMENT review. It never
+#     approves, never requests changes, never merges.
+#   - Review is capped at 6 files per PR (cost discipline) and superseded
+#     runs are cancelled per PR.
+#
+# Actions are pinned to full SHAs (docs/security/SECURITY.md §6) and should
+# be re-verified at every release.
+
+name: AI Review (Ollama)
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review (defaults to the event context)'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-review-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: advisory review (Ollama Cloud)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (default branch only — trusted agent tooling, never PR code)
+        # Pin: actions/checkout@v4 → SHA at tag v4.2.2.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Check Ollama credentials
+        id: creds
+        env:
+          # Server-side evaluation; the boolean (not the secret) is exported.
+          HAS_KEY: ${{ secrets.OLLAMA_API_KEY != '' }}
+        run: echo "has_key=${HAS_KEY}" >> "$GITHUB_OUTPUT"
+
+      - name: Report skip when unconfigured (or fork PR)
+        if: steps.creds.outputs.has_key != 'true'
+        run: echo '::notice::OLLAMA_API_KEY is not available for this run — AI review skipped (a skip, never a failure).'
+
+      - name: Setup Node 22
+        if: steps.creds.outputs.has_key == 'true'
+        # Pin: actions/setup-node@v4 → SHA at tag v4.1.0.
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+        with:
+          node-version: '22'
+
+      - name: Install the agent (from the default-branch tree only)
+        if: steps.creds.outputs.has_key == 'true'
+        working-directory: tools/ci-agent
+        run: npm ci
+
+      - name: Run the advisory AI review
+        if: steps.creds.outputs.has_key == 'true'
+        working-directory: tools/ci-agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+          OLLAMA_MODEL: ${{ vars.OLLAMA_MODEL_REVIEW }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: npm run review

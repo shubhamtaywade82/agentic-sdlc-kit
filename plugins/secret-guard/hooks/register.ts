@@ -190,6 +190,16 @@ export function register(on: On): void {
       const deny = await scanGitRead($, policy, read);
       if (deny !== null) return { deny };
     }
+    if (result.outcome !== 'clean') {
+      // skipped-too-large / skipped-ignored: the diff was NOT scanned, so it
+      // is not verified clean. Only an actual scan result may let it through.
+      $.ui.log(`secret-guard: staged diff not scanned (${result.outcome}); refusing git operation`);
+      return {
+        deny:
+          `secret-guard: the staged changes were not scanned (${result.outcome}; the diff is ` +
+          'too large to verify). Commit in smaller pieces, or scan it separately, and retry.',
+      };
+    }
     return next(e);
   }).catch(() => ({ deny: 'secret-guard: internal error — refusing (fail closed)' }));
 

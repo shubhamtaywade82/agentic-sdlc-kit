@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { MockRuntime } from '@agentic-sdlc-kit/mod-sdk';
 import { register } from '../hooks/register';
+import { DEFAULT_POLICY } from '../policies/default-policy';
 import type { RoutingPolicy } from '../policies/types';
 
 const APPLY_POLICY: RoutingPolicy = {
@@ -29,6 +30,9 @@ const APPLY_POLICY: RoutingPolicy = {
   defaultEffort: 'medium',
   suggestOnly: false,
 };
+
+// The shipped default rules, applied (suggestOnly off).
+const DEFAULTS_APPLY = { ...DEFAULT_POLICY, suggestOnly: false };
 
 describe('model-router register', () => {
   it('registers handlers for turn.step and agent.spawn', () => {
@@ -97,5 +101,54 @@ describe('model-router register', () => {
     const result = await runtime.fire('agent.spawn', { name: 'code-reviewer' });
     expect(result.forwarded).toBe(true);
     expect(result.terminalEvent).toMatchObject({ name: 'code-reviewer', model: 'sonnet' });
+  });
+
+  describe('real subagent context from the spawn event', () => {
+    const logs = (rt: MockRuntime): string => rt.getLogs().join('\n');
+
+    it('routes a trivial task to the lightweight model (apply mode, default rules)', async () => {
+      const runtime = new MockRuntime();
+      runtime.setState({ plugin: 'model-router', key: 'policy' }, { ...DEFAULTS_APPLY });
+      runtime.load(register);
+      const r = await runtime.fire('agent.spawn', { name: 'editor', description: 'fix a typo in the README' });
+      expect(r.terminalEvent).toMatchObject({ model: 'haiku' });
+    });
+
+    it('routes a critical-risk task to the strongest model and explains why', async () => {
+      const runtime = new MockRuntime();
+      runtime.setState({ plugin: 'model-router', key: 'policy' }, { ...DEFAULTS_APPLY });
+      runtime.load(register);
+      const r = await runtime.fire('agent.spawn', {
+        name: 'dba',
+        description: 'drop the users table in production',
+      });
+      expect(r.terminalEvent).toMatchObject({ model: 'opus' });
+      expect(logs(runtime)).toMatch(/because:.*drop/);
+    });
+
+    it('keeps the baseline (default model) when the text has no recognised signal', async () => {
+      const runtime = new MockRuntime();
+      runtime.setState({ plugin: 'model-router', key: 'policy' }, { ...DEFAULTS_APPLY });
+      runtime.load(register);
+      const r = await runtime.fire('agent.spawn', { name: 'code-reviewer' });
+      expect(r.terminalEvent).toMatchObject({ model: 'sonnet' });
+    });
+
+    it('still preserves an explicit model even when the text says trivial', async () => {
+      const runtime = new MockRuntime();
+      runtime.setState({ plugin: 'model-router', key: 'policy' }, { ...DEFAULTS_APPLY });
+      runtime.load(register);
+      const r = await runtime.fire('agent.spawn', { description: 'fix a typo', model: 'opus' });
+      expect(r.terminalEvent).toEqual({ description: 'fix a typo', model: 'opus' });
+    });
+
+    it('suggest-only (default) never changes the event, even with strong signals', async () => {
+      const runtime = new MockRuntime();
+      runtime.load(register);
+      const ev = { name: 'dba', description: 'drop the users table in production' };
+      const r = await runtime.fire('agent.spawn', ev);
+      expect(r.terminalEvent).toEqual(ev);
+      expect(logs(runtime)).toMatch(/suggest subagent dba model=opus/);
+    });
   });
 });

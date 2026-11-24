@@ -8,7 +8,7 @@
 
 import type { Complexity, RoutingRisk, RoutingContext } from './types';
 
-interface ClassifyInput {
+export interface ClassifyInput {
   // The task description or prompt being routed.
   prompt: string;
   // Whether the task touches production.

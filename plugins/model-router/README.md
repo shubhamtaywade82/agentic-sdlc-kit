@@ -62,3 +62,9 @@ main-turn routing, effort selection, and verification-driven escalation.
 ```
 
 Or from a local clone: `claude plugin marketplace add <clone-path>` then `claude plugin install model-router@agentic-sdlc-kit --scope user`.
+
+## What the router classifies (and what it does not)
+
+- **Subagent spawns** (`agent.spawn`) are classified from the text the event carries (`description`, `name`, `subagentType`) with deterministic whole-word signals (`policies/signals.ts`): destructive, production, security-sensitive, architecture-scale, and trivial. Only positive evidence changes the baseline; unrecognised text keeps it. A task is "low" only with a trivial keyword and no contrary signal. Each suggestion/application logs why (`because: destructive "drop", production "production"`).
+- **The main turn** (`turn.step`) still uses the baseline: the event exposes the model and effort but no prompt text (`request` is untyped on the engine), so there is nothing honest to classify.
+- Unchanged: suggest-only by default, an explicit model is always preserved, no LLM is called, and routing is advisory (fails open).

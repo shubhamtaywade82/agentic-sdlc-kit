@@ -6,13 +6,13 @@ stack-scoped expertise sources for AI coding agents:
 | Pack                 | Repository                                                                                    | Skills | Kit stacks served    |
 | :------------------- | :-------------------------------------------------------------------------------------------- | -----: | :------------------- |
 | `ruby-agent-skills`  | [shubhamtaywade82/ruby-agent-skills](https://github.com/shubhamtaywade82/ruby-agent-skills)   |    104 | `ruby-rails`, `ruby` |
-| `node-agent-skills`  | [shubhamtaywade82/node-agent-skills](https://github.com/shubhamtaywade82/node-agent-skills)   |    340 | `node-typescript`    |
-| `react-agent-skills` | [shubhamtaywade82/react-agent-skills](https://github.com/shubhamtaywade82/react-agent-skills) |    127 | `react-typescript`   |
+| `node-agent-skills`  | [shubhamtaywade82/node-agent-skills](https://github.com/shubhamtaywade82/node-agent-skills)   |    322 | `node-typescript`    |
+| `react-agent-skills` | [shubhamtaywade82/react-agent-skills](https://github.com/shubhamtaywade82/react-agent-skills) |    129 | `react-typescript`   |
 
 Each pack follows the open Agent Skills format: a `skills/<name>/SKILL.md`
 file with YAML frontmatter (`name`, `description`, `license`) plus optional
 reference documents inside the skill directory. Skill counts above were
-measured on 2026-11-23 and are recorded in the registry
+measured on 2026-11-25 and are recorded in the registry
 (`packages/core/src/stacks/skills-pack.ts`).
 
 ## Design principles

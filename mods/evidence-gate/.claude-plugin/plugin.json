@@ -1,0 +1,20 @@
+{
+  "name": "agentic-mods/evidence-gate",
+  "description": "Observes build/test/lint/typecheck commands, records exit codes with git fingerprints, invalidates evidence on relevant file changes, and blocks completion claims while required checks are MISSING or STALE.",
+  "agenticMods": {
+    "core": "^0.1.0",
+    "apiVersion": 1,
+    "claudeCode": ">=2.1.287",
+    "hooks": [
+      "tool.call",
+      "command.completed",
+      "file.changed",
+      "turn.complete"
+    ],
+    "capabilities": {
+      "networkAccess": false,
+      "processExecution": false,
+      "modifiesToolCalls": true
+    }
+  }
+}

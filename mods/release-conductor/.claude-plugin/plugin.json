@@ -1,0 +1,17 @@
+{
+  "name": "agentic-mods/release-conductor",
+  "description": "Release gate: aggregates PR readiness, changelog/version checks, migration detection, deployment and rollback checklists. Never deploys autonomously in v1.",
+  "agenticMods": {
+    "core": "^0.1.0",
+    "apiVersion": 1,
+    "claudeCode": ">=2.1.287",
+    "hooks": [
+      "turn.complete"
+    ],
+    "capabilities": {
+      "networkAccess": false,
+      "processExecution": false,
+      "modifiesToolCalls": true
+    }
+  }
+}

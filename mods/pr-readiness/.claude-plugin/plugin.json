@@ -1,0 +1,17 @@
+{
+  "name": "agentic-mods/pr-readiness",
+  "description": "Aggregates scope compliance, evidence freshness, review findings and unexplained files into a merge decision; generates PR descriptions that never claim unverified checks.",
+  "agenticMods": {
+    "core": "^0.1.0",
+    "apiVersion": 1,
+    "claudeCode": ">=2.1.287",
+    "hooks": [
+      "turn.complete"
+    ],
+    "capabilities": {
+      "networkAccess": false,
+      "processExecution": false,
+      "modifiesToolCalls": true
+    }
+  }
+}

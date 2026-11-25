@@ -37,6 +37,10 @@ pnpm-debug.log*
 # worktrees and projects at run time; they are machinery, not content)
 .claude/
 
+# Agentic Mods marketplace runtime artifacts (do not commit)
+.agentic-mods/state/
+.agentic-mods/audit/
+
 # OS
 Thumbs.db
 .omc

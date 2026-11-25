@@ -1,0 +1,12 @@
+{
+  "name": "engineering",
+  "mods": [
+    "essential",
+    "change-contract",
+    "tdd-conductor",
+    "regression-orchestrator",
+    "review-tracker",
+    "pr-readiness",
+    "architecture-guard"
+  ]
+}

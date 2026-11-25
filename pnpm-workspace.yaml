@@ -2,5 +2,6 @@ packages:
   - 'packages/*'
   - 'plugins/*'
   - 'fixtures/*'
+  - 'mods/*'
 allowBuilds:
   esbuild: true

@@ -1,0 +1,11 @@
+{
+  "name": "tdd",
+  "mods": [
+    "sdlc-controller",
+    "tdd-conductor",
+    "evidence-gate",
+    "test-impact",
+    "regression-orchestrator",
+    "behavior-lock"
+  ]
+}

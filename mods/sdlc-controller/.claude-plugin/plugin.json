@@ -1,0 +1,19 @@
+{
+  "name": "agentic-mods/sdlc-controller",
+  "description": "Entry point for SDLC workflows in Claude Code. Maps /agentic feature|fix|app intents to agentic-sdlc-kit workflow starts via sdlc-bridge.",
+  "agenticMods": {
+    "core": "^0.1.0",
+    "apiVersion": 1,
+    "claudeCode": ">=2.1.287",
+    "hooks": [
+      "session.start",
+      "prompt.submitted",
+      "turn.complete"
+    ],
+    "capabilities": {
+      "networkAccess": false,
+      "processExecution": false,
+      "modifiesToolCalls": true
+    }
+  }
+}

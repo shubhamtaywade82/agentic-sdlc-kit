@@ -1,0 +1,15 @@
+id: refactoring
+version: 1
+stages:
+  - id: baseline
+    exit: [behavior_lock_captured]
+  - id: refactor
+    exit: [bounded_increments_applied]
+  - id: compare
+    exit: [public_api_diff_empty_or_approved]
+transitions:
+  - { from: baseline, to: refactor }
+  - { from: refactor, to: compare }
+mods:
+  baseline: [behavior-lock]
+  compare:  [behavior-lock, evidence-gate, architecture-guard]

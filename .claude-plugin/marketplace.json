@@ -6,6 +6,14 @@
     { "name": "sdlc-guard", "source": "./plugins/sdlc-guard", "description": "Fail-closed approval for destructive commands" },
     { "name": "secret-guard", "source": "./plugins/secret-guard", "description": "Blocks writes that introduce secrets" },
     { "name": "model-router", "source": "./plugins/model-router", "description": "Cost-aware model routing" },
-    { "name": "run-observer", "source": "./plugins/run-observer", "description": "Bounded run telemetry" }
+    { "name": "run-observer", "source": "./plugins/run-observer", "description": "Bounded run telemetry" },
+    { "name": "sdlc-controller", "source": "./mods/sdlc-controller", "description": "Entry point for SDLC workflows in Claude Code. Maps /agentic feature|fix|app intents to agentic-sdlc-kit workflow starts via sdlc-bridge." },
+    { "name": "evidence-gate", "source": "./mods/evidence-gate", "description": "Observes build/test/lint/typecheck commands, records exit codes with git fingerprints, invalidates evidence on relevant file changes, and blocks completion claims while required checks are MISSING or STALE." },
+    { "name": "change-contract", "source": "./mods/change-contract", "description": "Boundaries implementation to an approved contract (objective / allowed / forbidden / required evidence). Warns or blocks Edit/Write outside allowed scopes; requires explicit user action to amend." },
+    { "name": "tdd-conductor", "source": "./mods/tdd-conductor", "description": "Enforces RED -> GREEN -> REFACTOR. Validates that RED failures are behavioral (not compilation), keeps cycle evidence, and prevents skipping RED without an approved exception." },
+    { "name": "regression-orchestrator", "source": "./mods/regression-orchestrator", "description": "Risk-based regression scope selection (targeted / component / cross-component / full) with a configurable, explainable risk score." },
+    { "name": "pr-readiness", "source": "./mods/pr-readiness", "description": "Aggregates scope compliance, evidence freshness, review findings and unexplained files into a merge decision; generates PR descriptions that never claim unverified checks." },
+    { "name": "architecture-guard", "source": "./mods/architecture-guard", "description": "Layer and dependency boundary enforcement from declarative rules; baselines existing violations and blocks only newly introduced ones." },
+    { "name": "release-conductor", "source": "./mods/release-conductor", "description": "Release gate: aggregates PR readiness, changelog/version checks, migration detection, deployment and rollback checklists. Never deploys autonomously in v1." }
   ]
 }

@@ -1,0 +1,12 @@
+{
+  "name": "release",
+  "mods": [
+    "sdlc-guard",
+    "secret-guard",
+    "evidence-gate",
+    "pr-readiness",
+    "migration-sentinel",
+    "dependency-risk-radar",
+    "release-conductor"
+  ]
+}

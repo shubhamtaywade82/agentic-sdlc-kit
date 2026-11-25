@@ -1,0 +1,15 @@
+id: review
+version: 1
+stages:
+  - id: findings
+    exit: [findings_recorded]
+  - id: disposition
+    exit: [no_unresolved_high_findings]
+  - id: readiness
+    exit: [readiness_report_generated]
+transitions:
+  - { from: findings, to: disposition }
+  - { from: disposition, to: readiness }
+mods:
+  disposition: [review-tracker]
+  readiness:    [pr-readiness]

@@ -1,0 +1,21 @@
+id: tdd
+version: 1
+stages:
+  - id: specify
+    exit: [acceptance_criteria_present]
+  - id: red
+    exit: [relevant_test_exists, test_failed_for_expected_reason]
+  - id: green
+    exit: [target_test_passed]
+  - id: refactor
+    exit: [affected_tests_passed, architecture_rules_passed]
+transitions:
+  - { from: specify, to: red }
+  - { from: red, to: green }
+  - { from: green, to: refactor }
+  - { from: refactor, to: red }
+  - { from: refactor, to: complete }
+mods:
+  red:      [tdd-conductor, evidence-gate]
+  green:    [tdd-conductor, evidence-gate]
+  refactor: [tdd-conductor, behavior-lock, architecture-guard]

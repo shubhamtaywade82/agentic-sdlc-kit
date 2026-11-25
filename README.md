@@ -6,7 +6,7 @@ A **runtime-independent** Agentic Software Development Lifecycle (SDLC) kit. It 
 
 ## Architecture Overview
 
-The repository is organized as a modular TypeScript monorepo under `packages/` and `plugins/`:
+The repository is organized as a modular TypeScript monorepo under `packages/`, `plugins/` and `mods/`:
 
 ```
 agentic-sdlc-kit/
@@ -16,12 +16,21 @@ agentic-sdlc-kit/
 │   ├── cli/                  # `kit` command-line interface (23 commands)
 │   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
 │   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
-│   └── testing/              # Test fixtures, assertion helpers, and contract validators
+│   ├── testing/              # Test fixtures, assertion helpers, and contract validators
+│   ├── sdlc-bridge/          # ONLY package that coordinates core from the marketplace layer (scaffold)
+│   ├── workflow-ui/          # Workflow / TDD / readiness panel state (scaffold)
+│   ├── cockpit/              # Unified engineering cockpit state (scaffold)
+│   ├── preset-resolver/      # Preset → mod set resolution (scaffold)
+│   └── external-mod-adapters/ # Adapters for catalogued external mods (scaffold)
 ├── plugins/                  # Standalone Claude Code runtime plugins (Mods)
 │   ├── sdlc-guard/           # Intercepts destructive operations and enforces fail-closed policy
 │   ├── secret-guard/         # Scans and redacts credentials and API keys before write/exec
 │   ├── model-router/         # Cost-aware model tier routing (Haiku / Sonnet / Opus)
 │   └── run-observer/         # Bounded event streaming and telemetry recorder
+├── mods/                     # agentic-mods marketplace engineering mods (8, scaffold)
+├── workflows/                # Declarative SDLC workflow stage machines (scaffold)
+├── marketplace/              # Installable mod presets (scaffold)
+├── tooling/                  # Marketplace generation/validation + create-mod (scaffold)
 ├── docs/                     # Specifications, architecture, contracts, ADRs, and workflows
 └── scripts/                  # Architecture verification and build scripts
 ```
@@ -268,6 +277,20 @@ kit install --profile full-sdlc --stack node-typescript
 
 ---
 
+## Agentic Mods Marketplace (scaffold)
+
+This repository also hosts the **agentic-mods** marketplace layer: the Claude Code distribution and UX surface built on top of the kit's engineering core. The scaffold (merged from the standalone `agentic-mods` design, see the integration plan below) adds:
+
+- **`mods/`** — 8 engineering workflow mods: `sdlc-controller`, `evidence-gate`, `change-contract`, `tdd-conductor`, `regression-orchestrator`, `pr-readiness`, `architecture-guard`, `release-conductor`. Each ships an `agenticMods` capability manifest in `.claude-plugin/plugin.json` (hooks, network/process access, `claudeCode >= 2.1.287`).
+- **Marketplace packages** — `@agentic-mods/sdlc-bridge` (the only package allowed to coordinate `@agentic-sdlc-kit/core`), `workflow-ui`, `cockpit`, `preset-resolver`, `external-mod-adapters`.
+- **`workflows/`** — declarative stage machines for feature-development, tdd, bug-fix, regression, review, refactoring and release, with per-stage mod bindings.
+- **`marketplace/presets/`** — installable bundles: `essential`, `engineering`, `tdd`, `release`, `regulated`.
+- **`tooling/`** — `pnpm marketplace:generate` / `pnpm marketplace:validate` maintain [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json), which now registers the 8 mods alongside the 4 runtime guard plugins.
+
+Status: **scaffold**. The mods compile and are registered in the marketplace manifest; runtime wiring is the next milestone — `defineMod` still comes from a local stand-in until `@agentic-sdlc-kit/mod-sdk` exports it, and `sdlc-bridge` maps its request/decision types onto the real core APIs. See [`docs/product/AGENTIC_MODS_INTEGRATION_PLAN.md`](docs/product/AGENTIC_MODS_INTEGRATION_PLAN.md) for the phased roadmap, [`docs/architecture/AGENTIC_MODS_MARKETPLACE.md`](docs/architecture/AGENTIC_MODS_MARKETPLACE.md) for the marketplace layering rules, and [`docs/mods/MOD_DEVELOPMENT.md`](docs/mods/MOD_DEVELOPMENT.md) for the authoring workflow.
+
+---
+
 ## Skills Packs Integration
 
 The kit integrates three external agent-skills packs as stack-scoped expertise
@@ -304,6 +327,9 @@ workflow mapping, install options, and the core registry API.
 - [`docs/skills/SKILL_PACKS.md`](docs/skills/SKILL_PACKS.md) — Integrating the ruby/node/react agent-skills packs with kit stacks and workflows.
 - [`AGENTS.md`](AGENTS.md) — Coding conventions and architectural invariants for AI agents.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — Contribution standards and verification requirements.
+- [`docs/product/AGENTIC_MODS_INTEGRATION_PLAN.md`](docs/product/AGENTIC_MODS_INTEGRATION_PLAN.md) — agentic-mods marketplace scaffold: product boundary, bridge design, presets, and phased roadmap.
+- [`docs/architecture/AGENTIC_MODS_MARKETPLACE.md`](docs/architecture/AGENTIC_MODS_MARKETPLACE.md) — Marketplace layering rules for mods, cockpit, and the sdlc-bridge.
+- [`docs/mods/MOD_DEVELOPMENT.md`](docs/mods/MOD_DEVELOPMENT.md) — How to author, declare, and register a new mod.
 - [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) — Monorepo design, boundaries, and invariants.
 - [`docs/workflows/WORKFLOWS.md`](docs/workflows/WORKFLOWS.md) — State machine specifications for feature, app, fix, and refactor.
 - [`docs/product/PRODUCT.md`](docs/product/PRODUCT.md) — Vision, target personas, and non-goals.

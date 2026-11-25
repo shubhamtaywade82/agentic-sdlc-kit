@@ -1,0 +1,20 @@
+id: regression
+version: 1
+stages:
+  - id: classify
+    exit: [risk_score_computed]
+  - id: select
+    exit: [regression_level_selected]
+  - id: run
+    exit: [selected_suites_executed]
+  - id: escalate
+    exit: [failures_analyzed]
+transitions:
+  - { from: classify, to: select }
+  - { from: select, to: run }
+  - { from: run, to: escalate, condition: unexpected_failure }
+  - { from: escalate, to: run }
+  - { from: run, to: complete, condition: all_pass }
+mods:
+  classify: [regression-orchestrator]
+  run:      [test-impact, evidence-gate]

@@ -1,0 +1,18 @@
+id: bug-fix
+version: 1
+stages:
+  - id: reproduce
+    exit: [reproduction_evidence_present]
+  - id: diagnose
+    exit: [root_cause_differs_from_symptom]
+  - id: fix
+    exit: [minimal_fix_applied]
+  - id: verify
+    exit: [regression_test_added, original_failure_gone]
+transitions:
+  - { from: reproduce, to: diagnose }
+  - { from: diagnose, to: fix }
+  - { from: fix, to: verify }
+mods:
+  reproduce: [defect-protocol]
+  verify:     [evidence-gate, regression-orchestrator]

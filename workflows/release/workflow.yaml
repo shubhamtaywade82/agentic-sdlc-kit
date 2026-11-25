@@ -1,0 +1,11 @@
+id: release
+version: 1
+stages:
+  - id: gate
+    exit: [release_checklist_complete]
+  - id: notes
+    exit: [release_notes_generated]
+transitions:
+  - { from: gate, to: notes }
+mods:
+  gate: [release-conductor, pr-readiness, migration-sentinel]

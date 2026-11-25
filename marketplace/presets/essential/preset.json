@@ -1,0 +1,10 @@
+{
+  "name": "essential",
+  "mods": [
+    "sdlc-controller",
+    "sdlc-guard",
+    "secret-guard",
+    "run-observer",
+    "evidence-gate"
+  ]
+}

@@ -1,0 +1,32 @@
+id: feature-development
+version: 1
+stages:
+  - id: discover
+    exit: [problem_statement_present]
+  - id: specify
+    exit: [acceptance_criteria_present]
+  - id: plan
+    exit: [change_contract_created]
+  - id: develop
+    exit: [contract_rules_satisfied]
+  - id: verify
+    exit: [evidence_current]
+  - id: review
+    exit: [no_unresolved_high_findings]
+  - id: release
+    exit: [release_checklist_complete]
+transitions:
+  - { from: discover, to: specify }
+  - { from: specify, to: plan }
+  - { from: plan, to: develop }
+  - { from: develop, to: verify }
+  - { from: verify, to: review }
+  - { from: review, to: release }
+mods:
+  discover:  [task-orientation]
+  specify:   [change-contract]
+  plan:      [change-contract, architecture-guard]
+  develop:   [change-contract, command-guard]
+  verify:    [evidence-gate, test-impact, regression-orchestrator]
+  review:    [review-tracker, pr-readiness]
+  release:   [release-conductor]

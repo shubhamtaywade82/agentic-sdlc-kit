@@ -1,0 +1,12 @@
+{
+  "name": "regulated",
+  "mods": [
+    "engineering",
+    "release",
+    "immutable-audit-log",
+    "mandatory-approvals",
+    "exception-expiry",
+    "capability-allowlist",
+    "network-disabled-by-default"
+  ]
+}

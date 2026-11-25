@@ -4,17 +4,40 @@ This guide walks you through setting up and using the **Agentic SDLC Kit** for d
 
 ---
 
-## 1. Installation and Health Check
+## 1. Installation & Health Check
 
-### Prerequisites
+### Option A: Standard Installation via NPM (Recommended)
+
+No repository clone is required. Install the CLI globally or run on-demand:
+
+```bash
+# Global installation
+npm install -g @agentic-sdlc-kit/cli
+# or with pnpm:
+pnpm add -g @agentic-sdlc-kit/cli
+
+# Verify toolchain health
+kit doctor
+kit --version
+```
+
+Or run on-demand without installing:
+
+```bash
+npx @agentic-sdlc-kit/cli doctor
+```
+
+### Option B: Building from Source (For Contributors)
+
+If you are developing or testing the kit directly from source:
 
 - **Node.js**: `>= 20.11.0`
-- **pnpm**: `>= 12.0.0` (managed via Corepack or installed globally)
-
-### Build and Test
+- **pnpm**: `>= 12.0.0`
 
 ```bash
 # Clone and install dependencies
+git clone https://github.com/shubhamtaywade82/agentic-sdlc-kit.git
+cd agentic-sdlc-kit
 pnpm install --frozen-lockfile
 
 # Compile TypeScript across all packages and plugins
@@ -22,16 +45,9 @@ pnpm run build
 
 # Run the complete verification suite (architecture, lint, types, tests)
 pnpm run verify
-```
 
-### CLI Verification
-
-```bash
-# Run doctor check
+# Verify local CLI build
 node packages/cli/dist/index.js doctor
-
-# (Optional) Link the CLI globally so you can run `kit` anywhere
-pnpm add -g ./packages/cli
 ```
 
 ---
@@ -63,6 +79,20 @@ This file declares:
 - Repository metadata and stack profile
 - Verification commands (`test`, `lint`, `typecheck`, `build`)
 - Protected paths and governance policies
+
+### Step 3: Configure Your AI Coding Assistant
+
+Inject standard standing rules, skills, and commands into your preferred AI host:
+
+```bash
+kit host install cursor       # Injects .cursor/rules/sdlc.mdc
+kit host install claude-code  # Injects ~/.claude/commands/ and standing skills
+kit host install gemini       # Injects GEMINI.md managed block
+kit host install agy          # Injects Antigravity skill
+kit host install codex        # Injects .codex/AGENTS.md
+kit host install aider        # Injects CONVENTIONS.md
+kit host install all          # Injects for all detected hosts
+```
 
 ---
 

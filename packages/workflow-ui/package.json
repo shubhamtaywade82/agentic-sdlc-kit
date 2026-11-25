@@ -1,0 +1,27 @@
+{
+  "name": "@agentic-mods/workflow-ui",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    ".claude-plugin"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@agentic-sdlc-kit/contracts": "workspace:*",
+    "@agentic-sdlc-kit/core": "workspace:*",
+    "@agentic-sdlc-kit/mod-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

@@ -4,9 +4,24 @@ This guide details how to install, configure, and use the **Agentic SDLC Kit** a
 
 ---
 
-## 1. Global CLI Setup (Prerequisite)
+## 1. CLI Setup (Prerequisite)
 
-Before integrating with any host tool, install dependencies, build the packages, and link the `kit` CLI globally:
+Before integrating with any host tool, ensure the `kit` CLI is available:
+
+### Option A: Install via NPM (Recommended)
+
+```bash
+# Global installation
+npm install -g @agentic-sdlc-kit/cli
+# or with pnpm:
+pnpm add -g @agentic-sdlc-kit/cli
+
+# Verify installation
+kit --version
+kit doctor
+```
+
+### Option B: Build from Source (For Contributors)
 
 ```bash
 # In the agentic-sdlc-kit directory:

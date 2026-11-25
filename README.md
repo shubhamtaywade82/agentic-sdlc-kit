@@ -4,80 +4,55 @@ A **runtime-independent** Agentic Software Development Lifecycle (SDLC) kit. It 
 
 ---
 
-## Architecture Overview
+## Quick Start (No Clone Required)
 
-The repository is organized as a modular TypeScript monorepo under `packages/`, `plugins/` and `mods/`:
+### 1. Installation
 
-```
-agentic-sdlc-kit/
-├── packages/
-│   ├── contracts/            # Shared Zod schemas and TypeScript domain contracts (imports nothing)
-│   ├── core/                 # Runtime-independent workflow engine, DAG planner, TDD machine, CLSE
-│   ├── cli/                  # `kit` command-line interface (23 commands)
-│   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
-│   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
-│   ├── testing/              # Test fixtures, assertion helpers, and contract validators
-│   ├── sdlc-bridge/          # ONLY package that coordinates core from the marketplace layer (scaffold)
-│   ├── workflow-ui/          # Workflow / TDD / readiness panel state (scaffold)
-│   ├── cockpit/              # Unified engineering cockpit state (scaffold)
-│   ├── preset-resolver/      # Preset → mod set resolution (scaffold)
-│   └── external-mod-adapters/ # Adapters for catalogued external mods (scaffold)
-├── plugins/                  # Standalone Claude Code runtime plugins (Mods)
-│   ├── sdlc-guard/           # Intercepts destructive operations and enforces fail-closed policy
-│   ├── secret-guard/         # Scans and redacts credentials and API keys before write/exec
-│   ├── model-router/         # Cost-aware model tier routing (Haiku / Sonnet / Opus)
-│   └── run-observer/         # Bounded event streaming and telemetry recorder
-├── mods/                     # agentic-mods marketplace engineering mods (8, scaffold)
-├── workflows/                # Declarative SDLC workflow stage machines (scaffold)
-├── marketplace/              # Installable mod presets (scaffold)
-├── tooling/                  # Marketplace generation/validation + create-mod (scaffold)
-├── docs/                     # Specifications, architecture, contracts, ADRs, and workflows
-└── scripts/                  # Architecture verification and build scripts
-```
-
-### Architectural Invariants
-
-Enforced by `scripts/check-architecture.ts` in CI:
-
-1. `contracts` imports nothing from sibling packages.
-2. `core` imports only from `contracts`.
-3. `cli` imports only from `core` and `contracts`.
-4. `testing` imports only from `contracts`.
-5. `claude-code-adapter` imports only from `contracts`.
-6. `mod-sdk` imports only from `contracts` and `core`.
-7. `plugins/*` import only from `contracts`, `core`, and `mod-sdk`.
-8. The engine core is **runtime-independent**; host adapters bridge host-specific runtimes to core contracts.
-
----
-
-## Quick Start
-
-### 1. Requirements & Installation
-
-- **Node.js**: `>= 20.11.0`
-- **pnpm**: `>= 12.0.0` (pinned via `packageManager` in `package.json`)
+Install the `kit` CLI globally or run it on-demand with `npx`:
 
 ```bash
-# Install dependencies
-pnpm install --frozen-lockfile
+# Global installation (recommended)
+npm install -g @agentic-sdlc-kit/cli
+# or with pnpm:
+pnpm add -g @agentic-sdlc-kit/cli
 
-# Build all packages and plugins
-pnpm run build
-
-# Run full verification (architecture check, build, lint, typecheck, test)
-pnpm run verify
+# Verify installation
+kit --version
+kit doctor
 ```
 
-### 2. Verify CLI Health
+Or run directly without installing:
 
 ```bash
-node packages/cli/dist/index.js doctor
+npx @agentic-sdlc-kit/cli doctor
 ```
 
-_(Optional)_ Link `kit` globally to run directly from your PATH:
+### 2. Onboard Any Existing Repository
+
+From the root of your project:
 
 ```bash
-pnpm add -g ./packages/cli
+# 1. Inspect repository stacks, test frameworks, and conventions (read-only)
+kit inspect .
+
+# 2. Initialize the project profile (.ai-kit/project.yml)
+kit init .
+
+# 3. Configure your AI coding assistant (Cursor, Claude Code, Gemini/AGY, Codex, Aider)
+kit host install cursor       # or: claude-code, gemini, agy, codex, aider, all
+```
+
+### 3. Claude Code Marketplace (Optional)
+
+Claude Code users can install runtime guard plugins directly from GitHub:
+
+```bash
+# Add the marketplace
+claude plugin marketplace add shubhamtaywade82/agentic-sdlc-kit
+
+# Install guard plugins
+claude plugin install sdlc-guard@agentic-sdlc-kit
+claude plugin install secret-guard@agentic-sdlc-kit
 ```
 
 ---
@@ -316,6 +291,74 @@ Installed skills land in `<project>/.claude/skills/<skill>/` and are recorded
 in `<project>/.ai-kit/skills-manifest.json` with the pack commit. See
 [`docs/skills/SKILL_PACKS.md`](docs/skills/SKILL_PACKS.md) for the full
 workflow mapping, install options, and the core registry API.
+
+---
+
+## Monorepo Architecture & Contributing (For Contributors)
+
+For developers contributing to or testing the kit directly from source:
+
+### Requirements & Setup
+
+- **Node.js**: `>= 20.11.0`
+- **pnpm**: `>= 12.0.0` (pinned via `packageManager` in `package.json`)
+
+```bash
+# Clone the repository
+git clone https://github.com/shubhamtaywade82/agentic-sdlc-kit.git
+cd agentic-sdlc-kit
+
+# Install dependencies
+pnpm install --frozen-lockfile
+
+# Build all packages and plugins
+pnpm run build
+
+# Run full verification (architecture check, build, lint, typecheck, test)
+pnpm run verify
+```
+
+### Monorepo Structure
+
+```
+agentic-sdlc-kit/
+├── packages/
+│   ├── contracts/            # Shared Zod schemas and TypeScript domain contracts (imports nothing)
+│   ├── core/                 # Runtime-independent workflow engine, DAG planner, TDD machine, CLSE
+│   ├── cli/                  # `kit` command-line interface (23 commands)
+│   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
+│   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
+│   ├── testing/              # Test fixtures, assertion helpers, and contract validators
+│   ├── sdlc-bridge/          # ONLY package that coordinates core from the marketplace layer (scaffold)
+│   ├── workflow-ui/          # Workflow / TDD / readiness panel state (scaffold)
+│   ├── cockpit/              # Unified engineering cockpit state (scaffold)
+│   ├── preset-resolver/      # Preset → mod set resolution (scaffold)
+│   └── external-mod-adapters/ # Adapters for catalogued external mods (scaffold)
+├── plugins/                  # Standalone Claude Code runtime plugins (Mods)
+│   ├── sdlc-guard/           # Intercepts destructive operations and enforces fail-closed policy
+│   ├── secret-guard/         # Scans and redacts credentials and API keys before write/exec
+│   ├── model-router/         # Cost-aware model tier routing (Haiku / Sonnet / Opus)
+│   └── run-observer/         # Bounded event streaming and telemetry recorder
+├── mods/                     # agentic-mods marketplace engineering mods (8, scaffold)
+├── workflows/                # Declarative SDLC workflow stage machines (scaffold)
+├── marketplace/              # Installable mod presets (scaffold)
+├── tooling/                  # Marketplace generation/validation + create-mod (scaffold)
+├── docs/                     # Specifications, architecture, contracts, ADRs, and workflows
+└── scripts/                  # Architecture verification and build scripts
+```
+
+### Architectural Invariants
+
+Enforced by `scripts/check-architecture.ts` in CI:
+
+1. `contracts` imports nothing from sibling packages.
+2. `core` imports only from `contracts`.
+3. `cli` imports only from `core` and `contracts`.
+4. `testing` imports only from `contracts`.
+5. `claude-code-adapter` imports only from `contracts`.
+6. `mod-sdk` imports only from `contracts` and `core`.
+7. `plugins/*` import only from `contracts`, `core`, and `mod-sdk`.
+8. The engine core is **runtime-independent**; host adapters bridge host-specific runtimes to core contracts.
 
 ---
 

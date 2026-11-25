@@ -214,6 +214,8 @@ importers:
 
   fixtures/fixture-node-fullstack: {}
 
+  fixtures/fixture-node-typescript: {}
+
   fixtures/fixture-react-spa:
     dependencies:
       react:
@@ -260,6 +262,158 @@ importers:
         specifier: ^5.1.1
         version: 5.1.1(@types/node@24.19.2)(jsdom@31.0.1)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15))
 
+  mods/architecture-guard:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/change-contract:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/evidence-gate:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/pr-readiness:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/regression-orchestrator:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/release-conductor:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/sdlc-controller:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  mods/tdd-conductor:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../../packages/mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
   packages/claude-code-adapter:
     dependencies:
       '@agentic-sdlc-kit/contracts':
@@ -288,6 +442,25 @@ importers:
       '@types/node':
         specifier: ^20.14.0
         version: 20.19.43
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  packages/cockpit:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../mod-sdk
+    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -324,6 +497,25 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
 
+  packages/external-mod-adapters:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
   packages/mod-sdk:
     dependencies:
       '@agentic-sdlc-kit/contracts':
@@ -343,6 +535,44 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
 
+  packages/preset-resolver:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  packages/sdlc-bridge:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../mod-sdk
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
   packages/testing:
     dependencies:
       '@agentic-sdlc-kit/contracts':
@@ -352,6 +582,25 @@ importers:
       '@types/node':
         specifier: ^20.14.0
         version: 20.19.43
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.43)(jsdom@31.0.1)(lightningcss@1.33.0)(supports-color@7.2.0)
+
+  packages/workflow-ui:
+    dependencies:
+      '@agentic-sdlc-kit/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@agentic-sdlc-kit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentic-sdlc-kit/mod-sdk':
+        specifier: workspace:*
+        version: link:../mod-sdk
+    devDependencies:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3

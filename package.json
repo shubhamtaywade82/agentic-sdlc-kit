@@ -12,6 +12,7 @@
   "workspaces": [
     "packages/*",
     "plugins/*",
+    "fixtures/*",
     "mods/*"
   ],
   "scripts": {

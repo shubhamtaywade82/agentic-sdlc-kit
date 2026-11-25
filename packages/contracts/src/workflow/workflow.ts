@@ -43,6 +43,7 @@ export const WorkflowStateSchema = z.object({
 });
 
 export type WorkflowState = z.infer<typeof WorkflowStateSchema>;
+export type WorkflowRun = WorkflowState;
 export type TaskHistoryEntry = z.infer<typeof TaskHistoryEntrySchema>;
 
 // Re-export for ergonomic imports.

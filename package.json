@@ -2,7 +2,7 @@
   "name": "agentic-sdlc-kit",
   "version": "0.9.1",
   "private": true,
-  "description": "Runtime-independent Agentic SDLC Kit. M0+M1 foundation: contracts, core, cli, testing, and the Claude Code adapter boundary.",
+  "description": "Runtime-independent Agentic SDLC Kit. M0+M1 foundation: contracts, core, cli, testing, and the Claude Code adapter boundary. Also hosts the agentic-mods Claude Code marketplace scaffold (mods/, workflows/, presets, marketplace tooling).",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -11,21 +11,24 @@
   "packageManager": "pnpm@12.21.0",
   "workspaces": [
     "packages/*",
-    "plugins/*"
+    "plugins/*",
+    "mods/*"
   ],
   "scripts": {
-    "build": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" build",
-    "typecheck": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" typecheck",
+    "build": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" --filter \"./mods/*\" build",
+    "typecheck": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" --filter \"./mods/*\" typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" test",
+    "test": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" --filter \"./mods/*\" test",
     "test:contract": "pnpm -r --workspace-concurrency=4 --filter \"./packages/*\" --filter \"./plugins/*\" test:contract",
     "check:architecture": "tsx scripts/check-architecture.ts",
     "milestones:check": "tsx scripts/milestone-status.ts --check",
     "milestones:write": "tsx scripts/milestone-status.ts --write",
+    "marketplace:generate": "node tooling/generate-marketplace/generate.js",
+    "marketplace:validate": "node tooling/generate-marketplace/validate.js",
     "verify": "pnpm run check:architecture && pnpm run milestones:check && pnpm run build && pnpm run lint && pnpm run typecheck && pnpm run test",
-    "clean": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" exec -- rm -rf dist *.tsbuildinfo",
+    "clean": "pnpm -r --filter \"./packages/*\" --filter \"./plugins/*\" --filter \"./mods/*\" exec -- rm -rf dist *.tsbuildinfo",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",

@@ -38,6 +38,14 @@ export function register(t: Registrar): void {
     assertEqual(result.folded.get(FILE), 'const a = 9;\nconst b = 8;\n', 'folded content');
   });
 
+  t('edit-policy: a replacement containing $ patterns is written literally', () => {
+    const result = applyEdits(
+      proposal([{ path: FILE, explanation: 'x', oldString: 'const a = 1;', newString: 'const a = "$&$1";' }]),
+      candidates([FILE, ORIGINAL]),
+    );
+    assertEqual(result.folded.get(FILE), 'const a = "$&$1";\nconst b = 2;\n', 'no $-pattern expansion');
+  });
+
   t('edit-policy: an oldString that no longer exists is refused as stale', () => {
     const result = applyEdits(
       proposal([{ path: FILE, explanation: 'x', oldString: 'missing line', newString: 'y' }]),
@@ -74,8 +82,9 @@ export function register(t: Registrar): void {
         return ORIGINAL;
       },
     );
-    assertEqual(fetched, [FILE, 'packages/core/src/a.ts'], 'only canonical source is fetched');
-    assertEqual(picked.map((c) => c.path), [FILE, 'packages/core/src/a.ts'], 'candidates');
+    // Fetch order is sorted, as before the extraction: a.ts sorts before x.ts.
+    assertEqual(fetched, ['packages/core/src/a.ts', FILE], 'only canonical source is fetched');
+    assertEqual(picked.map((c) => c.path), ['packages/core/src/a.ts', FILE], 'candidates');
   });
 
   t('edit-policy: candidate selection skips missing and oversized files', async () => {

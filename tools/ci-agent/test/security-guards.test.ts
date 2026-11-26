@@ -91,4 +91,52 @@ export function register(t: Registrar): void {
     assertEqual(accepted.length, 0, 'oversized oldString rejected');
     assert(rejected[0]?.reason.includes('exceeds') ?? false, 'size cap reason');
   });
+
+  // Regression for the `..` traversal the old prefix regex accepted. Each
+  // path below either escapes packages/<pkg>/src after normalization or
+  // hides a denied name behind an encoding, separator or case trick.
+  t('guards: non-canonical and traversal paths are all rejected', () => {
+    for (const path of [
+      'packages/core/src/../../../.github/workflows/ci.yml',
+      'packages/core/src/../../.github/workflows/ci.yml',
+      'packages/core/src/../../../tools/ci-agent/src/autofix.ts',
+      'packages/core/src/%2e%2e/%2e%2e/.github/workflows/ci.yml',
+      'packages\\core\\src\\..\\..\\.github\\workflows\\ci.yml',
+      'packages/core\\src/x.ts',
+      'packages/core/src/..\\..\\.github\\workflows\\ci.yml',
+      '/packages/core/src/x.ts',
+      'packages//core/src/x.ts',
+      'packages/core/src//x.ts',
+      'packages/core/src/x.ts/',
+      'packages/core/src/./x.ts',
+      'packages/core/src/x\u0000.ts',
+      'packages/core/src/a b.ts',
+      'Packages/core/src/x.ts',
+      'packages/core/src/.github/x.ts',
+      'packages/core/src/deep/.GitHub/workflows/ci.yml',
+      'packages/cli/src/package.json',
+      '',
+    ]) {
+      assertEqual(pathVerdict(path).allowed, false, `rejected: ${JSON.stringify(path)}`);
+    }
+  });
+
+  t('guards: canonical package source paths stay allowed', () => {
+    for (const path of ['packages/core/src/deep/nested/file.ts', 'packages/cli/src/index.test.ts', 'packages/a-b_c.v2/src/x.ts']) {
+      assertEqual(pathVerdict(path).allowed, true, `allowed: ${path}`);
+    }
+  });
+
+  t('guards: a traversal edit is dropped while the clean edit beside it is kept', () => {
+    const { accepted, rejected } = filterEdits([
+      { path: 'packages/core/src/../../../.github/workflows/ci.yml', explanation: 'x', oldString: 'a', newString: 'b' },
+      { path: okPath, explanation: 'ok', oldString: 'const x = 1;', newString: 'const x = 2;' },
+    ]);
+    assertEqual(
+      accepted.map((edit) => edit.path),
+      [okPath],
+      'only the canonical edit is accepted',
+    );
+    assertEqual(rejected.length, 1, 'traversal edit rejected');
+  });
 }

@@ -37,12 +37,15 @@ import {
 import { structuredChat } from './llm.js';
 import { mapFilePaths, minimizeJobLog } from './log-minimizer.js';
 import { FIX_JSON_CONTRACT, FixProposal } from './schemas.js';
-import { filterEdits, pathVerdict } from './security-guards.js';
+import {
+  applyEdits,
+  assertPatchablePaths,
+  selectCandidates,
+  type CandidateFile,
+} from './edit-policy.js';
 
 const MAX_JOBS = 2;
 const MAX_LOG_CHARS = 12_000;
-const MAX_CANDIDATE_FILES = 8;
-const MAX_FILE_CHARS = 16_000;
 const ATTEMPT_CAP = 2;
 const BRANCH_PREFIX = 'ai-autofix/';
 
@@ -69,11 +72,6 @@ REPAIR RULES:
 - "oldString" must be text that exists EXACTLY ONCE in that file — copy it verbatim, including indentation and line breaks.
 - Do not weaken test assertions to make failing tests pass; fix the production code unless the test itself is demonstrably wrong.
 - Return "edits": [] when you cannot confidently repair the failure — never guess.`;
-
-interface CandidateFile {
-  readonly path: string;
-  readonly content: string;
-}
 
 async function downloadJobLogsSafe(jobId: number): Promise<string | null> {
   try {
@@ -105,17 +103,8 @@ async function collectEvidence(
   }
 
   // Candidate files: referenced by the logs AND inside the bounded-write
-  // allowlist. Anything else (workflows, manifests, configs) is out of
-  // reach for this agent by design (invariant 4).
-  const candidates: CandidateFile[] = [];
-  for (const path of [...paths].sort()) {
-    if (candidates.length >= MAX_CANDIDATE_FILES) break;
-    if (!pathVerdict(path).allowed) continue;
-    const content = await fetchFileContents(path, headSha);
-    if (content === null) continue;
-    if (content.length > MAX_FILE_CHARS) continue; // oversized: unsafe for exact-match edits
-    candidates.push({ path, content });
-  }
+  // allowlist. The policy is checked before any fetch (invariant 4).
+  const candidates = await selectCandidates([...paths], (path) => fetchFileContents(path, headSha));
 
   return { jobs: failedJobs.map((j) => j.name), logs: logSections.join('\n\n'), candidates };
 }
@@ -145,48 +134,6 @@ async function countAttempts(branch: string): Promise<number> {
   const prefix = `${BRANCH_PREFIX}${sanitizeBranchName(branch)}`;
   const open = await listOpenPullRequests(branch);
   return open.filter((pr) => pr.head.ref.startsWith(prefix)).length;
-}
-
-interface AppliedEdits {
-  readonly applied: FixProposal['edits'];
-  readonly rejected: ReadonlyArray<{ path: string; reason: string }>;
-  /** Final content per changed path (same-file edits folded in order). */
-  readonly folded: ReadonlyMap<string, string>;
-}
-
-/** Verify every policy-accepted edit against real content; fold same-file edits in order. */
-function applyEdits(proposal: FixProposal, candidates: readonly CandidateFile[]): AppliedEdits {
-  const { accepted, rejected } = filterEdits(proposal.edits);
-  const byPath = new Map(candidates.map((c) => [c.path, c.content] as const));
-  const folded = new Map<string, string>();
-  const applied: FixProposal['edits'] = [];
-  const rejections: Array<{ path: string; reason: string }> = [...rejected];
-
-  for (const edit of accepted) {
-    const original = byPath.get(edit.path);
-    if (original === undefined) {
-      rejections.push({ path: edit.path, reason: 'file content was not available at the failing revision' });
-      continue;
-    }
-    const content = folded.get(edit.path) ?? original;
-    const occurrences = content.split(edit.oldString).length - 1;
-    if (occurrences === 0) {
-      rejections.push({ path: edit.path, reason: 'oldString not found in the file (stale proposal)' });
-      continue;
-    }
-    if (occurrences > 1) {
-      rejections.push({ path: edit.path, reason: `oldString matches ${occurrences} times — ambiguous edit refused` });
-      continue;
-    }
-    const next = content.replace(edit.oldString, edit.newString);
-    if (next === content) {
-      rejections.push({ path: edit.path, reason: 'replacement produced no change' });
-      continue;
-    }
-    folded.set(edit.path, next);
-    applied.push(edit);
-  }
-  return { applied, rejected: rejections, folded };
 }
 
 async function main(): Promise<number> {
@@ -259,6 +206,9 @@ async function main(): Promise<number> {
   }
 
   // ---- Commit the folded file states via the git data API (no checkout). ----
+  // Second, independent policy check: no path reaches the tree API unless it
+  // passes again, whatever the earlier stages concluded.
+  assertPatchablePaths(folded.keys());
   const commit = await getGitCommit(run.head_sha);
   const entries = [];
   for (const [path, content] of folded) {

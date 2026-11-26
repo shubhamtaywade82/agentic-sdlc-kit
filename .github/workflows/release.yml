@@ -4,25 +4,27 @@
 # defend against supply-chain tampering of the action ref.
 #
 # Triggers:
-#   - Pushing a release tag (e.g., v0.9.1)
-#   - Publishing a GitHub Release
-#   - Manual trigger (workflow_dispatch) with optional dry_run flag
+#   - Publishing a GitHub Release. The only trigger that publishes. A bare tag
+#     push does not, so one release cannot start the publish twice.
+#   - Manual trigger (workflow_dispatch). Dry run only: it runs the preflight
+#     and a dry-run publish, and refuses a real publish.
+#
+# scripts/release-preflight.ts runs before verification and fails closed when a
+# kit version does not match the tag, when any version is already on npm, or
+# when the registry cannot answer.
 
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (verify and simulate publish without writing to npm)'
+        description: 'Dry run (preflight and simulated publish; the only manual mode)'
         type: boolean
         required: false
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -59,18 +61,28 @@ jobs:
       - name: Install dependencies (frozen-lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Release preflight (tag, versions, registry)
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: pnpm exec tsx scripts/release-preflight.ts
+
       - name: Full verification (architecture, milestones, build, lint, typecheck, test)
         run: pnpm run verify
 
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
           set -e
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "$DRY_RUN" = "true" ]; then
             echo "Running dry-run publish..."
             pnpm -r --filter "./packages/*" publish --access public --dry-run --no-git-checks
+          elif [ "$EVENT_NAME" = "release" ]; then
+            echo "Publishing packages to npm registry with provenance..."
+            pnpm -r --filter "./packages/*" publish --access public --no-git-checks --provenance
           else
-            echo "Publishing packages to npm registry..."
-            pnpm -r --filter "./packages/*" publish --access public --no-git-checks
+            echo "::error::Manual runs must set dry_run. Only a published release publishes to npm."
+            exit 1
           fi

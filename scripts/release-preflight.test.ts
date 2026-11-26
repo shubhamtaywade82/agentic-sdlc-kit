@@ -10,7 +10,7 @@ import {
   planReleasePreflight,
   type PublishableManifest,
   type RegistryLookup,
-} from './release-preflight';
+} from './release-preflight.js';
 
 const KIT: PublishableManifest[] = [
   { name: '@agentic-sdlc-kit/core', version: '0.9.2', private: false },

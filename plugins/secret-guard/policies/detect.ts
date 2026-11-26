@@ -195,7 +195,7 @@ export const BUILTIN_DETECTION_RULES: ReadonlyArray<DetectionRule> = [
     // Case-insensitive by explicit classes (no (?i) in ECMAScript). Medium
     // severity: a quoted literal of 8+ chars assigned to a password name.
     pattern:
-      '(?:[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])\\s*[:=]\\s*["\']([^"\'\\s$<{]{8,})["\']',
+      '(?:[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Pp][Aa][Ss][Ss][Ww][Dd]|[Pp][Ww][Dd])\\s*[:=]\\s*["\'](?!\\[REDACTED)([^"\'\\s$<{]{8,})["\']',
     severity: 'medium',
     enabled: true,
   },
@@ -294,6 +294,14 @@ export function withheldMarker(length: number, limit: number): string {
   return `[WITHHELD: ${length} chars exceed the secret-scan limit of ${limit}; output was not scanned]`;
 }
 
+/**
+ * Stands in for text whose redaction could not be verified. Even a partly
+ * redacted copy is withheld: a value that survived is still a leak.
+ */
+export function unverifiedMarker(): string {
+  return '[WITHHELD: redaction could not be verified; output was not shown]';
+}
+
 function redactedPreview(value: string): string {
   if (value.length < 12) {
     return `[REDACTED:${value.length}]`;
@@ -308,7 +316,7 @@ interface CompiledRule {
 
 const COMPILED_BUILTINS: ReadonlyArray<CompiledRule> = BUILTIN_DETECTION_RULES.filter(
   (r) => r.enabled,
-).map((rule) => ({ rule, pattern: new RegExp(rule.pattern, 'g') }));
+).map((rule) => ({ rule, pattern: new RegExp(rule.pattern, 'gd') }));
 
 /**
  * Detect secrets in text. Returns findings with redacted previews; never
@@ -325,9 +333,14 @@ export function detectSecrets(
     let m: RegExpExecArray | null;
     while ((m = pattern.exec(text)) !== null) {
       // A rule with a capture group matches the group; else the whole match.
-      const value = m[1] ?? m[0];
+      // The `d` flag gives the exact span of whichever group was used, so a
+      // value that also occurs earlier in the match cannot shift the offset.
+      const groupIndex = m[1] !== undefined ? 1 : 0;
+      const span = m.indices?.[groupIndex];
+      if (span === undefined) throw new Error(`rule ${rule.id} produced no capture indices`);
+      const offset = span[0];
+      const value = text.slice(span[0], span[1]);
       if (!value) continue;
-      const offset = m.index + m[0].indexOf(value);
       const upTo = text.slice(0, offset);
       const lines = upTo.split('\n');
       const line = lines.length;
@@ -451,6 +464,36 @@ function mergeSpans(findings: ReadonlyArray<SecretFinding>): Span[] {
   return merged;
 }
 
+function valueOf(text: string, f: SecretFinding): string {
+  return text.slice(f.location.offset, f.location.offset + f.location.length);
+}
+
+/**
+ * Replaces each finding's span, then every other occurrence of each detected
+ * value. A value can also appear bare where no rule's context matches; span
+ * replacement alone would leave that copy in the output.
+ */
+function replaceEveryValue(
+  text: string,
+  findings: ReadonlyArray<SecretFinding>,
+  policy: RedactionPolicy,
+): string {
+  let out = text;
+  for (const sp of mergeSpans(findings).reverse()) {
+    out = out.slice(0, sp.start) + formatPlaceholder(policy, sp.finding) + out.slice(sp.end);
+  }
+  const byValue = new Map<string, SecretFinding>();
+  for (const f of findings) {
+    const value = valueOf(text, f);
+    if (value !== '' && !byValue.has(value)) byValue.set(value, f);
+  }
+  // Longest first, so a value that contains another is replaced whole.
+  for (const [value, f] of [...byValue].sort(([a], [b]) => b.length - a.length)) {
+    out = out.split(value).join(formatPlaceholder(policy, f));
+  }
+  return out;
+}
+
 export function redactSecrets(
   text: string,
   policy: RedactionPolicy,
@@ -470,21 +513,14 @@ export function redactSecrets(
   if (findings.length === 0) {
     return { redactedText: text, findings: [], status: 'verified-clean', fullyRedacted: true };
   }
-  let redactedText = text;
-  const updatedFindings: SecretFinding[] = [];
-  // Replace from the end so earlier offsets stay valid.
-  for (const sp of mergeSpans(findings).reverse()) {
-    redactedText =
-      redactedText.slice(0, sp.start) + formatPlaceholder(policy, sp.finding) + redactedText.slice(sp.end);
-  }
+  const redactedText = replaceEveryValue(text, findings, policy);
   // Verify: re-run the detector on the redacted output and check each
-  // original value is really gone.
+  // original value is really gone, anywhere in the output.
   const recheck = detectSecrets(redactedText, source, filePath);
-  for (const f of findings) {
-    const originalValue = text.slice(f.location.offset, f.location.offset + f.location.length);
-    const stillAppears = redactedText.includes(originalValue);
-    updatedFindings.push({ ...f, redacted: !stillAppears });
-  }
+  const updatedFindings: SecretFinding[] = findings.map((f) => ({
+    ...f,
+    redacted: !redactedText.includes(valueOf(text, f)),
+  }));
   const fullyRedacted = updatedFindings.every((f) => f.redacted) && recheck.length === 0;
   return {
     redactedText,

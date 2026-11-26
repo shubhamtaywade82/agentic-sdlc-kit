@@ -11,7 +11,9 @@
 //      commits and all local refs that may be published before a push.
 //      Ambiguous push targets, refspecs and directory changes are denied.
 //   3. Tool results — after `await next(e)`, redact secrets from the
-//      result's text (the field the model reads) and return the copy.
+//      result's text (the field the model reads) and return the copy. Output
+//      whose redaction cannot be verified is withheld, never returned partly
+//      redacted.
 //
 // Every gating registration chains .catch(...) so an internal error or
 // timeout REFUSES the action (fail closed) — the host would otherwise skip
@@ -35,7 +37,13 @@
 
 import type { EngineInterface, On, ToolCallInput, ToolCallResult } from 'claude-code';
 import { atom, read } from 'claude-code';
-import { DEFAULT_REDACTION_POLICY, redactSecrets, scanText } from '../policies/detect';
+import {
+  DEFAULT_REDACTION_POLICY,
+  redactSecrets,
+  scanText,
+  unverifiedMarker,
+  type RedactionResult,
+} from '../policies/detect';
 import { parseGitActions, type GitAction } from '../policies/git-command';
 import type { RedactionPolicy } from '../policies/detect';
 
@@ -155,6 +163,34 @@ async function scanGitRead($: EngineInterface, policy: RedactionPolicy, read: Gi
   );
 }
 
+/** Every string inside a value, at any depth. A cycle throws, so the gate denies. */
+function stringLeaves(value: unknown, ancestors: Set<object> = new Set()): string[] {
+  if (typeof value === 'string') return [value];
+  if (value === null || typeof value !== 'object') return [];
+  if (ancestors.has(value)) throw new Error('circular tool result');
+  ancestors.add(value);
+  const leaves = Object.values(value).flatMap((child) => stringLeaves(child, ancestors));
+  ancestors.delete(value);
+  return leaves;
+}
+
+/** The text the model reads for one redaction verdict. */
+export function toolResultText(redacted: RedactionResult): string {
+  if (redacted.status === 'failed') return unverifiedMarker();
+  // verified-clean and redacted carry the safe text; not-scanned carries its marker.
+  return redacted.redactedText;
+}
+
+function logToolResult($: EngineInterface, tool: string, redacted: RedactionResult): void {
+  if (redacted.status === 'not-scanned') {
+    $.ui.log(`secret-guard: ${tool} output not scanned (over the size limit); withheld`);
+  } else if (redacted.status === 'failed') {
+    $.ui.log(`secret-guard: ${tool} output withheld — redaction could not be verified complete`);
+  } else if (redacted.findings.length > 0) {
+    $.ui.log(`secret-guard: redacted ${redacted.findings.length} secret(s) from ${tool} output`);
+  }
+}
+
 export function register(on: On): void {
   // 1. Writes: Write (e.file_path + e.content) and NotebookEdit
   //    (e.notebook_path + e.new_source). The matcher narrows e to the
@@ -212,24 +248,21 @@ export function register(on: On): void {
     const r = (await p) as ToolCallResult<string> | undefined | null;
     if (r === null || typeof r !== 'object') return p;
     if (r.deny !== undefined) return r;
-    if (typeof r.text !== 'string') return r;
     const policy = await getPolicy($);
-    const redacted = redactSecrets(r.text, policy, 'tool-output');
-    if (redacted.status === 'not-scanned') {
-      // Too large to scan: surface a marker, never the unverified text.
-      $.ui.log(`secret-guard: ${e.tool} output not scanned (over the size limit); withheld`);
-      return { ...r, text: redacted.redactedText };
+    // Everything except the text is read too (context, structured fields). Any
+    // unverifiable string there withholds the whole result, never a partial copy.
+    const { text, ...others } = r;
+    const othersClean = stringLeaves(others).every(
+      (leaf) => redactSecrets(leaf, policy, 'tool-output').status === 'verified-clean',
+    );
+    if (!othersClean) {
+      $.ui.log(`secret-guard: ${e.tool} result carried unverified non-text content; withheld`);
+      return { text: unverifiedMarker() };
     }
-    if (redacted.findings.length > 0) {
-      $.ui.log(
-        `secret-guard: redacted ${redacted.findings.length} secret(s) from ${e.tool} output`,
-      );
-      if (!redacted.fullyRedacted) {
-        $.ui.log('secret-guard: WARNING — redaction could not be verified as complete');
-      }
-      return { ...r, text: redacted.redactedText };
-    }
-    return r;
+    if (typeof text !== 'string') return r;
+    const redacted = redactSecrets(text, policy, 'tool-output');
+    logToolResult($, e.tool, redacted);
+    return { ...r, text: toolResultText(redacted) };
     // Fail closed: if redaction itself throws, never surface the unverified
     // tool output to the model — refuse instead. (This registration is the
     // only one in secret-guard that previously lacked a .catch; the three

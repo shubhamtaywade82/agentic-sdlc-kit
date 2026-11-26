@@ -3,29 +3,35 @@
 // The bounded-write policy (README invariant 4): the autofix agent may only
 // patch source under packages/<pkg>/src/** and is hard-denied on workflow,
 // manifest, lockfile, config, and host-instruction files — regardless of
-// what the model proposes. Path edits are also capped (max 5 files, max 8
-// edits, 60 KB per side, no-op patches dropped).
+// what the model proposes. Paths are judged in canonical form and refused
+// when they are not already canonical. Normalizing them first would let
+// "packages/x/src/../../../.github/..." pass as source while the GitHub API
+// receives the unnormalized name.
 
 import type { FixProposal } from './schemas.js';
 import { MAX_EDIT_BYTES, MAX_EDIT_FILES, MAX_TOTAL_EDITS } from './schemas.js';
 
-/** The only tree the agent may patch: package source (tests live in src/ here). */
-const ALLOW = /^packages\/[^/]+\/src\/.+$/;
+/** Plain relative POSIX path of ordinary name characters, at most 256 long. */
+const CANONICAL_PATH = /^[A-Za-z0-9._/-]{1,256}$/;
 
 interface DenyRule {
-  readonly pattern: RegExp;
+  readonly matches: (lowercasedSegment: string) => boolean;
   readonly reason: string;
 }
 
+// Applied to every segment, so a denied name is denied at any depth.
 const DENY: readonly DenyRule[] = [
-  { pattern: /^\.github\//, reason: 'workflow and CI policy files' },
-  { pattern: /(^|\/)package\.json$/, reason: 'package manifests' },
-  { pattern: /(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$/, reason: 'lockfiles' },
-  { pattern: /^pnpm-workspace\.yaml$/, reason: 'workspace definition' },
-  { pattern: /(^|\/)tsconfig[^/]*\.json$/, reason: 'TypeScript configs' },
-  { pattern: /(^|\/)\.env/i, reason: 'environment files' },
-  { pattern: /(?:eslint\.config\.|\.prettierrc|\.editorconfig|biome\.json|oxlint)/, reason: 'lint/format configs' },
-  { pattern: /(^|\/)(?:AGENTS|GEMINI|CLAUDE)\.md$/i, reason: 'host instruction files' },
+  { matches: (s) => s === '.github', reason: 'workflow and CI policy files' },
+  { matches: (s) => s === 'package.json', reason: 'package manifests' },
+  { matches: (s) => /^(?:pnpm-lock\.yaml|package-lock\.json|yarn\.lock)$/.test(s), reason: 'lockfiles' },
+  { matches: (s) => s === 'pnpm-workspace.yaml', reason: 'workspace definition' },
+  { matches: (s) => /^tsconfig[^/]*\.json$/.test(s), reason: 'TypeScript configs' },
+  { matches: (s) => s.startsWith('.env'), reason: 'environment files' },
+  {
+    matches: (s) => /eslint\.config\.|\.prettierrc|\.editorconfig|biome\.json|oxlint/.test(s),
+    reason: 'lint/format configs',
+  },
+  { matches: (s) => /^(?:agents|gemini|claude)\.md$/.test(s), reason: 'host instruction files' },
 ];
 
 export interface PathVerdict {
@@ -33,16 +39,23 @@ export interface PathVerdict {
   readonly reason?: string;
 }
 
+const refuse = (reason: string): PathVerdict => ({ allowed: false, reason });
+
+/** Decides whether a proposed path may be patched. Pure; never normalizes. */
 export function pathVerdict(path: string): PathVerdict {
+  if (!CANONICAL_PATH.test(path)) {
+    return refuse('non-canonical path: only [A-Za-z0-9._/-], at most 256 characters');
+  }
+  const segments = path.split('/');
+  if (segments.some((s) => s === '' || s === '.' || s === '..')) {
+    return refuse('non-canonical path: empty, "." or ".." segment');
+  }
+  const lowered = segments.map((s) => s.toLowerCase());
   for (const rule of DENY) {
-    if (rule.pattern.test(path)) {
-      return { allowed: false, reason: `denied: ${rule.reason}` };
-    }
+    if (lowered.some((s) => rule.matches(s))) return refuse(`denied: ${rule.reason}`);
   }
-  if (!ALLOW.test(path)) {
-    return { allowed: false, reason: 'outside packages/<pkg>/src/**' };
-  }
-  return { allowed: true };
+  const inSource = segments.length >= 4 && segments[0] === 'packages' && segments[2] === 'src';
+  return inSource ? { allowed: true } : refuse('outside packages/<pkg>/src/**');
 }
 
 export interface EditRejection {

@@ -7,6 +7,7 @@
 
 import { registered, test, type Registrar } from './harness.js';
 import { register as diffParserTests } from './diff-parser.test.js';
+import { register as editPolicyTests } from './edit-policy.test.js';
 import { register as githubTests } from './github.test.js';
 import { register as llmTests } from './llm.test.js';
 import { register as logMinimizerTests } from './log-minimizer.test.js';
@@ -18,6 +19,7 @@ const modules: readonly ((t: Registrar) => void)[] = [
   logMinimizerTests,
   schemasTests,
   securityGuardTests,
+  editPolicyTests,
   llmTests,
   githubTests,
 ];

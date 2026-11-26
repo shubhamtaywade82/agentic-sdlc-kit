@@ -1,9 +1,9 @@
 // packages/core/src/verification/process-runner.ts
 //
-// Safe process executor using shell: false, argument array, and bounded timeouts.
-// Invariant (SECURITY.md §1): Commands must NEVER be passed through a shell interpreter.
+// Safe process executor using shell: false, argument array, bounded timeouts,
+// and one process group per command. Invariant (SECURITY.md §1): Commands must
+// NEVER be passed through a shell interpreter.
 
-import { spawn } from 'node:child_process';
 import {
   Errors,
   rollupReportStatus,
@@ -17,6 +17,7 @@ import {
   classifyFailure,
   type FailureClassification,
 } from './classification.js';
+import { runToSettlement, type RunOutcome } from './process-run.js';
 import type { VerificationRunOptions, VerificationRunner } from './runner.js';
 
 export interface ProcessRunOptions extends VerificationRunOptions {
@@ -86,91 +87,72 @@ function toProcessResult(outcome: CommandOutcome): ProcessResult {
 
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
+// Says whether the group was confirmed gone; a claim of a clean tree kill needs proof.
+const TERMINATION_NOTE = {
+  'group-terminated': 'process group terminated',
+  'termination-unconfirmed': 'termination not confirmed',
+} as const;
+
+function spawnFailureOutcome(run: RunOutcome, spawnError: string): CommandOutcome {
+  return {
+    status: 'failed',
+    exitCode: 1,
+    durationMs: run.durationMs,
+    output: spawnError,
+    truncated: false,
+    timedOut: false,
+    spawnError,
+  };
+}
+
+function timeoutOutcome(run: RunOutcome): CommandOutcome {
+  const combined = `${run.stdout}\n${run.stderr}`.trim();
+  const suffix = run.truncated ? '\n[output truncated: exceeded maxOutputBytes]' : '';
+  const note = run.termination === null ? '' : `\n[${TERMINATION_NOTE[run.termination]}]`;
+  return {
+    status: 'failed',
+    exitCode: 124,
+    durationMs: run.durationMs,
+    output: `Timed out: ${combined}${suffix}${note}`,
+    truncated: run.truncated,
+    timedOut: true,
+  };
+}
+
+function toCommandOutcome(run: RunOutcome): CommandOutcome {
+  if (run.spawnError !== undefined) return spawnFailureOutcome(run, run.spawnError);
+  if (run.timedOut) return timeoutOutcome(run);
+  const combined = `${run.stdout}\n${run.stderr}`.trim();
+  const suffix = run.truncated ? '\n[output truncated: exceeded maxOutputBytes]' : '';
+  return {
+    status: run.exitCode === 0 ? 'passed' : 'failed',
+    exitCode: run.exitCode,
+    durationMs: run.durationMs,
+    output: `${combined}${suffix}`,
+    truncated: run.truncated,
+    timedOut: false,
+  };
+}
+
 function executeProcess(
   cmd: string[],
   cwd: string,
   timeoutMs: number,
   maxOutputBytes: number,
 ): Promise<CommandOutcome> {
-  return new Promise<CommandOutcome>((resolve) => {
-    const start = Date.now();
-    const [file, ...args] = cmd;
-
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    let truncated = false;
-
-    if (!file) {
-      resolve({
-        status: 'failed',
-        exitCode: 1,
-        durationMs: 0,
-        output: 'Empty command array',
-        truncated: false,
-        timedOut: false,
-        spawnError: 'empty command array',
-      });
-      return;
-    }
-
-    let spawnError: string | undefined;
-    const child = spawn(file, args, { cwd, shell: false });
-    const timer = setTimeout(() => {
-      timedOut = true;
-      child.kill('SIGTERM');
-      setTimeout(() => child.kill('SIGKILL'), 2000).unref();
-    }, timeoutMs);
-
-    child.stdout?.on('data', (d: Buffer) => {
-      if (Buffer.byteLength(stdout, 'utf8') >= maxOutputBytes) {
-        truncated = true;
-        return;
-      }
-      stdout += d.toString('utf8');
+  const [file, ...args] = cmd;
+  if (!file) {
+    return Promise.resolve({
+      status: 'failed',
+      exitCode: 1,
+      durationMs: 0,
+      output: 'Empty command array',
+      truncated: false,
+      timedOut: false,
+      spawnError: 'empty command array',
     });
-    child.stderr?.on('data', (d: Buffer) => {
-      if (Buffer.byteLength(stderr, 'utf8') >= maxOutputBytes) {
-        truncated = true;
-        return;
-      }
-      stderr += d.toString('utf8');
-    });
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      const durationMs = Date.now() - start;
-      const combined = `${stdout}\n${stderr}`.trim();
-      const suffix = truncated ? '\n[output truncated: exceeded maxOutputBytes]' : '';
-      if (timedOut) {
-        resolve({
-          status: 'failed',
-          exitCode: 124,
-          durationMs,
-          output: `Timed out: ${combined}${suffix}`,
-          truncated,
-          timedOut,
-        });
-      } else {
-        const status = code === 0 ? 'passed' : 'failed';
-        resolve({ status, exitCode: code, durationMs, output: `${combined}${suffix}`, truncated, timedOut });
-      }
-    });
-
-    child.on('error', (err) => {
-      clearTimeout(timer);
-      spawnError = err.message;
-      resolve({
-        status: 'failed',
-        exitCode: 1,
-        durationMs: Date.now() - start,
-        output: err.message,
-        truncated: false,
-        timedOut: false,
-        spawnError,
-      });
-    });
-  });
+  }
+  return runToSettlement(file, args, cwd, timeoutMs, maxOutputBytes).then(toCommandOutcome);
 }
 
 export class ProcessVerificationRunner implements VerificationRunner {

@@ -312,7 +312,7 @@ describe('decision trace (item 3)', () => {
     expect(offers).toHaveLength(2);
     expect(offers[0]?.payload).toMatchObject({ requiredAction: 'task.red', taskId: 'TASK-001', phase: 'red' });
     expect(offers[1]?.payload).toMatchObject({ requiredAction: 'task.red', recoveryClassification: 'compilation' });
-    expect(verifyJournal(journal.value).ok).toBe(true);
+    expect((await verifyJournal(project.root, 'FEATURE-001')).ok).toBe(true);
   });
 
   it('does not record the protocol start, since no run exists yet', async () => {

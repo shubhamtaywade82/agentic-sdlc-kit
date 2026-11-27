@@ -42,6 +42,8 @@ export const JournalEventKindSchema = z.enum([
   'phase.failed',
   /** Final verification completed. `payload.status` is 'passed' | 'failed'. */
   'workflow.finalized',
+  /** The kit offered the host an action (`kit next`). Recorded when the offer changes. Trace only: never a verdict. */
+  'next.offered',
 ]);
 export type JournalEventKind = z.infer<typeof JournalEventKindSchema>;
 

@@ -16,6 +16,7 @@
 // audits the persisted chain and fails with `TDD evidence missing`
 // when any task lacks a complete Red -> Green -> Refactor chain.
 
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import {
@@ -181,6 +182,17 @@ async function loadFeatureContext(opts: FeatureWorkflowOptions): Promise<Result<
  * excerpt of the output tail. Same redaction and excerpt bound as
  * profile-level evidence.
  */
+/**
+ * Digest of exactly what a verdict judged: the command, its exit, its
+ * classification and its full output. A verdict names this id, so an audit
+ * can tell whether two verdicts judged the same evidence.
+ */
+function evidenceIdOf(command: readonly string[], result: ProcessResult): string {
+  return createHash('sha256')
+    .update(JSON.stringify([command, result.exitCode, result.classification, result.output]))
+    .digest('hex');
+}
+
 function evidenceFromProcessResult(result: ProcessResult): string {
   const flat = result.output.replace(/\s+/g, ' ').trim().slice(-300);
   const excerpt = flat
@@ -350,6 +362,7 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
     reason: result.reason,
   };
   const evidence = evidenceFromProcessResult(result);
+  const evidenceId = evidenceIdOf(taskDef.verification.command, result);
 
   const session = new TddSession(opts.taskId, { phase: task.phase, records: task.records });
 
@@ -375,6 +388,7 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
         classification: result.classification,
         reason: result.reason,
         evidence,
+        evidenceId,
       },
     });
     return {
@@ -409,6 +423,7 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
       classification: result.classification,
       advancedTo: advanceRes.ok ? session.getCurrentPhase() : null,
       evidence,
+      evidenceId,
     },
   });
 

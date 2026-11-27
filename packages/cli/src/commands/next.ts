@@ -18,7 +18,7 @@
 // guess.
 
 import path from 'node:path';
-import { computeNextAction, listFeatureRunStates } from '@agentic-sdlc-kit/core';
+import { computeNextAction, listFeatureRunStates, recordNextOffer } from '@agentic-sdlc-kit/core';
 import type { NextAction } from '@agentic-sdlc-kit/contracts';
 import type { Command, CommandContext, CommandResult } from './types.js';
 
@@ -69,6 +69,8 @@ export const nextCommand: Command = {
     const res = await computeNextAction({ projectRoot: root, featureId });
     if (!res.ok) return fail(ctx, res.error.message);
     const action = res.value;
+    // Trace only: a failed record must not block the protocol answer.
+    await recordNextOffer(root, action);
 
     if (isJson) {
       ctx.stdout(JSON.stringify(action, null, 2) + '\n');

@@ -87,6 +87,21 @@ function toProcessResult(outcome: CommandOutcome): ProcessResult {
 
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
+/** Per-command timeout when nothing overrides it. */
+export const DEFAULT_COMMAND_TIMEOUT_MS = 180_000;
+
+/**
+ * The timeout the runner enforces. The protocol advertises the same value
+ * (NextAction.constraints), so both read this one function. A malformed
+ * KIT_TIMEOUT_MS falls back to the default, never to NaN.
+ */
+export function resolveCommandTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.KIT_TIMEOUT_MS;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_COMMAND_TIMEOUT_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_COMMAND_TIMEOUT_MS;
+}
+
 // Says whether the group was confirmed gone; a claim of a clean tree kill needs proof.
 const TERMINATION_NOTE = {
   'group-terminated': 'process group terminated',
@@ -178,7 +193,7 @@ export class ProcessVerificationRunner implements VerificationRunner {
       };
     }
     const cwd = opts.cwd ?? process.cwd();
-    const timeoutMs = opts.timeoutMs ?? (process.env.KIT_TIMEOUT_MS ? Number(process.env.KIT_TIMEOUT_MS) : 180_000);
+    const timeoutMs = opts.timeoutMs ?? resolveCommandTimeoutMs();
     const maxOutputBytes = opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const outcome = await executeProcess([...cmd], cwd, timeoutMs, maxOutputBytes);
     return { ok: true, value: toProcessResult(outcome) };
@@ -189,7 +204,7 @@ export class ProcessVerificationRunner implements VerificationRunner {
     opts: ProcessRunOptions = {},
   ): Promise<Result<VerificationReport>> {
     const cwd = opts.cwd ?? process.cwd();
-    const timeoutMs = opts.timeoutMs ?? (process.env.KIT_TIMEOUT_MS ? Number(process.env.KIT_TIMEOUT_MS) : 180_000);
+    const timeoutMs = opts.timeoutMs ?? resolveCommandTimeoutMs();
     const maxOutputBytes = opts.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
     const checks: Check[] = [];
 

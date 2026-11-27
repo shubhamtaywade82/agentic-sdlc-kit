@@ -22,6 +22,7 @@ import { evolveCommand } from '../commands/evolve.js';
 import { refactorCommand } from '../commands/refactor.js';
 import { optimizeCommand } from '../commands/optimize.js';
 import { nextCommand } from '../commands/next.js';
+import { mcpCommand } from '../commands/mcp.js';
 import { journalCommand } from '../commands/journal.js';
 import { skillsCommand } from '../commands/skills.js';
 import { attachCommand } from '../commands/attach.js';
@@ -63,6 +64,7 @@ export function createDispatcher(opts: DispatcherOptions = {}): {
   if (!registry.get('optimize')) registry.register(optimizeCommand);
   if (!registry.get('next')) registry.register(nextCommand);
   if (!registry.get('journal')) registry.register(journalCommand);
+  if (!registry.get('mcp')) registry.register(mcpCommand);
   if (!registry.get('skills')) registry.register(skillsCommand);
   if (!registry.get('attach')) registry.register(attachCommand);
   if (!registry.get('host')) registry.register(hostCommand);

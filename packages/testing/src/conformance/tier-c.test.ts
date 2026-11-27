@@ -170,10 +170,15 @@ describe('runTierCConformanceTrace', () => {
     expect(TIER_C_GOLDEN_TRACE[TIER_C_GOLDEN_TRACE.length - 1]).toBe('journal --verify -> valid');
     expect(expectedJournalKinds(['TASK-001'])).toEqual([
       'workflow.started',
+      'next.offered',
       'phase.recorded',
+      'next.offered',
       'phase.recorded',
+      'next.offered',
       'phase.recorded',
+      'next.offered',
       'workflow.finalized',
+      'next.offered',
     ]);
   });
 });

@@ -11,6 +11,7 @@
 export * from './common/index.js';
 export * from './project/index.js';
 export * from './workflow/index.js';
+export * from './agent-tools/index.js';
 export * from './specification/index.js';
 export * from './planning/index.js';
 export * from './verification/index.js';

@@ -9,3 +9,4 @@ export * from './app-workflow.js';
 export * as ApplicationWorkflow from './application/index.js';
 export * as BugFixWorkflow from './bug-fix/index.js';
 export * as RefactorWorkflow from './refactor/index.js';
+export * from './decision-trace.js';

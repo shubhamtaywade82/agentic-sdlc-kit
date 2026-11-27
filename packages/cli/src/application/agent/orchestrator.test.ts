@@ -339,3 +339,42 @@ describe('cancellation and resumable state', () => {
     if (!again.ok) expect(again.error.message).toContain('already completed');
   });
 });
+
+describe('PR3: the next attempt is told why the gate rejected the last one (item 1)', () => {
+  // A check that fails to compile, not at an assertion: the Red gate rejects it.
+  const COMPILE_ERROR_CHECK = [
+    "console.error(\"src/TASK-001.ts:1:1 - error TS2304: Cannot find name 'missing'.\");",
+    'process.exit(1);',
+    '',
+  ].join('\n');
+
+  it('carries the classified rejection into the next execution', async () => {
+    const fixture = await buildOrchestrationFixture();
+    const instructions: string[] = [];
+    const provider = new MockAgentProvider({
+      performWork: async (request) => {
+        instructions.push(request.instructions);
+        if (instructions.length === 1) {
+          await fs.writeFile(path.join(request.workspace.rootPath, 'check.js'), COMPILE_ERROR_CHECK);
+        }
+      },
+    });
+    const gateway = gatewayFor(fixture, provider);
+    const run = () =>
+      runFeatureOrchestration({
+        projectRoot: fixture.root,
+        featureId: fixture.featureId,
+        gateway,
+        providerId: 'mock',
+      });
+
+    await run();
+    await run();
+
+    expect(instructions).toHaveLength(2);
+    expect(instructions[0]).not.toMatch(/Previous attempt/);
+    expect(instructions[1]).toMatch(
+      /Previous attempt 1 of 3 was rejected by the evidence gate \(classification: compilation\)/,
+    );
+  }, 60_000);
+});

@@ -3,7 +3,7 @@
 // TDD State Machine enforcing the Red-Green-Refactor discipline.
 // Red phase requires observed failure before implementation proceeds.
 
-import { Errors, type Result } from '@agentic-sdlc-kit/contracts';
+import { Errors, type Result, type StrengthEvidence } from '@agentic-sdlc-kit/contracts';
 import type { FailureClassification } from '../verification/classification.js';
 
 export type TddPhase = 'red' | 'green' | 'refactor' | 'completed';
@@ -19,6 +19,14 @@ export interface TddStepRecord {
    * treated as unclassified and rejected by the Red evidence gate.
    */
   readonly verification?: TddStepVerification;
+  /**
+   * Test-strength (mutation) evidence for a completed task
+   * (ADR-0022). Absent unless the project opts in via
+   * `verification.strength.enabled`. Strength never affects the
+   * Red -> Green -> Refactor phase machine; it is recorded on top of
+   * a completed chain and audited separately.
+   */
+  readonly strength?: StrengthEvidence;
 }
 
 /** How a phase step was actually verified: the task's own command, its
@@ -83,6 +91,47 @@ export class TddSession {
       ...(outcome.evidence !== undefined ? { evidence: outcome.evidence } : {}),
       ...(outcome.verification !== undefined ? { verification: outcome.verification } : {}),
     });
+  }
+
+  /**
+   * Record test-strength (mutation) evidence for a COMPLETED task
+   * (ADR-0022). Strength is a post-refactor measurement: it presupposes
+   * a complete Red -> Green -> Refactor chain, so recording it on an
+   * incomplete task is rejected — the evidence would claim to measure
+   * a suite that has not finished forming. Repeated calls append new
+   * measurements (the latest one is the audited score; the history is
+   * kept, like phase attempts).
+   */
+  recordStrength(evidence: StrengthEvidence): Result<true> {
+    if (this.phase !== 'completed') {
+      return {
+        ok: false,
+        error: Errors.verificationFailed(
+          'TDD strength evidence requires a completed Red -> Green -> Refactor chain ' +
+            `first (task is in phase '${this.phase}')`,
+        ),
+      };
+    }
+    this.records.push({
+      phase: 'completed',
+      status: 'passed',
+      timestamp: new Date().toISOString(),
+      strength: evidence,
+    });
+    return { ok: true, value: true };
+  }
+
+  /**
+   * Latest strength evidence recorded for the task, if any. The audit
+   * gate reads this (the last measurement is the current score; earlier
+   * ones are history).
+   */
+  latestStrength(): StrengthEvidence | undefined {
+    for (let i = this.records.length - 1; i >= 0; i--) {
+      const s = this.records[i]?.strength;
+      if (s !== undefined) return s;
+    }
+    return undefined;
   }
 
   advance(outcome: {

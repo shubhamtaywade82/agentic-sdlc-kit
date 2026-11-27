@@ -74,6 +74,29 @@ export const NextActionConstraintsSchema = z.object({
 });
 export type NextActionConstraints = z.infer<typeof NextActionConstraintsSchema>;
 
+/**
+ * Feedback for an attempt the evidence gate rejected. Its text is fixed
+ * guidance chosen by the kit, never stored or captured output, so it is
+ * safe to place in an agent's instructions.
+ */
+export const RecoveryHintSchema = z.object({
+  classification: z.enum([
+    'assertion',
+    'compilation',
+    'dependency',
+    'discovery',
+    'environment',
+    'timeout',
+    'unclassified',
+  ]),
+  action: z.literal('feedback'),
+  reason: z.string().min(1),
+  /** The failed attempt this hint reports, counted within the current phase (1-based). */
+  attempt: z.number().int().positive(),
+  maxAttempts: z.number().int().positive(),
+});
+export type RecoveryHint = z.infer<typeof RecoveryHintSchema>;
+
 export const NextActionSchema = z.object({
   schemaVersion: z.literal(NEXT_ACTION_SCHEMA_VERSION),
   /** The feature run this action belongs to (one run per feature id). */
@@ -96,6 +119,8 @@ export const NextActionSchema = z.object({
   blockingQuestions: z.array(z.string()),
   /** Advisory lessons (ADVISORY ONLY — never authority; ADR-0021 §4). */
   advisoryLessons: z.array(LessonRefSchema),
+  /** Present only when the last attempt was rejected and feedback is still offered. */
+  recoveryHint: RecoveryHintSchema.optional(),
   constraints: NextActionConstraintsSchema,
 });
 export type NextAction = z.infer<typeof NextActionSchema>;

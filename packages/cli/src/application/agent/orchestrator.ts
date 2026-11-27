@@ -41,11 +41,14 @@ import {
   type AgentExecutionRequest,
   type AgentPolicySnapshot,
   type ExecutionWorkspace,
+  type RecoveryHint,
   type Result,
   type VerificationReport,
 } from '@agentic-sdlc-kit/contracts';
 import {
+  assessRecovery,
   finalizeFeatureRun,
+  formatRecoveryInstruction,
   getFeatureRunState,
   kitStateRoot,
   loadPlan,
@@ -243,6 +246,7 @@ function buildInstructions(
   task: NonNullable<ReturnType<WorktreeContext['taskDefs']['get']>>,
   ctx: WorktreeContext,
   workspace: ExecutionWorkspace,
+  recovery: RecoveryHint | null,
 ): string {
   const command = task.verificationCommand.join(' ');
   const header =
@@ -257,6 +261,7 @@ function buildInstructions(
       : `The verification command MUST PASS.`;
   return [
     header,
+    ...(recovery !== null ? [formatRecoveryInstruction(recovery)] : []),
     `Task: ${task.description}`,
     `Acceptance criteria:\n${task.acceptanceCriteria.map((c) => `- ${c}`).join('\n')}`,
     task.likelyFiles.length > 0 ? `Likely files: ${task.likelyFiles.join(', ')}` : '',
@@ -464,6 +469,7 @@ export async function runFeatureOrchestration(
         taskDef,
         ctx,
         state.workspace,
+        assessRecovery(task).hint,
       ),
       context: {
         specificationRef: ctx.specPath,

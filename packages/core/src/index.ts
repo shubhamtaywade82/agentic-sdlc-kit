@@ -22,6 +22,7 @@ export * from './tdd/index.js';
 export * from './stacks/index.js';
 export * from './learning/index.js';
 export * from './verification/index.js';
+export * from './recovery/index.js';
 export * from './scaffolding/index.js';
 export * from './secret-guard/index.js';
 export * from './elicitation/index.js';

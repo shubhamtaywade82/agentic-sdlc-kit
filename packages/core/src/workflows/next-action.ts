@@ -20,6 +20,9 @@
 //   - First incomplete
 //     task in execution
 //     order               -> task.<phase> for the task's current phase.
+//   - Last attempt rejected -> recoveryHint (feedback) while the policy
+//                            allows it and attempts remain; otherwise a
+//                            blockingQuestion explains why not (item 1).
 //   - All tasks completed -> feature.verify; or run.completed when the
 //                            journal records a passed final verification.
 //                            A missing/unreadable journal falls back to
@@ -40,6 +43,8 @@ import {
   NEXT_ACTION_SCHEMA_VERSION,
 } from '@agentic-sdlc-kit/contracts';
 import { loadPlan } from '../planning/parser.js';
+import { assessRecovery } from '../recovery/policy.js';
+import { resolveCommandTimeoutMs } from '../verification/process-runner.js';
 import { readJournal } from './journal.js';
 import {
   featureRunPath,
@@ -48,8 +53,7 @@ import {
   type FeatureRunState,
 } from './tdd-run-store.js';
 
-/** Phase verification defaults (runTddPhase) and output bounds (ProcessVerificationRunner). */
-const DEFAULT_TIMEOUT_MS = 60_000;
+/** Output bound advertised to hosts; matches ProcessVerificationRunner's default. */
 const DEFAULT_MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
 export interface NextActionOptions {
@@ -105,7 +109,7 @@ export async function computeNextAction(opts: NextActionOptions): Promise<Result
         blockingQuestions: [],
         advisoryLessons: [],
         constraints: {
-          timeoutMs: DEFAULT_TIMEOUT_MS,
+          timeoutMs: resolveCommandTimeoutMs(),
           maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES,
         },
       },
@@ -143,7 +147,7 @@ export async function computeNextAction(opts: NextActionOptions): Promise<Result
           blockingQuestions: [],
           advisoryLessons: [],
           constraints: {
-            timeoutMs: DEFAULT_TIMEOUT_MS,
+            timeoutMs: resolveCommandTimeoutMs(),
             maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES,
           },
         },
@@ -161,7 +165,7 @@ export async function computeNextAction(opts: NextActionOptions): Promise<Result
         blockingQuestions: [],
         advisoryLessons: [],
         constraints: {
-          timeoutMs: DEFAULT_TIMEOUT_MS,
+          timeoutMs: resolveCommandTimeoutMs(),
           maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES,
         },
       },
@@ -195,6 +199,7 @@ export async function computeNextAction(opts: NextActionOptions): Promise<Result
       ),
     };
   }
+  const recovery = assessRecovery(taskState);
   const command =
     taskDef.verification && taskDef.verification.command.length > 0
       ? [...taskDef.verification.command]
@@ -212,10 +217,11 @@ export async function computeNextAction(opts: NextActionOptions): Promise<Result
         phase === 'red' ? 'task.red' : phase === 'green' ? 'task.green' : 'task.refactor',
       verificationCommand: command,
       nextInvocation: `kit feature ${opts.featureId} ${phase} ${nextTaskId}`,
-      blockingQuestions: [],
+      blockingQuestions: recovery.stopReason === null ? [] : [recovery.stopReason],
       advisoryLessons: [],
+      ...(recovery.hint !== null ? { recoveryHint: recovery.hint } : {}),
       constraints: {
-        timeoutMs: DEFAULT_TIMEOUT_MS,
+        timeoutMs: resolveCommandTimeoutMs(),
         maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES,
       },
     },

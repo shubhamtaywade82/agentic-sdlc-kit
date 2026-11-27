@@ -59,7 +59,7 @@ claude plugin install secret-guard@agentic-sdlc-kit
 
 ## Core Workflows
 
-The kit provides 23 commands covering the complete SDLC:
+The kit provides 24 commands covering the complete SDLC:
 
 ### 1. Repository Discovery & Initialization
 
@@ -217,6 +217,24 @@ kit host install all
 kit host install cursor --dir .
 ```
 
+### Agent tools over MCP (`kit mcp`)
+
+Instead of shelling out, a host can call three typed tools served over the Model Context Protocol on stdio:
+
+- `kit_next`: the next protocol action for a feature run, with feedback on a rejected attempt when one applies.
+- `kit_phase`: run one TDD phase (`red`, `green`, `refactor`) for a task. The kit runs the plan's own verification command. A call carrying a command is refused.
+- `kit_status`: each task's phase and attempt count.
+
+Register the server with an MCP-capable host, for example in a project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "agentic-sdlc-kit": { "command": "kit", "args": ["mcp"] }
+  }
+}
+```
+
 Supported host surfaces include:
 - **Claude Code**: Slash commands (`/kit-feature`, `/kit-fix`, `/kit-resume`) and standing skill in `~/.claude/`
 - **Cursor / Cursor CLI**: Always-on SDLC rules in `.cursor/rules/sdlc.mdc`
@@ -325,7 +343,7 @@ agentic-sdlc-kit/
 ├── packages/
 │   ├── contracts/            # Shared Zod schemas and TypeScript domain contracts (imports nothing)
 │   ├── core/                 # Runtime-independent workflow engine, DAG planner, TDD machine, CLSE
-│   ├── cli/                  # `kit` command-line interface (23 commands)
+│   ├── cli/                  # `kit` command-line interface (24 commands)
 │   ├── claude-code-adapter/  # Host runtime adapter and approval gate boundary
 │   ├── mod-sdk/              # Mod development framework (MockRuntime, capabilities, middleware)
 │   ├── testing/              # Test fixtures, assertion helpers, and contract validators

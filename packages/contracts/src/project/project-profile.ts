@@ -8,11 +8,12 @@
 // See docs/contracts/CONTRACTS.md §2 and ADR-0008.
 
 import { z } from 'zod';
+import { StrengthSettingsSchema } from '../verification/strength.js';
 
 /**
  * Schema version for the ProjectProfile contract. Bumped on breaking
-// changes; requires an ADR and a migration function in
-// core/artifacts/migrations/.
+ * changes; requires an ADR and a migration function in
+ * core/artifacts/migrations/.
  */
 export const PROJECT_PROFILE_SCHEMA_VERSION = 1 as const;
 
@@ -33,6 +34,18 @@ export const CommandsMapSchema = z
   })
   .strict();
 
+/**
+ * Verification settings overlay (ADR-0022). Optional, absent by
+ * default: a profile without a `verification` section keeps the exact
+ * pre-ADR-0022 behavior — strength evidence is opt-in.
+ */
+export const VerificationSettingsSectionSchema = z
+  .object({
+    strength: StrengthSettingsSchema.optional(),
+  })
+  .strict();
+export type VerificationSettingsSection = z.infer<typeof VerificationSettingsSectionSchema>;
+
 export const ProjectProfileSchema = z
   .object({
     schemaVersion: z.literal(PROJECT_PROFILE_SCHEMA_VERSION),
@@ -47,6 +60,7 @@ export const ProjectProfileSchema = z
       )
       .min(1, 'stack must contain at least one entry'),
     commands: CommandsMapSchema,
+    verification: VerificationSettingsSectionSchema.optional(),
   })
   .strict();
 

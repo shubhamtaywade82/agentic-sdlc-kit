@@ -252,16 +252,28 @@ export async function runTierCConformanceTrace(
 }
 
 /**
- * The golden journal for a clean run: one started, one recorded event
- * per phase per task, one finalized. Rejected/failed attempts are legal
- * in real runs (they are auditable evidence); the golden trace is the
- * happy path a conforming host must reproduce exactly.
+ * The golden journal for a clean run: one started, one finalized, and per
+ * task one recorded verdict per phase. Each protocol offer is recorded when
+ * it changes (`next.offered`), so every state the host is offered appears
+ * once, right before the verdict that answers it. The offers are part of the
+ * golden record: a conforming host's `kit next` calls produce them.
+ * Rejected/failed attempts are legal in real runs (they are auditable
+ * evidence); the golden trace is the happy path a host must reproduce exactly.
  */
 export function expectedJournalKinds(taskIds: readonly string[]): string[] {
   const kinds: string[] = ['workflow.started'];
   for (const _taskId of taskIds) {
-    kinds.push('phase.recorded', 'phase.recorded', 'phase.recorded');
+    // red, green and refactor are each offered, then answered by a verdict.
+    kinds.push(
+      'next.offered',
+      'phase.recorded',
+      'next.offered',
+      'phase.recorded',
+      'next.offered',
+      'phase.recorded',
+    );
   }
-  kinds.push('workflow.finalized');
+  // feature.verify is offered, the final verdict is recorded, then run.completed is offered.
+  kinds.push('next.offered', 'workflow.finalized', 'next.offered');
   return kinds;
 }

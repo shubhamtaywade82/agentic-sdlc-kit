@@ -21,7 +21,9 @@ interface TestProject {
 
 /** Same fixture shape as feature-workflow.test.ts: a task verification
  * script that fails with a REAL assertion error until a marker exists. */
-async function setupProject(): Promise<TestProject> {
+async function setupProject(
+  failureOutput = 'AssertionError: expected marker to exist (target not implemented)',
+): Promise<TestProject> {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-next-action-'));
   const marker = path.join(tmp, '.done');
 
@@ -35,7 +37,7 @@ async function setupProject(): Promise<TestProject> {
       'const fs = require("node:fs");',
       `const marker = ${JSON.stringify(marker)};`,
       'if (!fs.existsSync(marker)) {',
-      '  console.error("AssertionError: expected marker to exist (target not implemented)");',
+      '  console.error(' + JSON.stringify(failureOutput) + ');',
       '  process.exit(1);',
       '}',
       'process.exit(0);',
@@ -210,5 +212,77 @@ describe('listFeatureRunStates', () => {
     await fs.writeFile(path.join(corruptDir, 'FEATURE-002.json'), '{not json', 'utf8');
     const withCorrupt = await listFeatureRunStates(project.root);
     expect(withCorrupt.map((r) => r.featureId)).toEqual(['FEATURE-001']);
+  });
+});
+
+describe('computeNextAction: recovery hint and advertised timeout (item 1)', () => {
+  const COMPILE_ERROR = "src/feature.ts:12:5 - error TS2304: Cannot find name 'missing'.";
+  const red = { featureId: 'FEATURE-001', taskId: 'TASK-001', phase: 'red' as const };
+
+  it('has no hint before any attempt has been rejected', async () => {
+    const project = await setupProject();
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+    const res = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.recoveryHint).toBeUndefined();
+  });
+
+  it('feeds a rejected red compilation back as a recovery hint', async () => {
+    const project = await setupProject(COMPILE_ERROR);
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+    const rejected = await runTddPhase({ ...red, projectRoot: project.root });
+    expect(rejected.ok).toBe(false);
+    const res = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.requiredAction).toBe('task.red');
+    expect(res.value.recoveryHint).toMatchObject({
+      classification: 'compilation',
+      action: 'feedback',
+      attempt: 1,
+      maxAttempts: 3,
+    });
+  });
+
+  it('withdraws the hint and asks a human after the attempt limit', async () => {
+    const project = await setupProject(COMPILE_ERROR);
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+    for (let i = 0; i < 3; i++) {
+      await runTddPhase({ ...red, projectRoot: project.root });
+    }
+    const res = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.recoveryHint).toBeUndefined();
+    expect(res.value.blockingQuestions.join(' ')).toMatch(/exhausted/);
+  });
+
+  it('advertises the default timeout the runner enforces', async () => {
+    const saved = process.env.KIT_TIMEOUT_MS;
+    delete process.env.KIT_TIMEOUT_MS;
+    try {
+      const project = await setupProject();
+      const res = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value.constraints.timeoutMs).toBe(180_000);
+    } finally {
+      if (saved === undefined) delete process.env.KIT_TIMEOUT_MS;
+      else process.env.KIT_TIMEOUT_MS = saved;
+    }
+  });
+
+  it('advertises a KIT_TIMEOUT_MS override, since that is what the runner enforces', async () => {
+    const saved = process.env.KIT_TIMEOUT_MS;
+    process.env.KIT_TIMEOUT_MS = '5000';
+    try {
+      const project = await setupProject();
+      const res = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value.constraints.timeoutMs).toBe(5000);
+    } finally {
+      if (saved === undefined) delete process.env.KIT_TIMEOUT_MS;
+      else process.env.KIT_TIMEOUT_MS = saved;
+    }
   });
 });

@@ -7,6 +7,7 @@ import {
   NEXT_ACTION_SCHEMA_VERSION,
   NextActionSchema,
   NextRequiredActionSchema,
+  RecoveryHintSchema,
 } from './next-action.js';
 import { WorkflowStatusSchema } from './workflow.js';
 
@@ -97,5 +98,29 @@ describe('NextActionSchema', () => {
   it('rejects an unknown workflow status', () => {
     expect(WorkflowStatusSchema.safeParse('exploding').success).toBe(false);
     expect(NextActionSchema.safeParse({ ...base, status: 'exploding' }).success).toBe(false);
+  });
+});
+
+describe('RecoveryHintSchema', () => {
+  const hint = {
+    classification: 'compilation',
+    action: 'feedback',
+    reason: 'Fix the compile error; do not change the assertion.',
+    attempt: 1,
+    maxAttempts: 3,
+  };
+
+  it('accepts a feedback hint for a known classification', () => {
+    expect(RecoveryHintSchema.safeParse(hint).success).toBe(true);
+  });
+
+  it('rejects an unknown classification, a non-feedback action and a zero attempt', () => {
+    expect(RecoveryHintSchema.safeParse({ ...hint, classification: 'bogus' }).success).toBe(false);
+    expect(RecoveryHintSchema.safeParse({ ...hint, action: 'stop' }).success).toBe(false);
+    expect(RecoveryHintSchema.safeParse({ ...hint, attempt: 0 }).success).toBe(false);
+  });
+
+  it('is an optional field on the NextAction payload', () => {
+    expect('recoveryHint' in NextActionSchema.shape).toBe(true);
   });
 });

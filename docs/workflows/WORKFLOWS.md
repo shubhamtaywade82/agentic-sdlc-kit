@@ -87,6 +87,35 @@ counter fallback is allowed but documented in the run record.
 Each step persists an artifact under `docs/` or `.ai-kit/`. Each step that
 performs a destructive action goes through `core.policy.evaluator` (M10).
 
+### 4.1 Test-strength stage (`kit feature ... strength`, ADR-0022)
+
+After a task completes its Red -> Green -> Refactor chain, an optional
+strength stage measures whether the suite would actually catch a
+regression (mutation testing), budgeted and capped:
+
+```yaml
+# .ai-kit/project.yml
+verification:
+  strength:
+    enabled: true # opt-in; default false in v1
+    threshold: 60 # mutation score percentage
+    budgetMs: 300000 # hard cap; a timeout is recorded 'incomplete'
+    scope: diff # mutate the task's likelyFiles (per-task speed)
+    gateMode: warn # warn | enforce
+```
+
+- `kit feature <id> strength <task-id>` runs the stack's mutation tool
+  (StrykerJS for `node-typescript`; mutmut, mutant, go-mutesting,
+  cargo-mutants, Stryker.NET adapters for other stacks), records a
+  `StrengthEvidence` entry on the task and a `strength.recorded`
+  journal event, and reports the score.
+- `kit verify --strength` runs the same measurement standalone.
+- `gateMode: enforce` makes `verify` refuse completion below threshold
+  (or on missing/`incomplete` evidence). `warn` never blocks.
+- Honest limits: the mutation score is a proxy, not proof; diff scope
+  can miss cross-file escapes; an unparsable report is `incomplete`,
+  never a guessed score (ADR-0022).
+
 ## 5. App workflow (`/kit:app`, M8)
 
 Vertical-slice-driven, never single-pass:

@@ -79,6 +79,24 @@ export interface ProjectProfile {
 Every command MUST be an array of arguments. The executor (M6) MUST run
 these with `shell: false`. A string command is a contract violation.
 
+An optional `verification` section (ADR-0022) configures the test-strength
+stage:
+
+```ts
+export interface ProjectProfile {
+  // ...as above...
+  verification?: {
+    strength?: {
+      enabled: boolean; // default false — opt-in
+      threshold: number; // 0-100 mutation score percentage
+      budgetMs: number; // hard cap on the mutation run
+      scope: 'diff' | 'suite';
+      gateMode: 'warn' | 'enforce';
+    };
+  };
+}
+```
+
 The zod schema `ProjectProfileSchema` is exported alongside the type and is
 the single source of truth for validation.
 
@@ -133,12 +151,12 @@ allowed way to mutate `WorkflowState.status`.
 ```ts
 // packages/contracts/src/workflow/next-action.ts
 export type NextRequiredAction =
-  | 'feature.start'    // no run state for this feature
-  | 'task.red'         // write the failing test, then run red
-  | 'task.green'       // implement, then run green
-  | 'task.refactor'    // refactor (behavior preserved), then run refactor
-  | 'feature.verify'   // all tasks completed — audit + final verification
-  | 'run.completed';   // passed final verification; nothing further required
+  | 'feature.start' // no run state for this feature
+  | 'task.red' // write the failing test, then run red
+  | 'task.green' // implement, then run green
+  | 'task.refactor' // refactor (behavior preserved), then run refactor
+  | 'feature.verify' // all tasks completed — audit + final verification
+  | 'run.completed'; // passed final verification; nothing further required
 
 export interface LessonRef {
   lessonId: string;
@@ -150,13 +168,13 @@ export interface NextAction {
   schemaVersion: 1;
   featureId: string;
   status: WorkflowStatus;
-  taskId?: string;              // present iff task-scoped
+  taskId?: string; // present iff task-scoped
   phase?: 'red' | 'green' | 'refactor';
   requiredAction: NextRequiredAction;
   verificationCommand: string[]; // the task's own command from the plan (ADR-0018 P1)
-  nextInvocation: string;        // the literal CLI invocation
-  blockingQuestions: string[];   // honest: empty = not waiting on a human
-  advisoryLessons: LessonRef[];  // advisory only — never satisfies an invariant
+  nextInvocation: string; // the literal CLI invocation
+  blockingQuestions: string[]; // honest: empty = not waiting on a human
+  advisoryLessons: LessonRef[]; // advisory only — never satisfies an invariant
   constraints: { timeoutMs: number; maxOutputBytes: number };
 }
 ```
@@ -171,27 +189,27 @@ closed: corrupt state and diverged plans are errors, never guesses;
 // packages/contracts/src/observer/journal.ts
 export type JournalEventKind =
   | 'workflow.started'
-  | 'phase.recorded'   // attempt satisfied its invariant and advanced
-  | 'phase.rejected'   // recorded but did NOT advance (non-assertion Red)
-  | 'phase.failed'     // attempt ran and violated its invariant
+  | 'phase.recorded' // attempt satisfied its invariant and advanced
+  | 'phase.rejected' // recorded but did NOT advance (non-assertion Red)
+  | 'phase.failed' // attempt ran and violated its invariant
   | 'workflow.finalized';
 
 export interface JournalActor {
   kind: 'agent' | 'human' | 'kit'; // declared via --host / KIT_HOST, never inferred
-  host?: string;                   // 'claude-code' | 'cursor' | 'agy' | 'ci' | ...
+  host?: string; // 'claude-code' | 'cursor' | 'agy' | 'ci' | ...
 }
 
 export interface JournalEvent {
   schemaVersion: 1;
-  seq: number;          // 0-based, strictly increasing, no gaps
+  seq: number; // 0-based, strictly increasing, no gaps
   ts: string;
-  featureId: string;    // run id == feature id (one run per feature)
+  featureId: string; // run id == feature id (one run per feature)
   taskId?: string;
   kind: JournalEventKind;
   actor: JournalActor;
   payload: Record<string, unknown>; // redacted, bounded detail
-  prevHash: string;     // previous event's hash; 'GENESIS' for seq 0
-  hash: string;         // SHA-256 over the canonical serialization without `hash`
+  prevHash: string; // previous event's hash; 'GENESIS' for seq 0
+  hash: string; // SHA-256 over the canonical serialization without `hash`
 }
 ```
 
@@ -305,6 +323,50 @@ export interface VerificationReport {
 
 These invariants are enforced by `core.verification.runner` and tested in
 `packages/testing/src/validators/verification.ts`.
+
+### 6.3 StrengthEvidence (M38, ADR-0022)
+
+```ts
+// packages/contracts/src/verification/strength.ts
+export type MutationTool =
+  'stryker' | 'mutmut' | 'mutant' | 'go-mutesting' | 'gremlins' | 'cargo-mutants' | 'stryker-net';
+
+export interface StrengthEvidence {
+  schemaVersion: 1;
+  taskId?: string;
+  tool: MutationTool;
+  toolVersion?: string;
+  status: 'passed' | 'failed' | 'incomplete';
+  score?: number; // 0-100; present iff status is not 'incomplete'
+  mutantsGenerated: number;
+  mutantsKilled: number;
+  mutantsSurvived: number;
+  threshold: number; // configured mutation-score threshold
+  scope: 'diff' | 'suite';
+  scopeFiles: string[];
+  durationMs: number;
+  budgetMs: number; // hard cap; a timeout is 'incomplete'
+  summary: string; // bounded, redacted
+}
+```
+
+**Critical invariants:**
+
+- `passed` means the tool ran to completion AND the score is at or above
+  the configured threshold.
+- `failed` means the tool ran to completion and the score is below it.
+- `incomplete` means the run did not complete (budget exceeded, tool
+  missing, report unparsable). An `incomplete` run carries NO score — an
+  unknown strength is never a fabricated number, and never counts as
+  passed.
+- `mutantsKilled + mutantsSurvived` MUST NOT exceed `mutantsGenerated`.
+- The mutation score is a proxy for test strength, not proof of it
+  (ADR-0022 honest limits). `gateMode: enforce` refuses completion below
+  threshold or on `incomplete`; `warn` only logs.
+
+The project profile surface is `verification.strength`
+(`enabled`/`threshold`/`budgetMs`/`scope`/`gateMode`), documented in
+ADR-0022 and validated by `ProjectProfileSchema`.
 
 ## 7. Policy (M10)
 

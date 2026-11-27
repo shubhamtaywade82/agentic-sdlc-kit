@@ -170,3 +170,110 @@ describe('parseProfileFromYaml', () => {
     expect(res.ok).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// verification.strength section (ADR-0022): strict parse, round-trip, and
+// hard errors on typos — a misconfigured strength gate is never silent.
+// ---------------------------------------------------------------------------
+
+const strengthProfile: ProjectProfile = {
+  schemaVersion: 1,
+  name: 'strength-app',
+  stack: ['node-typescript'],
+  commands: { test: [['node', '--test']] },
+  verification: {
+    strength: {
+      enabled: true,
+      threshold: 60,
+      budgetMs: 300_000,
+      scope: 'diff',
+      gateMode: 'enforce',
+    },
+  },
+};
+
+describe('verification.strength (ADR-0022)', () => {
+  it('round-trips through serialize → parse', () => {
+    const res = parseProfileFromYaml(serializeProfileToYaml(strengthProfile));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toEqual(strengthProfile);
+  });
+
+  it('parses the documented hand-written form with comments', () => {
+    const res = parseProfileFromYaml(
+      [
+        'schemaVersion: 1',
+        'name: hand-written',
+        'stack:',
+        '  - node-typescript',
+        'commands:',
+        '  test:',
+        "    - ['node', '--test']",
+        'verification:',
+        '  strength:',
+        '    enabled: true   # opt-in',
+        '    threshold: 60',
+        '    budgetMs: 300000',
+        '    scope: diff',
+        '    gateMode: warn',
+      ].join('\n'),
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.verification?.strength).toEqual({
+        enabled: true,
+        threshold: 60,
+        budgetMs: 300_000,
+        scope: 'diff',
+        gateMode: 'warn',
+      });
+    }
+  });
+
+  it('keeps profiles without the section byte-identical in behavior (optional)', () => {
+    const res = parseProfileFromYaml(serializeProfileToYaml(sampleProfile));
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value.verification).toBeUndefined();
+  });
+
+  it('hard-errors on an unknown strength key (fail closed, with line number)', () => {
+    const res = parseProfileFromYaml(
+      [
+        'schemaVersion: 1',
+        'name: typo',
+        'stack: [node-typescript]',
+        'commands: {}',
+        'verification:',
+        '  strength:',
+        '    enabled: true',
+        '    threshold: 60',
+        '    budgetMs: 300000',
+        '    scope: diff',
+        '    gateMode: warn',
+        '    gate_mode: enforce',
+      ].join('\n'),
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.message).toContain('gate_mode');
+  });
+
+  it('hard-errors on an invalid enum value', () => {
+    const res = parseProfileFromYaml(
+      [
+        'schemaVersion: 1',
+        'name: typo',
+        'stack: [node-typescript]',
+        'commands: {}',
+        'verification:',
+        '  strength:',
+        '    enabled: maybe',
+        '    threshold: 60',
+        '    budgetMs: 300000',
+        '    scope: diff',
+        '    gateMode: warn',
+      ].join('\n'),
+    );
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.message).toContain('enabled');
+  });
+});

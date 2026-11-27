@@ -20,6 +20,7 @@ import path from 'node:path';
 import {
   finalizeFeatureRun,
   getFeatureRunState,
+  runStrengthPhase,
   runTddPhase,
   startFeatureRun,
   type FeatureRunReport,
@@ -59,9 +60,11 @@ function blocked(ctx: CommandContext, message: string): CommandResult {
  */
 function resolveActor(argv: ReadonlyArray<string>): JournalActor {
   const fromFlag = parseFlagValue(argv, '--host');
-  const host = fromFlag ?? (process.env['KIT_HOST'] && process.env['KIT_HOST'].length > 0
-    ? process.env['KIT_HOST']
-    : undefined);
+  const host =
+    fromFlag ??
+    (process.env['KIT_HOST'] && process.env['KIT_HOST'].length > 0
+      ? process.env['KIT_HOST']
+      : undefined);
   return host !== undefined ? { kind: 'agent', host } : { kind: 'human' };
 }
 
@@ -104,6 +107,8 @@ export function createFeatureCommand(opts: FeatureCommandOptions = {}): Command 
           return runStart(ctx, root, featureId, isJson, actor);
         case 'status':
           return runStatus(ctx, root, featureId, isJson);
+        case 'strength':
+          return runStrength(ctx, root, featureId, positional[2], isJson, actor);
         case 'verify':
           return runVerify(ctx, root, featureId, isJson, ctx.argv.includes('--dry-run'), actor);
         case 'run':
@@ -117,7 +122,7 @@ export function createFeatureCommand(opts: FeatureCommandOptions = {}): Command 
         default:
           return fail(
             ctx,
-            `unknown action '${action}' (expected start|red|green|refactor|status|verify|run)`,
+            `unknown action '${action}' (expected start|red|green|refactor|status|strength|verify|run)`,
           );
       }
     },
@@ -161,7 +166,11 @@ async function runPhase(
   isJson: boolean,
   actor: JournalActor,
 ): Promise<CommandResult> {
-  if (!taskId) return fail(ctx, `phase '${phase}' requires a task id (see \`kit feature ${featureId} status\`)`);
+  if (!taskId)
+    return fail(
+      ctx,
+      `phase '${phase}' requires a task id (see \`kit feature ${featureId} status\`)`,
+    );
   const res = await runTddPhase({ featureId, projectRoot: root, taskId, phase, actor });
   if (!res.ok) return fail(ctx, res.error.message);
   if (isJson) {
@@ -223,6 +232,56 @@ async function runStatus(
   return { exitCode: 0 };
 }
 
+/**
+ * `kit feature <id> strength <task-id>` (ADR-0022): run the optional
+ * mutation-score measurement for a completed task and record it as
+ * journal + persisted evidence. The gate decision is reported; blocking
+ * happens at verify when gateMode is enforce.
+ */
+async function runStrength(
+  ctx: CommandContext,
+  root: string,
+  featureId: string,
+  taskId: string | undefined,
+  isJson: boolean,
+  actor: JournalActor,
+): Promise<CommandResult> {
+  if (!taskId) {
+    return fail(ctx, `strength requires a task id (see \`kit feature ${featureId} status\`)`);
+  }
+  const res = await runStrengthPhase({
+    featureId,
+    projectRoot: root,
+    taskId,
+    actor,
+  });
+  if (!res.ok) return fail(ctx, res.error.message);
+  if (isJson) {
+    ctx.stdout(
+      JSON.stringify(
+        { taskId, strength: res.value.evidence, gateBlocked: res.value.blocked },
+        null,
+        2,
+      ) + '\n',
+    );
+    return { exitCode: 0 };
+  }
+  const e = res.value.evidence;
+  const score = e.score !== undefined ? `${e.score}%` : 'n/a';
+  ctx.stdout(
+    [
+      `${taskId} strength ${e.status} (score ${score} vs threshold ${e.threshold}%).`,
+      `  tool=${e.tool} scope=${e.scope} mutants=${e.mutantsKilled}/${e.mutantsGenerated} killed`,
+      `  ${e.summary}`,
+      res.value.blocked
+        ? `Strength gate: BLOCKED (enforce) — \`kit feature ${featureId} verify\` will refuse until the suite clears ${e.threshold}%.`
+        : `Strength gate: not blocking (warn mode).`,
+      '',
+    ].join('\n'),
+  );
+  return { exitCode: 0 };
+}
+
 async function runVerify(
   ctx: CommandContext,
   root: string,
@@ -261,8 +320,9 @@ async function runOrchestrated(
   // PR4: the shipped CLI registers claude-code against the resolved root
   // (the provider roots its encrypted resume store there). Explicitly
   // injected providers override the default entirely.
-  const providers: ReadonlyArray<AgentProvider> =
-    opts.agentProviders ?? [new ClaudeCodeProvider({ projectRoot: root })];
+  const providers: ReadonlyArray<AgentProvider> = opts.agentProviders ?? [
+    new ClaudeCodeProvider({ projectRoot: root }),
+  ];
 
   const gateway = new AgentGateway({
     providers,
@@ -302,7 +362,8 @@ async function runOrchestrated(
       ...(isJson ? {} : { onProgress: (line: string) => ctx.stdout(line) }),
     });
     if (!res.ok) {
-      if (res.error.code === 'AGENT_PROVIDER_NOT_CONFIGURED') return blocked(ctx, res.error.message);
+      if (res.error.code === 'AGENT_PROVIDER_NOT_CONFIGURED')
+        return blocked(ctx, res.error.message);
       return fail(ctx, res.error.message);
     }
     const report = res.value;
@@ -381,6 +442,8 @@ function formatHelp(): string {
     '  green <task-id>      run verification: it MUST pass (after implementing)',
     '  refactor <task-id>   run verification: it MUST pass (behavior preserved)',
     '  status               show run state and the next action',
+    '  strength <task-id>   run the optional mutation-score stage for a completed task',
+    '                       (ADR-0022; requires verification.strength.enabled)',
     '  verify               audit the evidence chain and run final verification',
     '  run                  Mode 1: orchestrate all phases through an agent provider',
     '                       in an isolated git worktree (ADR-0019)',

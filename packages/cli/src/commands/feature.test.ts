@@ -3,10 +3,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  scaffoldSpecification,
-  serializeProfileYaml,
-} from '@agentic-sdlc-kit/core';
+import { scaffoldSpecification, serializeProfileYaml } from '@agentic-sdlc-kit/core';
 import { MockAgentProvider } from '@agentic-sdlc-kit/testing';
 import type { AgentProvider } from '@agentic-sdlc-kit/contracts';
 import { buildOrchestrationFixture } from '../application/agent/test-fixture.js';
@@ -319,5 +316,40 @@ describe('featureCommand run (Mode 1, PR3+PR4)', () => {
     } finally {
       await fs.rm(fixture.root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('featureCommand strength (ADR-0022)', () => {
+  it('requires a task id and refuses when the profile has no strength section', async () => {
+    const project = await setupProject();
+    try {
+      // No task id.
+      const noTask = makeCtx(['FEATURE-001', 'strength'], project.root);
+      const r1 = await featureCommand.run(noTask);
+      expect(r1.exitCode).toBe(1);
+      expect(noTask.err[0]).toContain('strength requires a task id');
+
+      // Task id present, but strength not enabled in the profile (opt-in).
+      // Complete the chain properly: red (marker absent -> assertion failure),
+      // then implement (marker), then green, then refactor.
+      await featureCommand.run(makeCtx(['FEATURE-001', 'start'], project.root));
+      await featureCommand.run(makeCtx(['FEATURE-001', 'red', 'TASK-001'], project.root));
+      await fs.writeFile(project.marker, '');
+      await featureCommand.run(makeCtx(['FEATURE-001', 'green', 'TASK-001'], project.root));
+      await featureCommand.run(makeCtx(['FEATURE-001', 'refactor', 'TASK-001'], project.root));
+
+      const ctx = makeCtx(['FEATURE-001', 'strength', 'TASK-001'], project.root);
+      const r2 = await featureCommand.run(ctx);
+      expect(r2.exitCode).toBe(1);
+      expect(ctx.err[0]).toContain('not enabled');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('mentions the strength action in help output', async () => {
+    const ctx = makeCtx(['--help'], '/');
+    await featureCommand.run(ctx);
+    expect(ctx.out[0]).toContain('strength <task-id>');
   });
 });

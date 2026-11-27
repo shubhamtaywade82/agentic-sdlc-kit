@@ -40,6 +40,11 @@ export const JournalEventKindSchema = z.enum([
   'phase.rejected',
   /** A phase attempt ran and violated its invariant (e.g. Green failed). */
   'phase.failed',
+  /**
+   * A test-strength (mutation) run completed for a task (ADR-0022).
+   * `payload.status` is 'passed' | 'failed' | 'incomplete'.
+   */
+  'strength.recorded',
   /** Final verification completed. `payload.status` is 'passed' | 'failed'. */
   'workflow.finalized',
   /** The kit offered the host an action (`kit next`). Recorded when the offer changes. Trace only: never a verdict. */

@@ -115,3 +115,35 @@ describe('verifyCommand', () => {
     }
   });
 });
+
+describe('verifyCommand --strength (ADR-0022)', () => {
+  it('fails closed with an honest error for a stack without a mutation adapter', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'kit-cli-verify-strength-'));
+    try {
+      const aiKitDir = path.join(tmp, '.ai-kit');
+      await fs.mkdir(aiKitDir, { recursive: true });
+      const profile: ProjectProfile = {
+        schemaVersion: 1,
+        name: 'strength-cli-app',
+        stack: ['cobol'], // no adapter — must fail honestly, never silently skip
+        commands: { test: [['node', '-e', 'process.exit(0)']] },
+      };
+      await fs.writeFile(path.join(aiKitDir, 'project.yml'), serializeProfileYaml(profile), 'utf8');
+
+      const ctx = makeCtx(['--strength'], tmp);
+      const r = await verifyCommand.run(ctx);
+      expect(r.exitCode).toBe(1);
+      expect(ctx.err[0]).toContain('not supported');
+      expect(ctx.err[0]).toContain('cobol');
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('mentions --strength in help output', async () => {
+    const ctx = makeCtx(['--help'], '/');
+    await verifyCommand.run(ctx);
+    expect(ctx.out[0]).toContain('--strength');
+    expect(ctx.out[0]).toContain('ADR-0022');
+  });
+});

@@ -1,12 +1,22 @@
 // packages/cli/src/commands/verify.ts
 //
-// `kit verify [path] [--dry-run] [--json]`.
+// `kit verify [path] [--dry-run] [--json] [--strength]`.
 // Deterministic verification runner executing configured test, lint, and typecheck commands.
+// `--strength` additionally runs the optional mutation-score stage (ADR-0022).
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { parseProfileYaml, ProcessVerificationRunner } from '@agentic-sdlc-kit/core';
-import type { VerificationReport } from '@agentic-sdlc-kit/contracts';
+import {
+  parseProfileYaml,
+  ProcessVerificationRunner,
+  runStrengthCheck,
+} from '@agentic-sdlc-kit/core';
+import {
+  DEFAULT_STRENGTH_SETTINGS,
+  evaluateStrengthGate,
+  type StrengthEvidence,
+  type VerificationReport,
+} from '@agentic-sdlc-kit/contracts';
 import type { Command, CommandContext, CommandResult } from './types.js';
 
 export const verifyCommand: Command = {
@@ -20,6 +30,7 @@ export const verifyCommand: Command = {
 
     const isJson = ctx.argv.includes('--json');
     const isDryRun = ctx.argv.includes('--dry-run');
+    const withStrength = ctx.argv.includes('--strength');
     const targetArg = ctx.argv.find((a) => !a.startsWith('-'));
     const targetRoot = path.resolve(ctx.cwd, targetArg ?? '.');
     const profilePath = path.join(targetRoot, '.ai-kit', 'project.yml');
@@ -61,13 +72,44 @@ export const verifyCommand: Command = {
     }
 
     const report = repRes.value;
-    if (isJson) {
-      ctx.stdout(JSON.stringify(report, null, 2) + '\n');
-    } else {
-      ctx.stdout(formatReportSummary(report));
+
+    // Optional strength stage (ADR-0022): `--strength` runs the mutation
+    // tool under the profile's budget. Disabled-by-default stays honest —
+    // the flag also honors an explicit profile `enabled: true` run.
+    let strength: StrengthEvidence | undefined;
+    let strengthBlocked = false;
+    if (withStrength) {
+      const settings = profileRes.value.verification?.strength ?? {
+        ...DEFAULT_STRENGTH_SETTINGS,
+        enabled: true, // explicit flag is the opt-in
+      };
+      const strengthRes = await runStrengthCheck({
+        cwd: targetRoot,
+        stack: profileRes.value.stack[0] ?? '',
+        settings: { ...settings, enabled: true },
+        scopeFiles: [],
+      });
+      if (!strengthRes.ok) {
+        ctx.stderr(`kit verify --strength: ${strengthRes.error.message}\n`);
+        return { exitCode: 1, message: strengthRes.error.message };
+      }
+      strength = strengthRes.value;
+      strengthBlocked = evaluateStrengthGate(strength, settings.gateMode).block;
     }
 
-    return { exitCode: report.status === 'passed' ? 0 : 1 };
+    if (isJson) {
+      const reportJson: Record<string, unknown> = { ...report };
+      if (strength !== undefined) {
+        reportJson['strength'] = strength;
+      }
+      ctx.stdout(JSON.stringify(reportJson, null, 2) + '\n');
+    } else {
+      ctx.stdout(formatReportSummary(report));
+      if (strength !== undefined) ctx.stdout(formatStrengthSummary(strength));
+    }
+
+    const exitCode = report.status === 'passed' && !strengthBlocked ? 0 : 1;
+    return { exitCode };
   },
 };
 
@@ -96,9 +138,21 @@ function formatReportSummary(report: VerificationReport): string {
   return lines.join('\n') + '\n';
 }
 
+function formatStrengthSummary(strength: StrengthEvidence): string {
+  const score = strength.score !== undefined ? `${strength.score}%` : 'n/a';
+  const lines: string[] = [
+    `Strength:          ${strength.status.toUpperCase()} (score ${score} vs threshold ${strength.threshold}%)`,
+    `  tool=${strength.tool} scope=${strength.scope} mutants=${strength.mutantsKilled}/${strength.mutantsGenerated} killed`,
+    `  budget=${strength.budgetMs}ms duration=${strength.durationMs}ms`,
+    `  ${strength.summary}`,
+    '',
+  ];
+  return lines.join('\n') + '\n';
+}
+
 function formatHelp(): string {
   return [
-    'Usage: kit verify [path] [--dry-run] [--json]',
+    'Usage: kit verify [path] [--dry-run] [--json] [--strength]',
     '',
     'Execute deterministic verification checks configured in .ai-kit/project.yml.',
     'Commands run with shell: false and bounded timeouts.',
@@ -106,6 +160,9 @@ function formatHelp(): string {
     'Options:',
     '  --dry-run   Mark checks as skipped without executing processes',
     '  --json      Output full machine-readable VerificationReport',
+    '  --strength  Additionally run the mutation-score stage (ADR-0022);',
+    '              budgeted by verification.strength.budgetMs; exit 1 when',
+    '              gateMode enforce and below threshold',
     '  --help      Show this message',
     '',
   ].join('\n');

@@ -21,17 +21,20 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import {
   Errors,
+  evaluateStrengthGate,
   type FeatureSpecification,
   type ImplementationPlan,
   type JournalActor,
   type ProjectProfile,
   type Result,
+  type StrengthEvidence,
   type VerificationReport,
 } from '@agentic-sdlc-kit/contracts';
 import { FileSystemRepositoryScanner } from '../discovery/repository-scanner.js';
 import { loadSpecification } from '../specification/parser.js';
 import { loadPlan } from '../planning/parser.js';
 import { TddSession, type TddStepRecord, type TddStepVerification } from '../tdd/cycle.js';
+import { runStrengthCheck, type StrengthExecutor } from '../tdd/strength.js';
 import { DEFAULT_REDACTION_POLICY, redactSecrets } from '../secret-guard/redactor.js';
 import { ProcessVerificationRunner, type ProcessResult } from '../verification/process-runner.js';
 import { parseProfileFromYaml } from '../project-profile/serializer.js';
@@ -70,6 +73,32 @@ export interface TddPhaseRequest {
   readonly timeoutMs?: number;
   /** Journal actor (see FeatureWorkflowOptions.actor). */
   readonly actor?: JournalActor;
+}
+
+/**
+ * Test-strength (mutation) phase request (ADR-0022). Runs AFTER a
+ * task completes its Red -> Green -> Refactor chain: the budget and
+ * settings come from the profile's `verification.strength` section;
+ * `scope: diff` restricts mutation to the task's planned likelyFiles.
+ * The executor is injectable for offline tests.
+ */
+export interface StrengthPhaseRequest {
+  readonly featureId: string;
+  readonly projectRoot: string;
+  readonly taskId: string;
+  readonly actor?: JournalActor;
+  /** Overrides the profile settings (CLI `--threshold`/`--budget-ms`); tests. */
+  readonly overrides?: Partial<
+    Pick<StrengthPhaseOverrides, 'threshold' | 'budgetMs' | 'scope' | 'gateMode'>
+  >;
+  readonly executor?: StrengthExecutor;
+}
+
+export interface StrengthPhaseOverrides {
+  readonly threshold: number;
+  readonly budgetMs: number;
+  readonly scope: 'diff' | 'suite';
+  readonly gateMode: 'warn' | 'enforce';
 }
 
 export interface FeatureRunReport {
@@ -211,9 +240,7 @@ function evidenceFromProcessResult(result: ProcessResult): string {
  */
 function hasCompleteChain(records: readonly TddStepRecord[]): boolean {
   const isQualifyingRed = (r: TddStepRecord): boolean =>
-    r.phase === 'red' &&
-    r.status === 'failed' &&
-    r.verification?.classification === 'assertion';
+    r.phase === 'red' && r.status === 'failed' && r.verification?.classification === 'assertion';
   const isQualifyingPass = (r: TddStepRecord): boolean =>
     r.status === 'passed' && r.verification !== undefined && r.verification.classification === null;
 
@@ -241,6 +268,52 @@ function tddEvidenceMissing(featureId: string, taskIds: readonly string[]): Resu
         `Drive the phases: kit feature ${featureId} start, then red/green/refactor per task.`,
     ),
   };
+}
+
+/**
+ * Audit the strength gate for finalize (ADR-0022). Returns the failing
+ * tasks when `gateMode: enforce` and any completed task's latest
+ * strength evidence does not clear the threshold (or is missing /
+ * incomplete — an unknown score must not certify). In `warn` mode this
+ * never blocks; gaps are visible via `kit feature <id> status`.
+ */
+function auditStrengthEvidence(
+  tasks: readonly TaskRunState[],
+  settings: { threshold: number; gateMode: 'warn' | 'enforce' },
+): { blocking: readonly TaskRunState[]; warnings: readonly string[] } {
+  if (settings.gateMode !== 'enforce') {
+    const warnings = tasks
+      .filter((t) => t.phase === 'completed')
+      .map((t) => {
+        const latest = latestStrengthOf(t);
+        if (latest === undefined) return `${t.taskId}: no strength evidence recorded (warn)`;
+        return `${t.taskId}: ${latest.summary} (warn)`;
+      });
+    return { blocking: [], warnings };
+  }
+  const blocking = tasks.filter((t) => {
+    if (t.phase !== 'completed') return false; // chain gate covers these
+    const latest = latestStrengthOf(t);
+    if (latest === undefined) return true; // required but never measured
+    return evaluateStrengthGate(latest, 'enforce').block;
+  });
+  return {
+    blocking,
+    warnings: blocking.map(
+      (t) =>
+        `${t.taskId}: strength gate not cleared — ` +
+        (latestStrengthOf(t)?.summary ?? 'no strength evidence recorded'),
+    ),
+  };
+}
+
+/** Latest strength evidence of a task from its persisted records. */
+function latestStrengthOf(task: TaskRunState): StrengthEvidence | undefined {
+  for (let i = task.records.length - 1; i >= 0; i--) {
+    const s = task.records[i]?.strength;
+    if (s !== undefined) return s;
+  }
+  return undefined;
 }
 
 export async function startFeatureRun(
@@ -431,6 +504,131 @@ export async function runTddPhase(opts: TddPhaseRequest): Promise<Result<Feature
   return { ok: true, value: state };
 }
 
+/**
+ * Run the optional test-strength (mutation) measurement for a task
+ * (ADR-0022) and record it as persisted + journaled evidence.
+ *
+ * Preconditions (fail closed):
+ *   - the feature run exists and the task belongs to it;
+ *   - the task's TDD chain is COMPLETE (strength is post-refactor);
+ *   - the profile enables `verification.strength` (opt-in).
+ *
+ * Behavior:
+ *   - the budget is a hard cap — a timeout records `incomplete`
+ *     evidence instead of hanging;
+ *   - `scope: diff` restricts mutation to the task's planned
+ *     likelyFiles; `scope: suite` runs the tool's whole target set;
+ *   - the measurement is journaled (`strength.recorded`) and stored on
+ *     the task's records (latest one wins in audits);
+ *   - the gate decision (`enforce` below threshold) is returned to
+ *     the caller — recording never blocks; FINALIZE enforces.
+ */
+export async function runStrengthPhase(
+  opts: StrengthPhaseRequest,
+): Promise<Result<{ state: FeatureRunState; evidence: StrengthEvidence; blocked: boolean }>> {
+  const stateRes = await loadFeatureRunState(opts.projectRoot, opts.featureId);
+  if (!stateRes.ok) return stateRes;
+  const state = stateRes.value;
+
+  const task = state.tasks[opts.taskId];
+  if (!task) {
+    return {
+      ok: false,
+      error: Errors.contractInvalid(
+        `Unknown task '${opts.taskId}' in feature run ${opts.featureId}`,
+      ),
+    };
+  }
+  if (task.phase !== 'completed' || !hasCompleteChain(task.records)) {
+    return {
+      ok: false,
+      error: Errors.contractInvalid(
+        `Strength requires a completed Red -> Green -> Refactor chain for ` +
+          `${opts.taskId} (current phase: '${task.phase}') — strength measures the ` +
+          `finished suite, never a moving target`,
+      ),
+    };
+  }
+
+  const profileRes = await loadProfile(opts.projectRoot);
+  if (!profileRes.ok) return profileRes;
+  const configured = profileRes.value.verification?.strength;
+  if (!configured?.enabled && opts.overrides === undefined) {
+    return {
+      ok: false,
+      error: Errors.contractInvalid(
+        `Test-strength is not enabled for this project — add a ` +
+          `verification.strength section to .ai-kit/project.yml (enabled: true), ` +
+          `see ADR-0022. The default is opt-in on purpose.`,
+      ),
+    };
+  }
+
+  const planRes = await loadPlan(path.join(opts.projectRoot, 'docs', 'plans', opts.featureId));
+  if (!planRes.ok) return planRes;
+  const taskDef = planRes.value.plan.tasks.find((t) => t.id === opts.taskId);
+  if (!taskDef) {
+    return {
+      ok: false,
+      error: Errors.contractInvalid(
+        `Task '${opts.taskId}' exists in the run state but not in the plan for ` +
+          `${opts.featureId} — the plan and run state have diverged; refusing to verify`,
+      ),
+    };
+  }
+
+  const settings = {
+    enabled: true,
+    threshold: opts.overrides?.threshold ?? configured?.threshold ?? 60,
+    budgetMs: opts.overrides?.budgetMs ?? configured?.budgetMs ?? 300_000,
+    scope: opts.overrides?.scope ?? configured?.scope ?? ('diff' as const),
+    gateMode: opts.overrides?.gateMode ?? configured?.gateMode ?? ('warn' as const),
+  };
+
+  const evidenceRes = await runStrengthCheck({
+    cwd: opts.projectRoot,
+    stack: profileRes.value.stack[0] ?? '',
+    settings,
+    scopeFiles: taskDef.likelyFiles,
+    packageManager: undefined,
+    taskId: opts.taskId,
+    ...(opts.executor !== undefined ? { executor: opts.executor } : {}),
+  });
+  if (!evidenceRes.ok) return evidenceRes;
+  const evidence = evidenceRes.value;
+
+  const session = new TddSession(opts.taskId, { phase: task.phase, records: task.records });
+  const recordRes = session.recordStrength(evidence);
+  if (!recordRes.ok) return { ok: false, error: recordRes.error };
+  task.records = [...session.getHistory()];
+  state.updatedAt = new Date().toISOString();
+  await saveFeatureRunState(opts.projectRoot, state);
+
+  const gate = evaluateStrengthGate(evidence, settings.gateMode);
+  await journal(opts.projectRoot, {
+    featureId: opts.featureId,
+    taskId: opts.taskId,
+    kind: 'strength.recorded',
+    actor: opts.actor ?? { kind: 'human' },
+    payload: {
+      tool: evidence.tool,
+      status: evidence.status,
+      score: evidence.score ?? null,
+      threshold: evidence.threshold,
+      scope: evidence.scope,
+      mutantsGenerated: evidence.mutantsGenerated,
+      mutantsKilled: evidence.mutantsKilled,
+      mutantsSurvived: evidence.mutantsSurvived,
+      durationMs: evidence.durationMs,
+      budgetMs: evidence.budgetMs,
+      gateBlocked: gate.block,
+      summary: evidence.summary,
+    },
+  });
+
+  return { ok: true, value: { state, evidence, blocked: gate.block } };
+}
+
 export async function finalizeFeatureRun(
   opts: FeatureWorkflowOptions,
 ): Promise<Result<FeatureRunReport>> {
@@ -450,6 +648,28 @@ export async function finalizeFeatureRun(
     return !task || task.phase !== 'completed' || !hasCompleteChain(task.records);
   });
   if (incomplete.length > 0) return tddEvidenceMissing(opts.featureId, incomplete);
+
+  // Strength gate (ADR-0022): when the profile enables strength with
+  // gateMode enforce, a completed task without strength evidence — or
+  // with evidence below threshold / incomplete — refuses completion.
+  // warn mode never blocks (observability only).
+  const strengthSettings = profile.verification?.strength;
+  if (strengthSettings?.enabled && strengthSettings.gateMode === 'enforce') {
+    const tddEvidenceTasks = executionOrder.map((id) => stateRes.value.tasks[id]) as TaskRunState[];
+    const audit = auditStrengthEvidence(tddEvidenceTasks, strengthSettings);
+    if (audit.blocking.length > 0) {
+      return {
+        ok: false,
+        error: Errors.verificationFailed(
+          `Test-strength gate refused completion for ${opts.featureId}: tasks ` +
+            `[${audit.blocking.map((t) => t.taskId).join(', ')}] do not clear the ` +
+            `mutation-score threshold (${strengthSettings.threshold}%) — ` +
+            `run \`kit feature ${opts.featureId} strength <task-id>\` and strengthen ` +
+            `the suite, or lower the threshold in .ai-kit/project.yml (ADR-0022).`,
+        ),
+      };
+    }
+  }
 
   const runner = new ProcessVerificationRunner();
   const verifyRes = await runner.run(profile, {

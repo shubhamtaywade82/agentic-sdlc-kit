@@ -6,7 +6,7 @@
 // leaves no member of the command's process group alive.
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { DETACH_GROUP, groupState, signalGroup } from './process-group.js';
+import { DETACH_GROUP, groupState, signalGroup, trackGroup, untrackGroup } from './process-group.js';
 
 const TERM_GRACE_MS = 2_000;
 const SETTLE_GRACE_MS = 1_000;
@@ -88,6 +88,7 @@ class CommandRun {
     this.stdout = new ByteBudget(maxOutputBytes);
     this.stderr = new ByteBudget(maxOutputBytes);
     this.done = done;
+    trackGroup(this.child);
   }
 
   start(timeoutMs: number): void {
@@ -126,6 +127,7 @@ class CommandRun {
   private settle(code: number | null, spawnError?: string): void {
     if (this.settled) return;
     this.settled = true;
+    untrackGroup(this.child);
     for (const t of this.timers) clearTimeout(t);
     // Read the termination state before the final sweep: it is the state after our last signal.
     const termination = this.terminationState();

@@ -13,6 +13,7 @@ import {
   finalizeFeatureRun,
   getFeatureRunState,
   runFeatureWorkflow,
+  runStrengthPhase,
   runTddPhase,
   startFeatureRun,
 } from './feature-workflow.js';
@@ -439,11 +440,9 @@ describe('runTddPhase Red classification gate (ADR-0018 P1)', () => {
   it('rejects Red evidence when the command exceeds its bounded timeout', async () => {
     const project = await setupProject(['TASK-001']);
     try {
-      const script = await writeScript(
-        project.root,
-        'slow.js',
-        ['setTimeout(() => { console.error("way too late"); process.exit(1); }, 2000);'],
-      );
+      const script = await writeScript(project.root, 'slow.js', [
+        'setTimeout(() => { console.error("way too late"); process.exit(1); }, 2000);',
+      ]);
       await patchTaskVerification(project.root, 'TASK-001', ['node', script]);
       const base = { featureId: 'FEATURE-001', projectRoot: project.root };
       await startFeatureRun(base);
@@ -549,7 +548,10 @@ describe('lazy migration of pre-v2 run state', () => {
           },
         },
       };
-      await fs.writeFile(featureRunPath(project.root, 'FEATURE-001'), JSON.stringify(v1State, null, 2));
+      await fs.writeFile(
+        featureRunPath(project.root, 'FEATURE-001'),
+        JSON.stringify(v1State, null, 2),
+      );
 
       const loaded = await getFeatureRunState(project.root, 'FEATURE-001');
       expect(loaded.ok).toBe(true); // loads lazily, no crash
@@ -578,13 +580,14 @@ describe('lazy migration of pre-v2 run state', () => {
           'TASK-001': {
             taskId: 'TASK-001',
             phase: 'red',
-            records: [
-              { phase: 'red', status: 'failed', timestamp: '2026-01-01T00:00:01.000Z' },
-            ],
+            records: [{ phase: 'red', status: 'failed', timestamp: '2026-01-01T00:00:01.000Z' }],
           },
         },
       };
-      await fs.writeFile(featureRunPath(project.root, 'FEATURE-001'), JSON.stringify(v1State, null, 2));
+      await fs.writeFile(
+        featureRunPath(project.root, 'FEATURE-001'),
+        JSON.stringify(v1State, null, 2),
+      );
 
       // Fresh red attempt: the new engine runs the task command and
       // records classified evidence; the file upgrades to schema v2.
@@ -690,6 +693,266 @@ describe('runFeatureWorkflow (one-shot audit mode)', () => {
       await startFeatureRun(base);
       await completeTask(project, 'TASK-001');
       const res = await runFeatureWorkflow(base);
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value.status).toBe('passed');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test-strength evidence (ADR-0022): optional mutation-score stage recorded
+// on completed tasks, journaled, and enforced at finalize (gateMode enforce).
+// ---------------------------------------------------------------------------
+
+/** Fake mutation executor: a deterministic Stryker-style report. */
+function fakeMutationExecutor(score = 71): (
+  command: readonly string[],
+  opts: { cwd: string; timeoutMs: number },
+) => Promise<{
+  exitCode: number | null;
+  output: string;
+  timedOut: boolean;
+  durationMs: number;
+}> {
+  const killed = Math.round((score / 100) * 50);
+  return async (command, opts) => {
+    // The command must respect the settings surface: diff scope with the
+    // task's likelyFiles maps onto a --mutate argument (node-typescript).
+    expect(command).toContain('--mutate');
+    expect(command).toContain('src/TASK-001.ts');
+    expect(opts.timeoutMs).toBeGreaterThan(0);
+    return {
+      exitCode: 0,
+      output: `Killed: ${killed}\nSurvived: ${50 - killed}\nMutation score based on covered code: ${(
+        (killed / 50) *
+        100
+      ).toFixed(2)}%`,
+      timedOut: false,
+      durationMs: 42,
+    };
+  };
+}
+
+async function enableStrength(
+  project: TestProject,
+  settings: {
+    threshold: number;
+    gateMode: 'warn' | 'enforce';
+    budgetMs?: number;
+    scope?: 'diff' | 'suite';
+  },
+): Promise<void> {
+  const profilePath = path.join(project.root, '.ai-kit', 'project.yml');
+  const profile = serializeProfileYaml({
+    schemaVersion: 1,
+    name: 'test-tdd-app',
+    stack: ['node-typescript'],
+    commands: { test: [['node', path.join(project.root, 'check.js')]] },
+    verification: {
+      strength: {
+        enabled: true,
+        threshold: settings.threshold,
+        budgetMs: settings.budgetMs ?? 300_000,
+        scope: settings.scope ?? 'diff',
+        gateMode: settings.gateMode,
+      },
+    },
+  });
+  await fs.writeFile(profilePath, profile);
+}
+
+describe('runStrengthPhase (ADR-0022)', () => {
+  it('refuses strength on a task without a complete chain', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      const res = await runStrengthPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error.message).toContain('completed Red -> Green -> Refactor');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses when strength is not enabled in the profile (opt-in)', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+      const res = await runStrengthPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error.message).toContain('not enabled');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('records journal and persisted evidence end-to-end (node-typescript)', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await enableStrength(project, { threshold: 60, gateMode: 'warn' });
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+
+      const res = await runStrengthPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        executor: fakeMutationExecutor(70),
+      });
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.value.evidence.tool).toBe('stryker');
+        expect(res.value.evidence.score).toBe(70);
+        expect(res.value.evidence.status).toBe('passed');
+        expect(res.value.blocked).toBe(false); // warn never blocks
+      }
+
+      // Persisted on the task's records (latest measurement).
+      const state = await getFeatureRunState(project.root, 'FEATURE-001');
+      expect(state.ok).toBe(true);
+      if (state.ok) {
+        const records = state.value.tasks['TASK-001']?.records ?? [];
+        const strength = records.find((r) => r.strength !== undefined)?.strength;
+        expect(strength?.score).toBe(70);
+      }
+
+      // Journaled as a hash-chained strength.recorded event.
+      const { readJournal } = await import('./journal.js');
+      const events = await readJournal(project.root, 'FEATURE-001');
+      expect(events.ok).toBe(true);
+      if (events.ok) {
+        const kinds = events.value.map((e) => e.kind);
+        expect(kinds).toContain('strength.recorded');
+        const evt = events.value.find((e) => e.kind === 'strength.recorded');
+        expect(evt?.payload['score']).toBe(70);
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('timeout records incomplete evidence instead of hanging the run', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await enableStrength(project, { threshold: 60, gateMode: 'enforce', budgetMs: 5 });
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+      const res = await runStrengthPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        executor: async () => ({
+          exitCode: 124,
+          output: 'Timed out',
+          timedOut: true,
+          durationMs: 5,
+        }),
+      });
+      expect(res.ok).toBe(true);
+      if (res.ok) {
+        expect(res.value.evidence.status).toBe('incomplete');
+        expect(res.value.evidence.score).toBeUndefined();
+        expect(res.value.blocked).toBe(true); // enforce fail-closes on unknown
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('finalize strength gate (gateMode enforce, ADR-0022)', () => {
+  it('refuses completion below threshold and says which tasks', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await enableStrength(project, { threshold: 90, gateMode: 'enforce' });
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+      await runStrengthPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        executor: fakeMutationExecutor(70),
+      });
+
+      const res = await finalizeFeatureRun({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        dryRun: false,
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.error.message).toContain('Test-strength gate refused completion');
+        expect(res.error.message).toContain('TASK-001');
+      }
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses completion when enforce requires strength that was never recorded', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await enableStrength(project, { threshold: 60, gateMode: 'enforce' });
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+      const res = await finalizeFeatureRun({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        dryRun: false,
+      });
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error.message).toContain('Test-strength gate refused completion');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('passes at threshold in enforce mode', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await enableStrength(project, { threshold: 60, gateMode: 'enforce' });
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+      await runStrengthPhase({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        taskId: 'TASK-001',
+        executor: fakeMutationExecutor(70),
+      });
+      const res = await finalizeFeatureRun({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        dryRun: false,
+      });
+      expect(res.ok).toBe(true);
+      if (res.ok) expect(res.value.status).toBe('passed');
+    } finally {
+      await fs.rm(project.root, { recursive: true, force: true });
+    }
+  });
+
+  it('warn mode never blocks, even without strength evidence', async () => {
+    const project = await setupProject(['TASK-001']);
+    try {
+      await enableStrength(project, { threshold: 90, gateMode: 'warn' });
+      await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+      await completeTask(project, 'TASK-001');
+      const res = await finalizeFeatureRun({
+        featureId: 'FEATURE-001',
+        projectRoot: project.root,
+        dryRun: false,
+      });
       expect(res.ok).toBe(true);
       if (res.ok) expect(res.value.status).toBe('passed');
     } finally {

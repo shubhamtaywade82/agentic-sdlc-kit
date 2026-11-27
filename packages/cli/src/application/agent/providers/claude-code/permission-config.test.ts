@@ -54,9 +54,9 @@ describe('deriveClaudeCodePermissionConfig (ADR-0020 §2 generated representatio
     const cfg = configFor(['repository.read', 'repository.write'], {
       writablePaths: ['/ws/run-001', '/ws/shared'],
     });
-    expect(cfg.allowedTools).toContain('Write(/ws/run-001/**)');
+    expect(cfg.allowedTools).not.toContain('Write(/ws/run-001/**)');
     expect(cfg.allowedTools).toContain('Edit(/ws/run-001/**)');
-    expect(cfg.allowedTools).toContain('Write(/ws/shared/**)');
+    expect(cfg.allowedTools).toContain('Edit(/ws/shared/**)');
     // NO unscoped file mutation: an absolute-scope rule per path only.
     expect(cfg.allowedTools).not.toContain('Write');
     expect(cfg.allowedTools).not.toContain('Edit');
@@ -162,9 +162,9 @@ describe('argv carries the generated representation, never a bypass', () => {
     expect(joined).toContain('-p');
     expect(joined).toContain('--output-format stream-json');
     expect(joined).toContain('--verbose');
-    expect(joined).toContain('--permission-mode default');
+    expect(joined).toContain('--permission-mode acceptEdits');
     expect(joined).toContain('--allowedTools');
-    expect(joined).toContain('Write(/ws/run-001/**)');
+    expect(joined).toContain('Edit(/ws/run-001/**)');
     expect(joined).toContain('Bash(pnpm test:*)');
     expect(joined).toContain('--max-turns 40');
     expect(joined).not.toContain('bypassPermissions');

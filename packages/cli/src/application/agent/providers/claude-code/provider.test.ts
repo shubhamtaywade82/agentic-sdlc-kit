@@ -177,9 +177,9 @@ describe('ClaudeCodeProvider — happy path', () => {
     expect(captured?.argv[3]).toBe('stream-json');
     expect(captured?.argv).toContain('--verbose');
     expect(captured?.argv).toContain('--permission-mode');
-    expect(captured?.argv).toContain('default');
+    expect(captured?.argv).toContain('acceptEdits');
     const flat = captured?.argv.join(' ') ?? '';
-    expect(flat).toContain(`Write(${workspaceRoot}/**)`);
+    expect(flat).toContain(`Edit(${workspaceRoot}/**)`);
     expect(flat).toContain('Bash(pnpm test:*)');
     expect(captured?.argv).toContain('--max-turns');
     expect(captured?.argv).toContain('40');

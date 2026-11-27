@@ -12,6 +12,8 @@ import { scaffoldSpecification } from '../specification/scaffolder.js';
 import { computeNextAction, listFeatureRunStates } from './next-action.js';
 import { runTddPhase, startFeatureRun } from './feature-workflow.js';
 import { featureRunPath } from './tdd-run-store.js';
+import { readJournal, verifyJournal } from './journal.js';
+import { recordNextOffer } from './decision-trace.js';
 
 interface TestProject {
   readonly root: string;
@@ -284,5 +286,72 @@ describe('computeNextAction: recovery hint and advertised timeout (item 1)', () 
       if (saved === undefined) delete process.env.KIT_TIMEOUT_MS;
       else process.env.KIT_TIMEOUT_MS = saved;
     }
+  });
+});
+
+describe('decision trace (item 3)', () => {
+  const COMPILE_ERROR = "src/feature.ts:12:5 - error TS2304: Cannot find name 'missing'.";
+  const red = { featureId: 'FEATURE-001', taskId: 'TASK-001', phase: 'red' as const };
+
+  it('records each offered action, once per change, in the verifiable journal', async () => {
+    const project = await setupProject(COMPILE_ERROR);
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+    const before = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+    if (!before.ok) throw new Error(before.error.message);
+    await recordNextOffer(project.root, before.value);
+    await recordNextOffer(project.root, before.value); // unchanged: not recorded again
+
+    await runTddPhase({ ...red, projectRoot: project.root }); // rejected: the offer changes
+    const after = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+    if (!after.ok) throw new Error(after.error.message);
+    await recordNextOffer(project.root, after.value);
+
+    const journal = await readJournal(project.root, 'FEATURE-001');
+    if (!journal.ok) throw new Error(journal.error.message);
+    const offers = journal.value.filter((e) => e.kind === 'next.offered');
+    expect(offers).toHaveLength(2);
+    expect(offers[0]?.payload).toMatchObject({ requiredAction: 'task.red', taskId: 'TASK-001', phase: 'red' });
+    expect(offers[1]?.payload).toMatchObject({ requiredAction: 'task.red', recoveryClassification: 'compilation' });
+    expect(verifyJournal(journal.value).ok).toBe(true);
+  });
+
+  it('does not record the protocol start, since no run exists yet', async () => {
+    const project = await setupProject();
+    const res = await computeNextAction({ projectRoot: project.root, featureId: 'FEATURE-001' });
+    if (!res.ok) throw new Error(res.error.message);
+    await recordNextOffer(project.root, res.value);
+    const journal = await readJournal(project.root, 'FEATURE-001');
+    expect(journal.ok ? journal.value.length : 0).toBe(0);
+  });
+
+  it('stamps each phase verdict with the id of the exact evidence it judged', async () => {
+    const project = await setupProject(COMPILE_ERROR);
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: project.root });
+    await runTddPhase({ ...red, projectRoot: project.root });
+    const journal = await readJournal(project.root, 'FEATURE-001');
+    if (!journal.ok) throw new Error(journal.error.message);
+    const verdict = journal.value.find((e) => e.kind === 'phase.rejected');
+    const evidenceId = verdict?.payload['evidenceId'];
+    expect(typeof evidenceId).toBe('string');
+    expect(evidenceId).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('gives the same evidence id for the same output, and a different one for different output', async () => {
+    const first = await setupProject(COMPILE_ERROR);
+    const second = await setupProject("src/other.ts:3:1 - error TS1005: ';' expected.");
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: first.root });
+    await startFeatureRun({ featureId: 'FEATURE-001', projectRoot: second.root });
+    await runTddPhase({ ...red, projectRoot: first.root });
+    await runTddPhase({ ...red, projectRoot: second.root });
+    const idOf = async (root: string) => {
+      const journal = await readJournal(root, 'FEATURE-001');
+      if (!journal.ok) throw new Error(journal.error.message);
+      return journal.value.find((e) => e.kind === 'phase.rejected')?.payload['evidenceId'];
+    };
+    const idA = await idOf(first.root);
+    const idB = await idOf(second.root);
+    expect(idA).not.toBe(idB);
+    await runTddPhase({ ...red, projectRoot: first.root });
+    expect(await idOf(first.root)).toBe(idA);
   });
 });

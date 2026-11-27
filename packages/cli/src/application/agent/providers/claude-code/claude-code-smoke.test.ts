@@ -111,7 +111,7 @@ describe.skipIf(!available)('claude-code real-provider smoke (acceptance: PR4)',
     const flat = args.join(' ');
     expect(flat).not.toContain('bypassPermissions');
     expect(flat).not.toContain('--dangerously-skip-permissions');
-    expect(flat).toContain(`Write(${workspaceRoot}/**)`);
+    expect(flat).toContain(`Edit(${workspaceRoot}/**)`);
 
     const provider = new ClaudeCodeProvider({ projectRoot: projectRoot!, cliPath: CLAUDE_BIN });
     const handle = await provider.start(req, new AbortController().signal);

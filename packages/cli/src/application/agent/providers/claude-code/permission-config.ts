@@ -102,6 +102,10 @@ const BASH_RULES: readonly BashRule[] = [
 
 /** Capabilities that map to non-Bash Claude Code tools. */
 const READ_TOOLS: readonly string[] = ['Read', 'Grep', 'Glob', 'LS'];
+// Claude Code 2.1.x matches file permissions only through Edit(path) rules, and an Edit rule covers every
+// file-editing tool. A Write(path) rule is ignored and reported as unmatched, so it is never emitted.
+const EDIT_RULE_TOOLS: readonly string[] = ['Edit'];
+/** Every tool that edits files: a call to any of them needs repository.write, whatever rule allowed it. */
 const WRITE_TOOLS: readonly string[] = ['Write', 'Edit', 'NotebookEdit'];
 const NETWORK_TOOLS: readonly string[] = ['WebFetch', 'WebSearch'];
 
@@ -138,7 +142,7 @@ export function deriveClaudeCodePermissionConfig(
 
   // repository.write -> file mutation tools, SCOPED to writablePaths
   if (has(granted, 'repository.write')) {
-    for (const tool of WRITE_TOOLS) {
+    for (const tool of EDIT_RULE_TOOLS) {
       for (const target of permissions.writablePaths) {
         allowed.push(`${tool}(${target}/**)`);
       }
@@ -167,7 +171,9 @@ export function deriveClaudeCodePermissionConfig(
     // 'default': headless sessions cannot prompt, so anything outside the
     // allowlist is denied by Claude Code itself — which is exactly the
     // fail-closed behavior the policy wants. Never bypassPermissions.
-    permissionMode: 'default',
+    // A non-interactive run refuses edits under `default` even with an Edit rule granted. `acceptEdits`
+    // lets the granted Edit rules decide, and those rules are already scoped to the writable paths.
+    permissionMode: granted.includes('repository.write') ? 'acceptEdits' : 'default',
     maxTurns: budget.maxToolCalls > 0 ? budget.maxToolCalls : undefined,
   };
 }
